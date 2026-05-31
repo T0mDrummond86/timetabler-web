@@ -11,6 +11,35 @@ Multi-tenant web reimplementation of [Joondalup Timetable](https://github.com/T0
 | Jobs | Redis + RQ (solver worker — Phase 5) |
 | UI | React 18, TypeScript, Vite, TanStack Query |
 
+## Phase 1 API (auth + sessions)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/auth/register` | Create user, org, default session |
+| POST | `/auth/login` | JWT (optional `organization_id`) |
+| GET | `/auth/me` | Current user |
+| GET | `/orgs` | Organizations you belong to |
+| POST | `/orgs` | Create organization |
+| GET | `/orgs/{id}/sessions` | List timetable sessions |
+| POST | `/orgs/{id}/sessions` | Create session (seeds semester/week) |
+| GET | `/sessions/{id}` | Session metadata |
+
+Frontend: `/register`, `/login`, `/dashboard` (session list).
+
+Run tests: `cd backend && pytest tests/test_phase1_auth.py tests/test_phase2_timetable.py`
+
+## Phase 2 API (read-only grid)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/sessions/{id}/courses` | Courses in session |
+| GET | `/sessions/{id}/timetable?course_id=` | Week grid payload (bookings, colours, violations) |
+| POST | `/sessions/{id}/seed-demo` | Sample course + bookings (empty sessions only) |
+
+Frontend: `/timetable/:sessionId` — course picker, coloured week grid, violations strip.
+
+---
+
 ## Quick start (Docker)
 
 ```bash
@@ -58,12 +87,12 @@ scripts/             # sync-domain-from-desktop.sh
 
 ## Roadmap
 
-| Phase | Scope |
-|-------|--------|
-| **0** (now) | Repo bootstrap, domain copy, health API, React shell |
-| **1** | Auth, orgs, sessions, `session_id` tenancy in Postgres |
-| **2** | Read-only timetable grid |
-| **3** | Booking edit, move, undo |
+| Phase | Scope | Status |
+|-------|--------|--------|
+| **0** | Repo bootstrap, domain copy, health API, React shell | Done |
+| **1** | Auth, orgs, sessions, `timetable_session_id` on domain tables | Done |
+| **2** | Read-only week grid (course view) | Done |
+| **3** | Booking edit, move, undo | Next |
 | **4** | Staff / rooms / classes editors, JSON import/export |
 | **5** | Async solver, change log |
 | **6** | Holding area, split views, print, Excel exports |

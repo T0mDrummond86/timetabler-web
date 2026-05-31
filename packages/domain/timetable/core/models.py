@@ -43,6 +43,7 @@ class Base(DeclarativeBase):
 
 
 class Semester(Base):
+    # Web: each semester belongs to one timetable session (desktop: one SQLite file).
     """Single-row placeholder.
 
     Currently every session has exactly one Semester (Week 0 inside it) and
@@ -58,11 +59,17 @@ class Semester(Base):
     """
     __tablename__ = "semester"
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String, unique=True)
+    timetable_session_id: Mapped[int] = mapped_column(
+        ForeignKey("timetable_session.id", ondelete="CASCADE"),
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String)
     num_weeks: Mapped[int] = mapped_column(Integer, default=18)
     repeating: Mapped[int] = mapped_column(Integer, default=1)
 
     weeks: Mapped[list["Week"]] = relationship(back_populates="semester", cascade="all, delete-orphan")
+
+    __table_args__ = (UniqueConstraint("timetable_session_id", "name", name="semester_session_name_uk"),)
 
 
 class Week(Base):
@@ -82,16 +89,26 @@ class Week(Base):
 class Room(Base):
     __tablename__ = "room"
     id: Mapped[int] = mapped_column(primary_key=True)
-    code: Mapped[str] = mapped_column(String, unique=True)
+    timetable_session_id: Mapped[int] = mapped_column(
+        ForeignKey("timetable_session.id", ondelete="CASCADE"),
+        index=True,
+    )
+    code: Mapped[str] = mapped_column(String)
     name: Mapped[str | None] = mapped_column(String, nullable=True)
     room_type: Mapped[str | None] = mapped_column(String, nullable=True)
     capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    __table_args__ = (UniqueConstraint("timetable_session_id", "code", name="room_session_code_uk"),)
 
 
 class Staff(Base):
     __tablename__ = "staff"
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String, unique=True)
+    timetable_session_id: Mapped[int] = mapped_column(
+        ForeignKey("timetable_session.id", ondelete="CASCADE"),
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String)
     max_hours_per_week: Mapped[float | None] = mapped_column(nullable=True)
     non_teaching_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Full-time equivalent (input); lecturing load = fte × 21 hours per FTE.
@@ -119,7 +136,7 @@ class Staff(Base):
         back_populates="staff", cascade="all, delete-orphan"
     )
 
-    __table_args__ = ()
+    __table_args__ = (UniqueConstraint("timetable_session_id", "name", name="staff_session_name_uk"),)
 
 
 class StaffAvailability(Base):
@@ -149,7 +166,11 @@ class Unit(Base):
     """
     __tablename__ = "unit"
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String, unique=True)
+    timetable_session_id: Mapped[int] = mapped_column(
+        ForeignKey("timetable_session.id", ondelete="CASCADE"),
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String)
     length_slots: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Comma-separated list of underlying study-unit codes that compose this
     # class (e.g. "VU23217, ICTICT443"). Free text; the UI labels it "Units".
@@ -160,6 +181,8 @@ class Unit(Base):
     double_session: Mapped[int] = mapped_column(Integer, default=0)
     double_session_same_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
     double_session_first_slots: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    __table_args__ = (UniqueConstraint("timetable_session_id", "name", name="unit_session_name_uk"),)
 
 
 class Qualification(Base):
@@ -172,7 +195,11 @@ class Qualification(Base):
     """
     __tablename__ = "qualification"
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String, unique=True)
+    timetable_session_id: Mapped[int] = mapped_column(
+        ForeignKey("timetable_session.id", ondelete="CASCADE"),
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String)
     num_groups: Mapped[int] = mapped_column(Integer, default=1)
     # ``day`` (08:30–19:00) or ``night`` (17:30–21:30); drives qualification_time_window rows.
     schedule_period: Mapped[str] = mapped_column(String, default="day")
@@ -180,6 +207,10 @@ class Qualification(Base):
     delivery_mode: Mapped[str] = mapped_column(String, default="regular")
     block_week_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     block_start_semester_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("timetable_session_id", "name", name="qualification_session_name_uk"),
+    )
 
 
 class QualificationTimeWindow(Base):
@@ -275,7 +306,11 @@ class Course(Base):
     """
     __tablename__ = "course"
     id: Mapped[int] = mapped_column(primary_key=True)
-    code: Mapped[str] = mapped_column(String, unique=True)
+    timetable_session_id: Mapped[int] = mapped_column(
+        ForeignKey("timetable_session.id", ondelete="CASCADE"),
+        index=True,
+    )
+    code: Mapped[str] = mapped_column(String)
     name: Mapped[str | None] = mapped_column(String, nullable=True)
     qualification_id: Mapped[int | None] = mapped_column(
         ForeignKey("qualification.id", ondelete="SET NULL"), nullable=True
@@ -289,6 +324,8 @@ class Course(Base):
     block_start_semester_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Block delivery cohorts are separate from regular semester group courses.
     is_block_cohort: Mapped[int] = mapped_column(Integer, default=0)
+
+    __table_args__ = (UniqueConstraint("timetable_session_id", "code", name="course_session_code_uk"),)
 
 
 class CourseUnit(Base):
@@ -357,6 +394,10 @@ class ChangeLogEntry(Base):
     """An audit row for a user-initiated change in this session."""
     __tablename__ = "change_log"
     id: Mapped[int] = mapped_column(primary_key=True)
+    timetable_session_id: Mapped[int] = mapped_column(
+        ForeignKey("timetable_session.id", ondelete="CASCADE"),
+        index=True,
+    )
     ts: Mapped[_dt.datetime] = mapped_column(
         DateTime,
         default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
