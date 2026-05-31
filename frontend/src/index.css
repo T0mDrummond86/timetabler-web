@@ -1,0 +1,67 @@
+:root {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  line-height: 1.5;
+  color: #1a1a1a;
+  background: #f4f4f5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem;
+}
+
+.header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.75rem;
+}
+
+.subtitle {
+  margin: 0 0 1.5rem;
+  color: #52525b;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e4e4e7;
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.card h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+}
+
+.card ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.muted {
+  color: #71717a;
+}
+
+.error {
+  color: #b91c1c;
+}
+
+code {
+  font-size: 0.9em;
+  background: #f4f4f5;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+a {
+  color: #2563eb;
+}
