@@ -13,6 +13,7 @@ from timetable.core.tenancy_models import (  # noqa: F401 — register mappers
     Organization,
     TimetableSession,
     User,
+    ViolationDismissal,
 )
 
 from .config import settings

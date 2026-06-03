@@ -42,9 +42,11 @@ SECTION_ROOMS = "Rooms!"
 
 KEPT_SHEETS = {"Overall", "Course Template", "Staff Template", "Room Template"}
 
-def _write_backup_sheet(wb, session: Session) -> None:
+def _write_backup_sheet(
+    wb, session: Session, *, timetable_session_id: int | None = None
+) -> None:
     """Embed a hidden sheet carrying the full structured session payload."""
-    write_backup_sheet(wb, session)
+    write_backup_sheet(wb, session, timetable_session_id=timetable_session_id)
 
 
 def _course_fill_hex(key: str) -> str:
@@ -745,11 +747,21 @@ def _unmerge_course_body(ws, markers: dict[str, int]) -> None:
             ws.unmerge_cells(str(r))
 
 
-def _rewrite_overall(ws, session: Session, week_id: int, report: ExportReport) -> None:
+def _rewrite_overall(
+    ws,
+    session: Session,
+    week_id: int,
+    report: ExportReport,
+    *,
+    timetable_session_id: int | None = None,
+) -> None:
     markers = _scan_row1_markers(ws)
     _unmerge_course_body(ws, markers)
     template_courses = _course_columns_in_template(ws, markers)
-    db_courses = {c.code: c for c in session.query(Course).order_by(Course.id).all()}
+    course_q = session.query(Course).order_by(Course.id)
+    if timetable_session_id is not None:
+        course_q = course_q.filter(Course.timetable_session_id == timetable_session_id)
+    db_courses = {c.code: c for c in course_q.all()}
 
     # Clear body for every template course column, then repaint from DB.
     for code, col in template_courses.items():
@@ -777,6 +789,7 @@ def write_into_template(
     week_id: int | None = None,
     *,
     colour_by_class: bool = True,
+    timetable_session_id: int | None = None,
 ) -> ExportReport:
     """Clone template, strip macro-generated sheets, repaint Overall body."""
     template_path = Path(template_path)
@@ -800,13 +813,26 @@ def write_into_template(
     _ensure_class_lecturer_entity_templates(wb)
 
     week = _resolve_week(session, week_id)
-    _rewrite_overall(wb["Overall"], session, week.id, report)
+    _rewrite_overall(
+        wb["Overall"],
+        session,
+        week.id,
+        report,
+        timetable_session_id=timetable_session_id,
+    )
 
     # Per-course / per-staff / per-room tabs cloned from the templates.
-    _generate_entity_tabs(wb, session, week.id, report, colour_by_class=colour_by_class)
+    _generate_entity_tabs(
+        wb,
+        session,
+        week.id,
+        report,
+        colour_by_class=colour_by_class,
+        timetable_session_id=timetable_session_id,
+    )
 
     # Embed the round-trip backup payload (hidden sheet).
-    _write_backup_sheet(wb, session)
+    _write_backup_sheet(wb, session, timetable_session_id=timetable_session_id)
 
     wb.save(out_path)
     return report
@@ -819,6 +845,7 @@ def _generate_entity_tabs(
     report: ExportReport,
     *,
     colour_by_class: bool = True,
+    timetable_session_id: int | None = None,
 ) -> None:
     """Clone each of the 3 templates once per entity, populated with bookings."""
     from ..core.sidebar_order import ordered_courses, ordered_staff
@@ -831,7 +858,9 @@ def _generate_entity_tabs(
     room_t = wb["Room Template"] if "Room Template" in wb.sheetnames else None
 
     if course_t is not None:
-        for c in ordered_courses(session, include_block_cohorts=True):
+        for c in ordered_courses(
+            session, include_block_cohorts=True, timetable_session_id=timetable_session_id
+        ):
             ws = wb.copy_worksheet(course_t)
             ws.title = _safe_sheet_name(c.code, used_names)
             _render_entity_tab(
@@ -844,7 +873,7 @@ def _generate_entity_tabs(
             report.course_tabs += 1
 
     if staff_t is not None:
-        for s in ordered_staff(session):
+        for s in ordered_staff(session, timetable_session_id=timetable_session_id):
             ws = wb.copy_worksheet(staff_t)
             ws.title = _safe_sheet_name(s.name, used_names)
             staff_bookings = _bookings_for_staff_tab(bookings, s.id)
@@ -859,9 +888,10 @@ def _generate_entity_tabs(
             report.staff_tabs += 1
 
     if room_t is not None:
-        rooms = [
-            r for r in session.query(Room).order_by(Room.code).all() if room_is_physical(r)
-        ]
+        room_q = session.query(Room).order_by(Room.code)
+        if timetable_session_id is not None:
+            room_q = room_q.filter(Room.timetable_session_id == timetable_session_id)
+        rooms = [r for r in room_q.all() if room_is_physical(r)]
         for r in rooms:
             ws = wb.copy_worksheet(room_t)
             ws.title = _safe_sheet_name(r.code, used_names)
@@ -883,14 +913,22 @@ def _generate_entity_tabs(
 
 # ---------------- Plain-xlsx fallback (no template) ----------------
 
-def write_fresh(session: Session, out_path: str | Path, week_id: int | None = None) -> ExportReport:
+def write_fresh(
+    session: Session,
+    out_path: str | Path,
+    week_id: int | None = None,
+    *,
+    timetable_session_id: int | None = None,
+) -> ExportReport:
     """Emit a styled .xlsx (no macros) with Overall + per-entity tabs."""
     out_path = Path(out_path)
     wb = Workbook()
     ws = wb.active
     ws.title = "Overall"
     week = _resolve_week(session, week_id)
-    _populate_overall_fresh(ws, session, week.id)
+    _populate_overall_fresh(
+        ws, session, week.id, timetable_session_id=timetable_session_id
+    )
 
     report = ExportReport(out_path=out_path)
     bookings = _week_bookings(session, week.id)
@@ -898,12 +936,14 @@ def write_fresh(session: Session, out_path: str | Path, week_id: int | None = No
 
     from ..core.sidebar_order import ordered_courses, ordered_staff
 
-    for c in ordered_courses(session, include_block_cohorts=True):
+    for c in ordered_courses(
+        session, include_block_cohorts=True, timetable_session_id=timetable_session_id
+    ):
         sheet = wb.create_sheet(_safe_sheet_name(c.code, used))
         _scaffold_entity_tab(sheet)
         _render_entity_tab(sheet, c.code, [b for b in bookings if b.course_id == c.id], "course")
         report.course_tabs += 1
-    for s in ordered_staff(session):
+    for s in ordered_staff(session, timetable_session_id=timetable_session_id):
         sheet = wb.create_sheet(_safe_sheet_name(s.name, used))
         _scaffold_entity_tab(sheet)
         staff_bookings = _bookings_for_staff_tab(bookings, s.id)
@@ -911,13 +951,16 @@ def write_fresh(session: Session, out_path: str | Path, week_id: int | None = No
             sheet, s.name, staff_bookings, "staff", view_staff_id=s.id
         )
         report.staff_tabs += 1
-    for r in [r for r in session.query(Room).order_by(Room.code).all() if room_is_physical(r)]:
+    room_q = session.query(Room).order_by(Room.code)
+    if timetable_session_id is not None:
+        room_q = room_q.filter(Room.timetable_session_id == timetable_session_id)
+    for r in [r for r in room_q.all() if room_is_physical(r)]:
         sheet = wb.create_sheet(_safe_sheet_name(r.code, used))
         _scaffold_entity_tab(sheet)
         _render_entity_tab(sheet, r.code, [b for b in bookings if b.room_id == r.id], "room")
         report.room_tabs += 1
 
-    _write_backup_sheet(wb, session)
+    _write_backup_sheet(wb, session, timetable_session_id=timetable_session_id)
     wb.save(out_path)
     return report
 
@@ -959,13 +1002,26 @@ def _scaffold_entity_tab(ws) -> None:
     ws.freeze_panes = "C7"
 
 
-def _populate_overall_fresh(ws, session: Session, week_id: int) -> None:
+def _populate_overall_fresh(
+    ws,
+    session: Session,
+    week_id: int,
+    *,
+    timetable_session_id: int | None = None,
+) -> None:
     """Build a styled Overall sheet from scratch with card-merged bookings."""
     from openpyxl.utils import get_column_letter as col_letter
 
-    courses = session.query(Course).order_by(Course.id).all()
-    staff_all = session.query(Staff).order_by(Staff.name).all()
-    rooms = session.query(Room).order_by(Room.code).all()
+    course_q = session.query(Course).order_by(Course.id)
+    staff_q = session.query(Staff).order_by(Staff.name)
+    room_q = session.query(Room).order_by(Room.code)
+    if timetable_session_id is not None:
+        course_q = course_q.filter(Course.timetable_session_id == timetable_session_id)
+        staff_q = staff_q.filter(Staff.timetable_session_id == timetable_session_id)
+        room_q = room_q.filter(Room.timetable_session_id == timetable_session_id)
+    courses = course_q.all()
+    staff_all = staff_q.all()
+    rooms = room_q.all()
 
     header_fill = PatternFill(start_color="FFE9ECEF", end_color="FFE9ECEF", fill_type="solid")
     header_font = Font(name="Calibri", size=10, bold=True, color="FF1F2937")

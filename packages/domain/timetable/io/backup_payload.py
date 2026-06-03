@@ -89,8 +89,57 @@ def _prepare_units_for_restore(units: list[dict[str, Any]]) -> list[dict[str, An
     return prepared
 
 
-def serialize(session: Session) -> dict[str, Any]:
-    """Build a plain-dict snapshot of the session's data."""
+def serialize(session: Session, *, timetable_session_id: int | None = None) -> dict[str, Any]:
+    """Build a plain-dict snapshot of the session's data.
+
+    When ``timetable_session_id`` is set (web multi-session DB), only rows for that
+    timetable session are included.
+    """
+    qual_q = session.query(Qualification).order_by(Qualification.id)
+    course_q = session.query(Course).order_by(Course.id)
+    unit_q = session.query(Unit).order_by(Unit.id)
+    staff_q = session.query(Staff).order_by(Staff.id)
+    room_q = session.query(Room).order_by(Room.id)
+    if timetable_session_id is not None:
+        qual_q = qual_q.filter(Qualification.timetable_session_id == timetable_session_id)
+        course_q = course_q.filter(Course.timetable_session_id == timetable_session_id)
+        unit_q = unit_q.filter(Unit.timetable_session_id == timetable_session_id)
+        staff_q = staff_q.filter(Staff.timetable_session_id == timetable_session_id)
+        room_q = room_q.filter(Room.timetable_session_id == timetable_session_id)
+
+    qualifications = qual_q.all()
+    courses = course_q.all()
+    units = unit_q.all()
+    staff_rows = staff_q.all()
+    rooms = room_q.all()
+
+    qual_ids = {q.id for q in qualifications}
+    course_ids = {c.id for c in courses}
+    unit_ids = {u.id for u in units}
+    staff_ids = {s.id for s in staff_rows}
+
+    week_ids: set[int] | None = None
+    if timetable_session_id is not None:
+        from ..core.models import Semester, Week
+
+        sem = (
+            session.query(Semester)
+            .filter(Semester.timetable_session_id == timetable_session_id)
+            .first()
+        )
+        if sem is not None:
+            week_ids = {
+                wid
+                for (wid,) in session.query(Week.id).filter(Week.semester_id == sem.id).all()
+            }
+
+    booking_q = session.query(Booking).order_by(Booking.id)
+    if week_ids is not None:
+        booking_q = booking_q.filter(
+            Booking.week_id.in_(week_ids or [-1]),
+            Booking.course_id.in_(course_ids or [-1]),
+        )
+
     return {
         "version": PAYLOAD_VERSION,
         "qualifications": [
@@ -103,7 +152,7 @@ def serialize(session: Session) -> dict[str, Any]:
                 "block_week_count": getattr(q, "block_week_count", None),
                 "block_start_semester_week": getattr(q, "block_start_semester_week", None),
             }
-            for q in session.query(Qualification).order_by(Qualification.id).all()
+            for q in qualifications
         ],
         "qualification_time_windows": [
             {
@@ -113,6 +162,7 @@ def serialize(session: Session) -> dict[str, Any]:
                 "end_slot": w.end_slot,
             }
             for w in session.query(QualificationTimeWindow).all()
+            if w.qualification_id in qual_ids
         ],
         "courses": [
             {
@@ -126,7 +176,7 @@ def serialize(session: Session) -> dict[str, Any]:
                 "block_start_semester_week": getattr(c, "block_start_semester_week", None),
                 "is_block_cohort": getattr(c, "is_block_cohort", 0) or 0,
             }
-            for c in session.query(Course).order_by(Course.id).all()
+            for c in courses
         ],
         "units": [
             {
@@ -139,19 +189,22 @@ def serialize(session: Session) -> dict[str, Any]:
                 "double_session_same_day": getattr(u, "double_session_same_day", None),
                 "double_session_first_slots": getattr(u, "double_session_first_slots", None),
             }
-            for u in session.query(Unit).order_by(Unit.id).all()
+            for u in units
         ],
         "unit_qualifications": [
             {"unit_id": uq.unit_id, "qualification_id": uq.qualification_id}
             for uq in session.query(UnitQualification).all()
+            if uq.unit_id in unit_ids and uq.qualification_id in qual_ids
         ],
         "unit_allowed_rooms": [
             {"unit_id": ur.unit_id, "room_id": ur.room_id}
             for ur in session.query(UnitAllowedRoom).all()
+            if ur.unit_id in unit_ids
         ],
         "course_units": [
             {"course_id": cu.course_id, "unit_id": cu.unit_id}
             for cu in session.query(CourseUnit).all()
+            if cu.course_id in course_ids and cu.unit_id in unit_ids
         ],
         "staff": [
             {
@@ -172,7 +225,7 @@ def serialize(session: Session) -> dict[str, Any]:
                 "timetable_locked": getattr(s, "timetable_locked", 0) or 0,
                 "sidebar_order": getattr(s, "sidebar_order", 0) or 0,
             }
-            for s in session.query(Staff).order_by(Staff.id).all()
+            for s in staff_rows
         ],
         "staff_qualification_online_students": [
             {
@@ -181,6 +234,7 @@ def serialize(session: Session) -> dict[str, Any]:
                 "student_count": row.student_count,
             }
             for row in session.query(StaffQualificationOnlineStudents).all()
+            if row.staff_id in staff_ids and row.qualification_id in qual_ids
         ],
         "staff_unit_online_students": [
             {
@@ -189,6 +243,7 @@ def serialize(session: Session) -> dict[str, Any]:
                 "student_count": row.student_count,
             }
             for row in session.query(StaffUnitOnlineStudents).all()
+            if row.staff_id in staff_ids and row.unit_id in unit_ids
         ],
         "staff_preferences": [
             {
@@ -201,10 +256,12 @@ def serialize(session: Session) -> dict[str, Any]:
                 "unit_id": p.unit_id,
             }
             for p in session.query(StaffPreference).order_by(StaffPreference.id).all()
+            if p.staff_id in staff_ids
         ],
         "staff_competencies": [
             {"staff_id": sc.staff_id, "unit_id": sc.unit_id}
             for sc in session.query(StaffCompetency).all()
+            if sc.staff_id in staff_ids and sc.unit_id in unit_ids
         ],
         "staff_availability": [
             {
@@ -212,13 +269,14 @@ def serialize(session: Session) -> dict[str, Any]:
                 "day": a.day, "start_slot": a.start_slot, "end_slot": a.end_slot,
             }
             for a in session.query(StaffAvailability).all()
+            if a.staff_id in staff_ids
         ],
         "rooms": [
             {
                 "id": r.id, "code": r.code, "name": r.name,
                 "room_type": r.room_type, "capacity": r.capacity,
             }
-            for r in session.query(Room).order_by(Room.id).all()
+            for r in rooms
         ],
         "bookings": [
             {
@@ -240,7 +298,7 @@ def serialize(session: Session) -> dict[str, Any]:
                 "session_weeks": getattr(b, "session_weeks", None),
                 "block_week_index": getattr(b, "block_week_index", None),
             }
-            for b in session.query(Booking).order_by(Booking.id).all()
+            for b in booking_q.all()
         ],
     }
 
@@ -423,7 +481,9 @@ def deserialize(session: Session, payload: dict[str, Any]) -> None:
     session.commit()
 
 
-def write_backup_sheet(wb, session: Session) -> None:
+def write_backup_sheet(
+    wb, session: Session, *, timetable_session_id: int | None = None
+) -> None:
     """Embed a hidden sheet with the full structured session payload."""
     if BACKUP_SHEET_NAME in wb.sheetnames:
         del wb[BACKUP_SHEET_NAME]
@@ -432,7 +492,10 @@ def write_backup_sheet(wb, session: Session) -> None:
         "DO NOT EDIT — round-trip backup for the timetabling app. "
         f"Payload v{PAYLOAD_VERSION}. Visual sheets are regenerated on import."
     )
-    payload = json.dumps(serialize(session), separators=(",", ":"))
+    payload = json.dumps(
+        serialize(session, timetable_session_id=timetable_session_id),
+        separators=(",", ":"),
+    )
     for idx, start in enumerate(range(0, len(payload), _BACKUP_CHUNK_SIZE)):
         ws.cell(row=idx + 2, column=1, value=payload[start : start + _BACKUP_CHUNK_SIZE])
     ws.sheet_state = "hidden"

@@ -45,6 +45,8 @@ services:
     volumes:
       - ./backend/app:/app/app
       - ./packages/domain/timetable:/app/packages/domain/timetable
+      - ./packages/domain/templates:/app/packages/domain/templates
+      - ./packages/domain/adminExportStyleGuide.xlsx:/app/packages/domain/adminExportStyleGuide.xlsx
 
   frontend:
     image: node:22-alpine

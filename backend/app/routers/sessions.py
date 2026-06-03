@@ -8,7 +8,7 @@ from timetable.core.tenancy_models import TimetableSession
 
 from ..auth.deps import AuthContext, get_auth_context, require_editor
 from ..database import get_db
-from ..schemas import TimetableSessionCreate, TimetableSessionOut
+from ..schemas import TimetableSessionCreate, TimetableSessionOut, TimetableSessionPatch
 from ..services.session_seed import seed_timetable_session_data
 
 router = APIRouter(tags=["sessions"])
@@ -94,3 +94,44 @@ def get_session(
     db: Session = Depends(get_db),
 ):
     return _session_in_org(db, session_id, ctx.organization.id)
+
+
+@router.patch("/sessions/{session_id}", response_model=TimetableSessionOut)
+def update_session(
+    session_id: int,
+    body: TimetableSessionPatch,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    row = _session_in_org(db, session_id, ctx.organization.id)
+    name = body.name.strip()
+    existing = (
+        db.query(TimetableSession)
+        .filter(
+            TimetableSession.organization_id == ctx.organization.id,
+            TimetableSession.name == name,
+            TimetableSession.id != session_id,
+        )
+        .first()
+    )
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Session {name!r} already exists",
+        )
+    row.name = name
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_session(
+    session_id: int,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    row = _session_in_org(db, session_id, ctx.organization.id)
+    db.delete(row)
+    db.commit()
+    return None

@@ -1,4 +1,16 @@
-import { TimetableGrid } from "./types";
+import {
+  BlockDeliveryPanel,
+  BlockOverview,
+  BlockWeekUsage,
+  BookingMutation,
+  ChangeLogList,
+  CourseSemesterSchedule,
+  ImportReport,
+  TimetableEntity,
+  TimetableGrid,
+  TimetableView,
+  ViolationsReport,
+} from "./types";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -12,7 +24,51 @@ export type TimetableSession = {
   created_at: string;
   updated_at: string;
 };
-export type Course = { id: number; code: string; name: string | null };
+export type Course = {
+  id: number;
+  code: string;
+  name: string | null;
+  timetable_locked?: number;
+  block_week_count?: number | null;
+  block_start_semester_week?: number | null;
+};
+export type Staff = {
+  id: number;
+  name: string;
+  max_hours_per_week?: number | null;
+  fte?: number | null;
+  non_teaching_day?: number | null;
+  ot_hours?: number | null;
+  development_project_hours?: number | null;
+  development_project_description?: string | null;
+  tae_hours?: number | null;
+  supervision_hours?: number | null;
+  default_online_students_per_class?: number | null;
+  timetable_locked?: number;
+};
+export type Room = {
+  id: number;
+  code: string;
+  name: string | null;
+  room_type?: string | null;
+  capacity?: number | null;
+};
+export type Unit = {
+  id: number;
+  name: string;
+  length_slots?: number | null;
+  component_codes?: string | null;
+  double_session?: number;
+  double_session_same_day?: number | null;
+  double_session_first_slots?: number | null;
+  qualification_ids?: number[];
+};
+export type Qualification = {
+  id: number;
+  name: string;
+  num_groups?: number;
+  schedule_period?: string;
+};
 
 const TOKEN_KEY = "timetabler_token";
 
@@ -53,6 +109,43 @@ async function apiFetch<T>(
   return res.json() as Promise<T>;
 }
 
+function timetablePath(
+  sessionId: number,
+  opts: {
+    view?: TimetableView;
+    courseId?: number | null;
+    staffId?: number | null;
+    day?: number | null;
+    semesterWeek?: number | null;
+    blockWeekIndex?: number | null;
+    colourByClass?: boolean;
+    hideDismissed?: boolean;
+  },
+): string {
+  const params = new URLSearchParams();
+  const view = opts.view ?? "course";
+  params.set("view", view);
+
+  if (opts.colourByClass === false) params.set("colour_by_class", "false");
+  if (opts.hideDismissed === false) params.set("hide_dismissed", "false");
+
+  const courseViews: TimetableView[] = ["course", "course_semester", "block_delivery"];
+  if (courseViews.includes(view) && opts.courseId != null) {
+    params.set("course_id", String(opts.courseId));
+  }
+  if (view === "staff" && opts.staffId != null) params.set("staff_id", String(opts.staffId));
+  if ((view === "room" || view === "day") && opts.day != null) {
+    params.set("day", String(opts.day));
+  }
+  if (view === "course_semester" && opts.semesterWeek != null) {
+    params.set("semester_week", String(opts.semesterWeek));
+  }
+  if (view === "block_delivery" && opts.blockWeekIndex != null) {
+    params.set("block_week_index", String(opts.blockWeekIndex));
+  }
+  return `/sessions/${sessionId}/timetable?${params.toString()}`;
+}
+
 export const api = {
   register: (body: {
     email: string;
@@ -78,10 +171,80 @@ export const api = {
 
   courses: (sessionId: number) => apiFetch<Course[]>(`/sessions/${sessionId}/courses`),
 
-  timetable: (sessionId: number, courseId: number) =>
-    apiFetch<TimetableGrid>(
-      `/sessions/${sessionId}/timetable?course_id=${courseId}`,
+  timetable: (
+    sessionId: number,
+    opts: {
+      view?: TimetableView;
+      courseId?: number | null;
+      staffId?: number | null;
+      day?: number | null;
+      semesterWeek?: number | null;
+      blockWeekIndex?: number | null;
+      colourByClass?: boolean;
+      hideDismissed?: boolean;
+    },
+  ) => apiFetch<TimetableGrid>(timetablePath(sessionId, opts)),
+
+  timetableEntities: (sessionId: number, view: TimetableView | "block_overview") => {
+    const params = new URLSearchParams({ view });
+    return apiFetch<TimetableEntity[]>(
+      `/sessions/${sessionId}/timetable-entities?${params.toString()}`,
+    );
+  },
+
+  courseSemesterSchedule: (
+    sessionId: number,
+    courseId: number,
+    semesterWeek?: number,
+  ) => {
+    const params = new URLSearchParams({ course_id: String(courseId) });
+    if (semesterWeek != null) params.set("semester_week", String(semesterWeek));
+    return apiFetch<CourseSemesterSchedule>(
+      `/sessions/${sessionId}/course-semester-schedule?${params.toString()}`,
+    );
+  },
+
+  toggleSemesterWeek: (
+    sessionId: number,
+    body: { booking_id: number; semester_week: number },
+  ) =>
+    apiFetch<CourseSemesterSchedule>(
+      `/sessions/${sessionId}/course-semester-schedule/toggle-week`,
+      { method: "POST", body: JSON.stringify(body) },
     ),
+
+  blockDeliveryPanel: (
+    sessionId: number,
+    opts: {
+      qualificationId: number;
+      courseId?: number | null;
+      blockWeekIndex?: number | null;
+    },
+  ) => {
+    const params = new URLSearchParams({
+      qualification_id: String(opts.qualificationId),
+    });
+    if (opts.courseId != null) params.set("course_id", String(opts.courseId));
+    if (opts.blockWeekIndex != null) {
+      params.set("block_week_index", String(opts.blockWeekIndex));
+    }
+    return apiFetch<BlockDeliveryPanel>(
+      `/sessions/${sessionId}/block-delivery-panel?${params.toString()}`,
+    );
+  },
+
+  blockOverview: (sessionId: number) =>
+    apiFetch<BlockOverview>(`/sessions/${sessionId}/block-overview`),
+
+  blockWeekUsage: (sessionId: number, courseId: number, semesterWeek: number) => {
+    const params = new URLSearchParams({
+      course_id: String(courseId),
+      semester_week: String(semesterWeek),
+    });
+    return apiFetch<BlockWeekUsage>(
+      `/sessions/${sessionId}/block-week-usage?${params.toString()}`,
+    );
+  },
 
   seedDemo: (sessionId: number) =>
     apiFetch<{ course_id?: number; booking_count?: number; skipped?: boolean }>(
@@ -89,5 +252,483 @@ export const api = {
       { method: "POST" },
     ),
 
+  staff: (sessionId: number) => apiFetch<Staff[]>(`/sessions/${sessionId}/staff`),
+
+  rooms: (sessionId: number) => apiFetch<Room[]>(`/sessions/${sessionId}/rooms`),
+
+  units: (sessionId: number) => apiFetch<Unit[]>(`/sessions/${sessionId}/units`),
+
+  qualifications: (sessionId: number) => apiFetch<Qualification[]>(`/sessions/${sessionId}/qualifications`),
+
+  patchStaff: (sessionId: number, staffId: number, body: Partial<Staff>) =>
+    apiFetch<Staff>(`/sessions/${sessionId}/staff/${staffId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  patchRoom: (sessionId: number, roomId: number, body: Partial<Room>) =>
+    apiFetch<Room>(`/sessions/${sessionId}/rooms/${roomId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  patchUnit: (sessionId: number, unitId: number, body: Partial<Unit>) =>
+    apiFetch<Unit>(`/sessions/${sessionId}/units/${unitId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  patchCourse: (sessionId: number, courseId: number, body: Partial<Course>) =>
+    apiFetch<Course>(`/sessions/${sessionId}/courses/${courseId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  patchQualification: (sessionId: number, qualificationId: number, body: Partial<Qualification>) =>
+    apiFetch<Qualification>(`/sessions/${sessionId}/qualifications/${qualificationId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  moveBooking: (
+    sessionId: number,
+    bookingId: number,
+    body: { course_id: number; day: number; start_slot: number; room_id?: number | null },
+  ) =>
+    apiFetch<BookingMutation>(`/sessions/${sessionId}/bookings/${bookingId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  patchBooking: (
+    sessionId: number,
+    bookingId: number,
+    body: {
+      course_id: number;
+      day?: number;
+      start_slot?: number;
+      end_slot?: number;
+      notes?: string | null;
+      staff_id?: number | null;
+      room_id?: number | null;
+      unit_id?: number | null;
+      external_id?: string | null;
+      in_term_1?: number;
+      in_term_2?: number;
+      sfs_co_teacher_staff_id?: number | null;
+      sfs_co_teacher_in_term_1?: number;
+      sfs_co_teacher_in_term_2?: number;
+      online_student_count?: number | null;
+    },
+  ) =>
+    apiFetch<BookingMutation>(`/sessions/${sessionId}/bookings/${bookingId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  restoreBookings: (
+    sessionId: number,
+    body: {
+      course_id: number;
+      action: "undo" | "redo";
+      label: string;
+      snapshots: Record<string, Record<string, unknown> | null>;
+    },
+  ) =>
+    apiFetch<BookingMutation>(`/sessions/${sessionId}/bookings/restore`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  holdingArea: (
+    sessionId: number,
+    opts: {
+      kind?: "course" | "block" | "unassigned";
+      courseId?: number;
+      blockWeekIndex?: number;
+    },
+  ) => {
+    const params = new URLSearchParams();
+    const kind = opts.kind ?? "course";
+    params.set("kind", kind);
+    if (opts.courseId != null) params.set("course_id", String(opts.courseId));
+    if (opts.blockWeekIndex != null) {
+      params.set("block_week_index", String(opts.blockWeekIndex));
+    }
+    return apiFetch<
+      {
+        course_id: number;
+        unit_id: number;
+        unit_name: string | null;
+        duration_slots: number;
+        session_part: number;
+      }[]
+    >(`/sessions/${sessionId}/holding-area?${params.toString()}`);
+  },
+
+  createBooking: (
+    sessionId: number,
+    body: {
+      course_id: number;
+      unit_id: number;
+      day: number;
+      start_slot: number;
+      end_slot: number;
+      staff_id?: number | null;
+      room_id?: number | null;
+      session_part?: number;
+      notes?: string | null;
+      block_week_index?: number | null;
+    },
+  ) =>
+    apiFetch<BookingMutation>(`/sessions/${sessionId}/bookings`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  deleteBooking: (sessionId: number, bookingId: number, courseId: number) =>
+    apiFetch<BookingMutation>(
+      `/sessions/${sessionId}/bookings/${bookingId}?course_id=${courseId}`,
+      { method: "DELETE" },
+    ),
+
+  async importSession(sessionId: number, file: File): Promise<ImportReport> {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${API_BASE}/sessions/${sessionId}/import`, {
+      method: "POST",
+      headers,
+      body: form,
+    });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        if (body.detail) detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      } catch {
+        /* ignore */
+      }
+      throw new Error(detail);
+    }
+    return res.json() as Promise<ImportReport>;
+  },
+
+  async exportSessionJson(sessionId: number): Promise<void> {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE}/sessions/${sessionId}/export/json`, { headers });
+    if (!res.ok) throw new Error("Export failed");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `session-${sessionId}-backup.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
   health: () => apiFetch<{ status: string; database: string; phase: number }>("/health", {}, false),
+
+  changeLog: (sessionId: number, resolved = false) =>
+    apiFetch<ChangeLogList>(
+      `/sessions/${sessionId}/change-log?resolved=${resolved ? "true" : "false"}`,
+    ),
+
+  setChangeLogNote: (
+    sessionId: number,
+    entryId: number,
+    body: { booking_id: number; note: string },
+  ) =>
+    apiFetch<{ ok: boolean }>(
+      `/sessions/${sessionId}/change-log/entries/${entryId}/notes`,
+      { method: "PATCH", body: JSON.stringify(body) },
+    ),
+
+  rollbackChangeLog: (
+    sessionId: number,
+    body: { booking_id: number; course_id: number },
+  ) =>
+    apiFetch<BookingMutation>(`/sessions/${sessionId}/change-log/rollback`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  async exportChangeLog(sessionId: number): Promise<void> {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(
+      `${API_BASE}/sessions/${sessionId}/change-log/export?resolved=true`,
+      { headers },
+    );
+    if (!res.ok) throw new Error("Export failed");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "change_log_resolved.xlsx";
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  violationsReport: (sessionId: number, severity?: "hard" | "soft") => {
+    const params = new URLSearchParams();
+    if (severity) params.set("severity", severity);
+    const q = params.toString();
+    return apiFetch<ViolationsReport>(
+      `/sessions/${sessionId}/violations-report${q ? `?${q}` : ""}`,
+    );
+  },
+
+  sidebarOrder: (sessionId: number, body: { view: "course" | "staff"; entity_ids: number[] }) =>
+    apiFetch<{ ok: boolean }>(`/sessions/${sessionId}/sidebar-order`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+
+  createBlock: (sessionId: number, qualificationId: number) =>
+    apiFetch<{ qualification_id: number; course_id: number; course_code: string }>(
+      `/sessions/${sessionId}/qualifications/${qualificationId}/create-block`,
+      { method: "POST" },
+    ),
+
+  suggestedBlockCode: (sessionId: number, qualificationId: number) =>
+    apiFetch<{ code: string | null }>(
+      `/sessions/${sessionId}/block-groups/suggested-code?qualification_id=${qualificationId}`,
+    ),
+
+  duplicateBlockGroup: (sessionId: number, courseId: number, newCode: string) =>
+    apiFetch<{ course_id: number; course_code: string }>(
+      `/sessions/${sessionId}/block-groups/${courseId}/duplicate`,
+      { method: "POST", body: JSON.stringify({ new_code: newCode }) },
+    ),
+
+  deleteBlockGroup: (sessionId: number, courseId: number) =>
+    apiFetch<{ deleted: boolean; qualification_reverted: boolean }>(
+      `/sessions/${sessionId}/block-groups/${courseId}`,
+      { method: "DELETE" },
+    ),
+
+  patchBookingLocks: (
+    sessionId: number,
+    bookingId: number,
+    body: { course_id: number; lock_time?: number; lock_staff?: number },
+  ) =>
+    apiFetch<BookingMutation>(`/sessions/${sessionId}/bookings/${bookingId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  alternateSlots: (
+    sessionId: number,
+    bookingId: number,
+    opts?: { timesOnly?: boolean; fixedRoomId?: number },
+  ) => {
+    const params = new URLSearchParams();
+    if (opts?.timesOnly) params.set("times_only", "true");
+    if (opts?.fixedRoomId != null) params.set("fixed_room_id", String(opts.fixedRoomId));
+    const q = params.toString();
+    return apiFetch<import("./types").AlternateSlots>(
+      `/sessions/${sessionId}/bookings/${bookingId}/alternate-slots${q ? `?${q}` : ""}`,
+    );
+  },
+
+  classCustodians: (sessionId: number) =>
+    apiFetch<import("./types").ClassCustodians>(`/sessions/${sessionId}/class-custodians`),
+
+  staffAvailability: (sessionId: number, staffId: number) =>
+    apiFetch<import("./types").StaffAvailability>(
+      `/sessions/${sessionId}/staff/${staffId}/availability`,
+    ),
+
+  saveStaffAvailability: (sessionId: number, staffId: number, blocked: { day: number; slot: number }[]) =>
+    apiFetch<import("./types").StaffAvailability>(
+      `/sessions/${sessionId}/staff/${staffId}/availability`,
+      { method: "PUT", body: JSON.stringify({ blocked }) },
+    ),
+
+  createStaff: (sessionId: number, name: string) =>
+    apiFetch<Staff>(`/sessions/${sessionId}/staff`, { method: "POST", body: JSON.stringify({ name }) }),
+
+  deleteStaff: (sessionId: number, staffId: number) =>
+    apiFetch<{ deleted: boolean }>(`/sessions/${sessionId}/staff/${staffId}`, { method: "DELETE" }),
+
+  createRoom: (sessionId: number, code: string) =>
+    apiFetch<Room>(`/sessions/${sessionId}/rooms`, { method: "POST", body: JSON.stringify({ code }) }),
+
+  deleteRoom: (sessionId: number, roomId: number) =>
+    apiFetch<{ deleted: boolean }>(`/sessions/${sessionId}/rooms/${roomId}`, { method: "DELETE" }),
+
+  createUnit: (sessionId: number, name: string) =>
+    apiFetch<Unit>(`/sessions/${sessionId}/units`, { method: "POST", body: JSON.stringify({ name }) }),
+
+  deleteUnit: (sessionId: number, unitId: number) =>
+    apiFetch<{ deleted: boolean }>(`/sessions/${sessionId}/units/${unitId}`, { method: "DELETE" }),
+
+  setUnitQualifications: (sessionId: number, unitId: number, qualificationIds: number[]) =>
+    apiFetch<Unit>(`/sessions/${sessionId}/units/${unitId}/qualifications`, {
+      method: "PUT",
+      body: JSON.stringify({ qualification_ids: qualificationIds }),
+    }),
+
+  createQualification: (sessionId: number, name: string, schedulePeriod = "day") =>
+    apiFetch<Qualification>(`/sessions/${sessionId}/qualifications`, {
+      method: "POST",
+      body: JSON.stringify({ name, schedule_period: schedulePeriod }),
+    }),
+
+  deleteQualification: (sessionId: number, qualificationId: number) =>
+    apiFetch<{ deleted: boolean }>(`/sessions/${sessionId}/qualifications/${qualificationId}`, {
+      method: "DELETE",
+    }),
+
+  createCourse: (sessionId: number, code: string) =>
+    apiFetch<Course>(`/sessions/${sessionId}/courses`, {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }),
+
+  duplicateCourse: (sessionId: number, courseId: number, newCode: string) =>
+    apiFetch<Course>(`/sessions/${sessionId}/courses/${courseId}/duplicate`, {
+      method: "POST",
+      body: JSON.stringify({ new_code: newCode }),
+    }),
+
+  deleteCourse: (sessionId: number, courseId: number) =>
+    apiFetch<{ deleted: boolean }>(`/sessions/${sessionId}/courses/${courseId}`, { method: "DELETE" }),
+
+  staffUsage: (sessionId: number) =>
+    apiFetch<import("./types").ResourceUsage>(`/sessions/${sessionId}/usage/staff`),
+
+  roomUsage: (sessionId: number) =>
+    apiFetch<import("./types").ResourceUsage>(`/sessions/${sessionId}/usage/rooms`),
+
+  patchSession: (sessionId: number, name: string) =>
+    apiFetch<TimetableSession>(`/sessions/${sessionId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    }),
+
+  deleteSession: (sessionId: number) =>
+    apiFetch<void>(`/sessions/${sessionId}`, { method: "DELETE" }),
+
+  dismissViolation: (sessionId: number, bookingId: number, code: string) =>
+    apiFetch<{ ok: boolean }>(`/sessions/${sessionId}/violation-dismissals`, {
+      method: "POST",
+      body: JSON.stringify({ booking_id: bookingId, code }),
+    }),
+
+  staffDetail: (sessionId: number, staffId: number) =>
+    apiFetch<import("./types").StaffDetail>(`/sessions/${sessionId}/staff/${staffId}/detail`),
+
+  staffHoursTable: (sessionId: number) =>
+    apiFetch<import("./types").StaffHoursRow[]>(`/sessions/${sessionId}/staff/hours-table`),
+
+  saveStaffPreferences: (
+    sessionId: number,
+    staffId: number,
+    prefs: { first: string[]; second: string[]; third: string[] },
+  ) =>
+    apiFetch<{ ok: boolean }>(`/sessions/${sessionId}/staff/${staffId}/preferences`, {
+      method: "PUT",
+      body: JSON.stringify(prefs),
+    }),
+
+  saveStaffOnlineStudents: (
+    sessionId: number,
+    staffId: number,
+    counts: { unit_id: number; student_count: number | null }[],
+  ) =>
+    apiFetch<{ ok: boolean }>(`/sessions/${sessionId}/staff/${staffId}/online-students`, {
+      method: "PUT",
+      body: JSON.stringify({ counts }),
+    }),
+
+  qualificationDetail: (sessionId: number, qualificationId: number) =>
+    apiFetch<import("./types").QualificationDetail>(
+      `/sessions/${sessionId}/qualifications/${qualificationId}/detail`,
+    ),
+
+  unitConstraints: (sessionId: number, unitId: number) =>
+    apiFetch<import("./types").UnitConstraints>(`/sessions/${sessionId}/units/${unitId}/constraints`),
+
+  setUnitAllowedRooms: (sessionId: number, unitId: number, roomIds: number[]) =>
+    apiFetch<import("./types").UnitConstraints>(
+      `/sessions/${sessionId}/units/${unitId}/allowed-rooms`,
+      { method: "PUT", body: JSON.stringify({ room_ids: roomIds }) },
+    ),
+
+  setUnitCompetencies: (sessionId: number, unitId: number, staffIds: number[]) =>
+    apiFetch<import("./types").UnitConstraints>(
+      `/sessions/${sessionId}/units/${unitId}/competencies`,
+      { method: "PUT", body: JSON.stringify({ staff_ids: staffIds }) },
+    ),
+
+  splitUnitsFromBrackets: (sessionId: number) =>
+    apiFetch<{ updated: number }>(`/sessions/${sessionId}/units/split-from-brackets`, {
+      method: "POST",
+    }),
+
+  setStaffCompetencies: (sessionId: number, staffId: number, unitIds: number[]) =>
+    apiFetch<{ unit_ids: number[] }>(`/sessions/${sessionId}/staff/${staffId}/competencies`, {
+      method: "PUT",
+      body: JSON.stringify({ unit_ids: unitIds }),
+    }),
+
+  roomTypeChoices: () =>
+    apiFetch<{ choices: [string, string][] }>("/room-type-choices"),
+
+  async downloadExport(path: string, filename: string): Promise<void> {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE}${path}`, { headers });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        if (body.detail) detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      } catch {
+        /* ignore */
+      }
+      throw new Error(detail);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  async importFile(sessionId: number, kind: "session" | "qualifications" | "lecturer-preferences" | "overall-visual", file: File) {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const form = new FormData();
+    form.append("file", file);
+    const paths: Record<string, string> = {
+      session: `/sessions/${sessionId}/import`,
+      qualifications: `/sessions/${sessionId}/import/qualifications`,
+      "lecturer-preferences": `/sessions/${sessionId}/import/lecturer-preferences`,
+      "overall-visual": `/sessions/${sessionId}/import/overall-visual`,
+    };
+    const res = await fetch(`${API_BASE}${paths[kind]}`, { method: "POST", headers, body: form });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        if (body.detail) detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      } catch {
+        /* ignore */
+      }
+      throw new Error(detail);
+    }
+    return res.json();
+  },
 };

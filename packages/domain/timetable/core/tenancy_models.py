@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import datetime as _dt
 
-from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .models import Base
@@ -57,6 +57,28 @@ class Membership(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "organization_id", name="membership_user_org_uk"),
+    )
+
+
+class ViolationDismissal(Base):
+    """User-dismissed constraint on a booking (session-scoped, web persistence)."""
+
+    __tablename__ = "violation_dismissal"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    timetable_session_id: Mapped[int] = mapped_column(
+        ForeignKey("timetable_session.id", ondelete="CASCADE"),
+        index=True,
+    )
+    booking_id: Mapped[int] = mapped_column(Integer, index=True)
+    code: Mapped[str] = mapped_column(String(80))
+
+    __table_args__ = (
+        UniqueConstraint(
+            "timetable_session_id",
+            "booking_id",
+            "code",
+            name="violation_dismissal_session_booking_code_uk",
+        ),
     )
 
 

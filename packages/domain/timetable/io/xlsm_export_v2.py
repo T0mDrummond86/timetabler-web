@@ -611,6 +611,7 @@ def _generate_v2_entity_tabs(
     report: ExportV2Report,
     *,
     colour_by_class: bool,
+    timetable_session_id: int | None = None,
 ) -> None:
     from ..core.sidebar_order import ordered_courses, ordered_staff
 
@@ -622,7 +623,9 @@ def _generate_v2_entity_tabs(
     room_t = wb["Room Template v2"] if "Room Template v2" in wb.sheetnames else None
 
     if course_t is not None:
-        for c in ordered_courses(session, include_block_cohorts=True):
+        for c in ordered_courses(
+            session, include_block_cohorts=True, timetable_session_id=timetable_session_id
+        ):
             ws = wb.copy_worksheet(course_t)
             ws.title = _safe_sheet_name(c.code, used_names)
             _render_v2_course_tab(
@@ -634,7 +637,7 @@ def _generate_v2_entity_tabs(
             report.course_tabs += 1
 
     if staff_t is not None:
-        for s in ordered_staff(session):
+        for s in ordered_staff(session, timetable_session_id=timetable_session_id):
             ws = wb.copy_worksheet(staff_t)
             ws.title = _safe_sheet_name(s.name, used_names)
             staff_bookings = _bookings_for_staff_tab(bookings, s.id)
@@ -649,9 +652,10 @@ def _generate_v2_entity_tabs(
             report.staff_tabs += 1
 
     if room_t is not None:
-        rooms = [
-            r for r in session.query(Room).order_by(Room.code).all() if room_is_physical(r)
-        ]
+        room_q = session.query(Room).order_by(Room.code)
+        if timetable_session_id is not None:
+            room_q = room_q.filter(Room.timetable_session_id == timetable_session_id)
+        rooms = [r for r in room_q.all() if room_is_physical(r)]
         for r in rooms:
             ws = wb.copy_worksheet(room_t)
             ws.title = _safe_sheet_name(r.code, used_names)
@@ -688,6 +692,7 @@ def write_v2(
     template_path: str | Path | None = None,
     week_id: int | None = None,
     colour_by_class: bool | None = None,
+    timetable_session_id: int | None = None,
 ) -> ExportV2Report:
     """Export course / staff / room tabs using the v2 templates (no Overall)."""
     from ..core.display_settings import resolve_export_colour_by_class
@@ -727,10 +732,15 @@ def write_v2(
         _strip_saturday_from_sheet(wb[tpl_name])
 
     _generate_v2_entity_tabs(
-        wb, session, week.id, report, colour_by_class=colour_by_class
+        wb,
+        session,
+        week.id,
+        report,
+        colour_by_class=colour_by_class,
+        timetable_session_id=timetable_session_id,
     )
     report.bookings = len(_week_bookings(session, week.id))
-    write_backup_sheet(wb, session)
+    write_backup_sheet(wb, session, timetable_session_id=timetable_session_id)
     _apply_v2_readonly_protection(wb)
     wb.save(out_path)
     return report

@@ -504,9 +504,18 @@ def _write_course_admin_sheet(
     return bookings_written, warnings
 
 
-def _courses_for_admin_export(session: Session, week: Week, *, co_teach_only: bool) -> list[Course]:
+def _courses_for_admin_export(
+    session: Session,
+    week: Week,
+    *,
+    co_teach_only: bool,
+    timetable_session_id: int | None = None,
+) -> list[Course]:
     if not co_teach_only:
-        return session.query(Course).order_by(Course.code).all()
+        q = session.query(Course).order_by(Course.code)
+        if timetable_session_id is not None:
+            q = q.filter(Course.timetable_session_id == timetable_session_id)
+        return q.all()
     ids = {
         row[0]
         for row in session.query(Booking.course_id)
@@ -530,6 +539,8 @@ def _write_admin_workbook(
     template_path: Path,
     *,
     co_teach_only: bool = False,
+    week_id: int | None = None,
+    timetable_session_id: int | None = None,
 ) -> AdminExportReport:
     layout = _layout()
     probe = load_workbook(template_path, read_only=True)
@@ -543,12 +554,22 @@ def _write_admin_workbook(
 
     wb = load_workbook(out_path)
     base_ws = wb[template_sheet]
-    week = session.query(Week).order_by(Week.id).first()
+    if week_id is not None:
+        week = session.get(Week, week_id)
+        if week is None:
+            raise RuntimeError(f"Week id {week_id} not found.")
+    else:
+        week = session.query(Week).order_by(Week.id).first()
     if week is None:
         raise RuntimeError("No week exists in session.")
     # Full highlight logic lives in desktop UI; web export uses no highlights for now.
     change_highlights: dict = {}
-    courses = _courses_for_admin_export(session, week, co_teach_only=co_teach_only)
+    courses = _courses_for_admin_export(
+        session,
+        week,
+        co_teach_only=co_teach_only,
+        timetable_session_id=timetable_session_id,
+    )
     used_titles: set[str] = set()
     warnings: list[str] = []
     bookings_written = 0
@@ -578,7 +599,7 @@ def _write_admin_workbook(
         label = "No SFS co-teach classes" if co_teach_only else "No courses"
         ws = wb.create_sheet(label[:31])
         ws["A1"] = f"{label} in session."
-    write_backup_sheet(wb, session)
+    write_backup_sheet(wb, session, timetable_session_id=timetable_session_id)
     wb.save(out_path)
     return AdminExportReport(
         out_path=str(out_path),
@@ -593,17 +614,37 @@ def write_admin_export(
     session: Session,
     out_path: str | Path,
     template_path: str | Path | None = None,
+    *,
+    week_id: int | None = None,
+    timetable_session_id: int | None = None,
 ) -> AdminExportReport:
     """Export one sheet per course; template supplies all formatting."""
     template_path = resolve_admin_template_path(template_path)
-    return _write_admin_workbook(session, Path(out_path), template_path, co_teach_only=False)
+    return _write_admin_workbook(
+        session,
+        Path(out_path),
+        template_path,
+        co_teach_only=False,
+        week_id=week_id,
+        timetable_session_id=timetable_session_id,
+    )
 
 
 def write_co_teach_admin_export(
     session: Session,
     out_path: str | Path,
     template_path: str | Path | None = None,
+    *,
+    week_id: int | None = None,
+    timetable_session_id: int | None = None,
 ) -> AdminExportReport:
     """Export one sheet per course that has SFS co-teach classes (admin template)."""
     template_path = resolve_admin_template_path(template_path)
-    return _write_admin_workbook(session, Path(out_path), template_path, co_teach_only=True)
+    return _write_admin_workbook(
+        session,
+        Path(out_path),
+        template_path,
+        co_teach_only=True,
+        week_id=week_id,
+        timetable_session_id=timetable_session_id,
+    )

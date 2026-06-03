@@ -1,0 +1,264 @@
+"""Import and export timetable session data."""
+from __future__ import annotations
+
+import json
+
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import Response
+from sqlalchemy.orm import Session
+
+from ..auth.deps import AuthContext, require_editor
+from ..database import get_db
+from ..schemas import ImportReportOut
+from ..services.session_import_export import (
+    cleanup_temp,
+    export_json,
+    import_json_payload,
+    import_lecturer_preferences_workbook,
+    import_overall_visual_workbook,
+    import_qualifications_workbook,
+    import_workbook,
+    save_upload_to_temp,
+)
+from ..services.session_excel_export import (
+    export_admin_xlsx,
+    export_change_log_xlsx_bytes,
+    export_lecturer_preferences_template,
+    export_staff_tab,
+    export_timetable_xlsx,
+    export_warnings_xlsx,
+)
+from ..services.timetable_grid import assert_session_in_org
+
+router = APIRouter(tags=["import-export"])
+
+
+def _file_response(content: bytes, filename: str, media_type: str) -> Response:
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+async def _upload_to_temp(file: UploadFile, default_suffix: str = ".xlsx") -> str:
+    suffix = default_suffix
+    if file.filename and "." in file.filename:
+        suffix = "." + file.filename.rsplit(".", 1)[-1].lower()
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file")
+    return save_upload_to_temp(data, suffix)
+
+
+@router.post("/sessions/{session_id}/import", response_model=ImportReportOut)
+async def import_session(
+    session_id: int,
+    file: UploadFile = File(...),
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    """Restore session from desktop Timetable Export / Admin export (.xlsm/.xlsx)."""
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    tmp = await _upload_to_temp(file, ".xlsx")
+    try:
+        counts = import_workbook(db, session_id, tmp)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Import failed: {exc}",
+        ) from exc
+    finally:
+        cleanup_temp(tmp)
+    return ImportReportOut(**counts)
+
+
+@router.post("/sessions/{session_id}/import/qualifications")
+async def import_qualifications(
+    session_id: int,
+    file: UploadFile = File(...),
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    tmp = await _upload_to_temp(file, ".xlsx")
+    try:
+        return import_qualifications_workbook(db, session_id, tmp)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    finally:
+        cleanup_temp(tmp)
+
+
+@router.post("/sessions/{session_id}/import/lecturer-preferences")
+async def import_lecturer_preferences(
+    session_id: int,
+    file: UploadFile = File(...),
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    tmp = await _upload_to_temp(file, ".xlsx")
+    try:
+        return import_lecturer_preferences_workbook(db, session_id, tmp)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    finally:
+        cleanup_temp(tmp)
+
+
+@router.post("/sessions/{session_id}/import/overall-visual")
+async def import_overall_visual(
+    session_id: int,
+    file: UploadFile = File(...),
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    tmp = await _upload_to_temp(file, ".xlsm")
+    try:
+        return import_overall_visual_workbook(db, session_id, tmp)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    finally:
+        cleanup_temp(tmp)
+
+
+@router.post("/sessions/{session_id}/import/json", response_model=ImportReportOut)
+def import_session_json(
+    session_id: int,
+    payload: dict = Body(...),
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        counts = import_json_payload(db, session_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return ImportReportOut(**counts)
+
+
+@router.get("/sessions/{session_id}/export/json")
+def export_session_json(
+    session_id: int,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    payload = export_json(db, session_id)
+    body = json.dumps(payload, indent=2)
+    return Response(
+        content=body,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="session-{session_id}-backup.json"'},
+    )
+
+
+@router.get("/sessions/{session_id}/export/timetable")
+def export_timetable(
+    session_id: int,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+    variant: str = Query(default="fresh", pattern="^(fresh|v2|template)$"),
+    colour_by_class: bool = Query(default=True),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        content, filename, media = export_timetable_xlsx(
+            db,
+            timetable_session_id=session_id,
+            variant=variant,
+            colour_by_class=colour_by_class,
+        )
+    except (RuntimeError, FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return _file_response(content, filename, media)
+
+
+@router.get("/sessions/{session_id}/export/admin")
+def export_admin(
+    session_id: int,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+    co_teach_only: bool = Query(default=False),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        content, filename = export_admin_xlsx(
+            db,
+            timetable_session_id=session_id,
+            co_teach_only=co_teach_only,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return _file_response(
+        content,
+        filename,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@router.get("/sessions/{session_id}/export/staff-tab")
+def export_staff_tab_route(
+    session_id: int,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    content, filename = export_staff_tab(db)
+    return _file_response(
+        content,
+        filename,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@router.get("/sessions/{session_id}/export/warnings")
+def export_warnings(
+    session_id: int,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        content, filename = export_warnings_xlsx(db, timetable_session_id=session_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return _file_response(
+        content,
+        filename,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@router.get("/sessions/{session_id}/export/change-log")
+def export_change_log(
+    session_id: int,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    content, filename = export_change_log_xlsx_bytes(db, timetable_session_id=session_id)
+    return _file_response(
+        content,
+        filename,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@router.get("/sessions/{session_id}/export/lecturer-preferences-template")
+def export_lecturer_prefs_template(
+    session_id: int,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    content, filename = export_lecturer_preferences_template(db)
+    return _file_response(
+        content,
+        filename,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )

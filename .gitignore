@@ -17,4 +17,6 @@ frontend/dist/
 *.db
 *.xlsx
 !templates/*.xlsx
+!packages/domain/templates/*.xlsx
+!packages/domain/templates/*.xlsm
 *.bak

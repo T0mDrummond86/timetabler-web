@@ -88,6 +88,57 @@ def pending_classes_for_week(session: Session, week_id: int) -> list[PendingClas
     return pending
 
 
+def pending_classes_for_course(
+    session: Session,
+    week_id: int,
+    course_id: int,
+) -> list[PendingClass]:
+    """Unscheduled classes for one course only (web holding area)."""
+    course = session.get(Course, course_id)
+    if course is None:
+        return []
+    pending: list[PendingClass] = []
+    for uid in unit_ids_for_course(session, course):
+        unit = session.get(Unit, uid)
+        if unit is None:
+            continue
+        if course_unit_fully_scheduled(
+            session, week_id, course.id, uid, unit, block_week_index=None
+        ):
+            continue
+        if unit_has_double_session(unit):
+            slots1, slots2 = session_part_durations(unit)
+            parts = scheduled_session_parts(session, week_id, course.id, uid)
+            if 1 not in parts:
+                pending.append(
+                    PendingClass(
+                        course_id=course.id,
+                        unit_id=uid,
+                        duration_slots=slots1,
+                        session_part=1,
+                    )
+                )
+            if 2 not in parts:
+                pending.append(
+                    PendingClass(
+                        course_id=course.id,
+                        unit_id=uid,
+                        duration_slots=slots2,
+                        session_part=2,
+                    )
+                )
+        else:
+            pending.append(
+                PendingClass(
+                    course_id=course.id,
+                    unit_id=uid,
+                    duration_slots=unit.length_slots or 4,
+                    session_part=1,
+                )
+            )
+    return pending
+
+
 def pending_classes_for_block_week(
     session: Session,
     week_id: int,

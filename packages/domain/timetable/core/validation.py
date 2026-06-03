@@ -12,6 +12,7 @@ from typing import Iterable
 
 from sqlalchemy.orm import Session
 
+from ..constants import DAYS
 from .models import (
     Booking,
     Qualification,
@@ -158,7 +159,7 @@ def _check_pairwise_clashes(session: Session, bookings: list[Booking]) -> Iterab
                     yield Violation(
                         Severity.HARD,
                         "room_double_booking",
-                        f"Room double-booked: {a.room.code} on {day}",
+                        f"Room double-booked: {a.room.code} on {DAYS[day]}",
                         (a.id, b.id),
                     )
                 shared_staff = set(timetable_staff_ids(a)) & set(timetable_staff_ids(b))
@@ -168,14 +169,14 @@ def _check_pairwise_clashes(session: Session, bookings: list[Booking]) -> Iterab
                     yield Violation(
                         Severity.HARD,
                         "staff_double_booking",
-                        f"Staff double-booked: {label} on {day}",
+                        f"Staff double-booked: {label} on {DAYS[day]}",
                         (a.id, b.id),
                     )
                 if a.course_id == b.course_id:
                     yield Violation(
                         Severity.HARD,
                         "course_clash",
-                        f"Course {a.course.code} has overlapping classes on {day}",
+                        f"Course {a.course.code} has overlapping classes on {DAYS[day]}",
                         (a.id, b.id),
                     )
 

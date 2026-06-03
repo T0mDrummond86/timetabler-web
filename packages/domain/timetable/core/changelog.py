@@ -42,12 +42,17 @@ def booking_change_log_payload(
 
 def resolve_session_booking_net_maps(
     session: Session,
+    *,
+    timetable_session_id: int | None = None,
 ) -> tuple[dict[int, dict | None], dict[int, dict | None]]:
     """First / last booking snapshots per id from timetabling change-log entries."""
     first_before: dict[int, dict | None] = {}
     last_after: dict[int, dict | None] = {}
     seen: set[int] = set()
-    rows = session.query(ChangeLogEntry).order_by(ChangeLogEntry.id).all()
+    q = session.query(ChangeLogEntry).order_by(ChangeLogEntry.id)
+    if timetable_session_id is not None:
+        q = q.filter(ChangeLogEntry.timetable_session_id == timetable_session_id)
+    rows = q.all()
     for row in rows:
         if row.action not in TIMETABLING_LOG_ACTIONS or not row.details:
             continue

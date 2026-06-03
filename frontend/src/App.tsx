@@ -1,13 +1,11 @@
 import { Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { FormEvent, useEffect, useState } from "react";
 import { api, getToken, Organization, setToken, TimetableSession, User } from "./api";
+import { AppShell } from "./components/AppShell";
 import { TimetablePage } from "./pages/TimetablePage";
+import { TimetableSplitPage } from "./pages/TimetableSplitPage";
 
-function AuthForm({
-  mode,
-}: {
-  mode: "login" | "register";
-}) {
+function AuthForm({ mode }: { mode: "login" | "register" }) {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,57 +38,61 @@ function AuthForm({
   }
 
   return (
-    <main className="page narrow">
-      <h1>{mode === "register" ? "Create account" : "Sign in"}</h1>
-      <form className="card form" onSubmit={onSubmit}>
-        <label>
-          Email
-          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-        {mode === "register" && (
-          <>
+    <AppShell>
+      <div className="auth-page">
+        <div className="card auth-card">
+          <h1>{mode === "register" ? "Create account" : "Sign in"}</h1>
+          <form className="form" onSubmit={onSubmit}>
             <label>
-              Your name
-              <input value={name} onChange={(e) => setName(e.target.value)} />
+              Email
+              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
             </label>
             <label>
-              Organization name
+              Password
               <input
+                type="password"
                 required
-                value={orgName}
-                onChange={(e) => setOrgName(e.target.value)}
-                placeholder="e.g. Joondalup campus"
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
             </label>
-          </>
-        )}
-        {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={loading}>
-          {loading ? "Please wait…" : mode === "register" ? "Register" : "Sign in"}
-        </button>
-      </form>
-      <p className="muted center">
-        {mode === "register" ? (
-          <>
-            Already have an account? <Link to="/login">Sign in</Link>
-          </>
-        ) : (
-          <>
-            New here? <Link to="/register">Create account</Link>
-          </>
-        )}
-      </p>
-    </main>
+            {mode === "register" && (
+              <>
+                <label>
+                  Your name
+                  <input value={name} onChange={(e) => setName(e.target.value)} />
+                </label>
+                <label>
+                  Organization name
+                  <input
+                    required
+                    value={orgName}
+                    onChange={(e) => setOrgName(e.target.value)}
+                    placeholder="e.g. Joondalup campus"
+                  />
+                </label>
+              </>
+            )}
+            {error && <p className="error">{error}</p>}
+            <button type="submit" className="btn-primary" disabled={loading} style={{ width: "100%" }}>
+              {loading ? "Please wait…" : mode === "register" ? "Create account" : "Sign in"}
+            </button>
+          </form>
+        </div>
+        <p className="muted center" style={{ marginTop: "1rem" }}>
+          {mode === "register" ? (
+            <>
+              Already have an account? <Link to="/login">Sign in</Link>
+            </>
+          ) : (
+            <>
+              New here? <Link to="/register">Create account</Link>
+            </>
+          )}
+        </p>
+      </div>
+    </AppShell>
   );
 }
 
@@ -143,54 +145,58 @@ function Dashboard() {
   const org = orgs[0];
 
   return (
-    <main className="page">
-      <header className="header row">
-        <div>
-          <h1>Timetabler</h1>
-          {user && (
-            <p className="subtitle">
-              {user.name || user.email}
-              {org ? ` · ${org.name} (${org.role})` : ""}
-            </p>
-          )}
-        </div>
-        <button type="button" className="secondary" onClick={logout}>
+    <AppShell
+      title="Dashboard"
+      subtitle={
+        user
+          ? `${user.name || user.email}${org ? ` · ${org.name}` : ""}`
+          : undefined
+      }
+      actions={
+        <button type="button" className="btn-secondary" onClick={logout}>
           Sign out
         </button>
-      </header>
-
-      {error && <p className="error">{error}</p>}
+      }
+    >
+      {error && <div className="error-banner">{error}</div>}
 
       <section className="card">
         <h2>Timetable sessions</h2>
-        <p className="muted">Each session is one editable timetable (like a desktop <code>.db</code> file).</p>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Each session is one editable timetable — like a desktop <code>.db</code> file.
+        </p>
         <ul className="session-list">
           {sessions.map((s) => (
             <li key={s.id}>
               <Link to={`/timetable/${s.id}`} className="session-link">
                 <strong>{s.name}</strong>
-                <span className="muted">Open timetable →</span>
+                <span className="muted">Open →</span>
               </Link>
             </li>
           ))}
+          {!sessions.length && <p className="muted panel-empty">No sessions yet.</p>}
         </ul>
-        <div className="row gap">
+        <div className="inline-form">
           <input
+            className="field-input"
             placeholder="New session name"
             value={newSessionName}
             onChange={(e) => setNewSessionName(e.target.value)}
           />
-          <button type="button" onClick={createSession} disabled={!newSessionName.trim()}>
+          <button type="button" className="btn-primary" onClick={createSession} disabled={!newSessionName.trim()}>
             Add session
           </button>
         </div>
       </section>
 
-      <section className="card muted">
-        <h2>Phase 2</h2>
-        <p>Click a session above to open the read-only week grid (course view).</p>
+      <section className="card">
+        <h2>Getting started</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Open a session, import a desktop <strong>Timetable Export</strong> (.xlsm), then drag
+          classes from the holding area onto the grid.
+        </p>
       </section>
-    </main>
+    </AppShell>
   );
 }
 
@@ -206,6 +212,7 @@ export default function App() {
       <Route path="/register" element={<AuthForm mode="register" />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/timetable/:sessionId" element={<TimetablePage />} />
+      <Route path="/timetable/:sessionId/split" element={<TimetableSplitPage />} />
     </Routes>
   );
 }

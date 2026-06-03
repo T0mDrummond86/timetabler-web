@@ -24,6 +24,12 @@ rsync -a --delete --exclude='__pycache__' \
 rsync -a --delete --exclude='__pycache__' \
   "$DESKTOP_ROOT/timetable/io/" "$WEB_DOMAIN/io/"
 
+mkdir -p "$(dirname "$WEB_DOMAIN")/templates"
+rsync -a \
+  "$DESKTOP_ROOT/templates/admin_export_base.xlsx" \
+  "$(dirname "$WEB_DOMAIN")/templates/"
+cp "$DESKTOP_ROOT/adminExportStyleGuide.xlsx" "$(dirname "$WEB_DOMAIN")/"
+
 # Re-apply web-only patches
 if [[ -f "$(dirname "$0")/patches/io-export-headers.py" ]]; then
   cp "$(dirname "$0")/patches/io-export-headers.py" "$WEB_DOMAIN/io/export_headers.py"

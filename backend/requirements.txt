@@ -11,3 +11,4 @@ redis>=5.2,<6
 rq>=2.0,<3
 pytest>=8.3,<9
 httpx>=0.28,<1
+python-multipart>=0.0.9,<1

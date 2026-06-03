@@ -38,6 +38,11 @@ def seed_demo_timetable(db: Session, timetable_session_id: int) -> dict[str, int
         name="Cyber Foundations",
         length_slots=4,
     )
+    unit2 = Unit(
+        timetable_session_id=timetable_session_id,
+        name="Workshop Lab",
+        length_slots=4,
+    )
     staff = Staff(
         timetable_session_id=timetable_session_id,
         name="Alex Teacher",
@@ -49,7 +54,7 @@ def seed_demo_timetable(db: Session, timetable_session_id: int) -> dict[str, int
         room_type="on-campus",
         capacity=24,
     )
-    db.add_all([qual, course, unit, staff, room])
+    db.add_all([qual, course, unit, unit2, staff, room])
     db.flush()
     course.qualification_id = qual.id
 
@@ -82,12 +87,12 @@ def seed_demo_timetable(db: Session, timetable_session_id: int) -> dict[str, int
             in_term_2=1,
         )
     )
-    # Second booking same class Tuesday — tests lane-free second day
+    # Second booking different unit Tuesday — tests second day column
     db.add(
         Booking(
             week_id=week.id,
             course_id=course.id,
-            unit_id=unit.id,
+            unit_id=unit2.id,
             staff_id=staff.id,
             room_id=room.id,
             day=1,

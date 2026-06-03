@@ -8,9 +8,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from .export_headers import CHANGE_LOG_EXPORT_HEADERS
-
-# Desktop-only display row type; web export uses dict rows until shared helpers land.
-ChangeLogDisplayRow = dict  # type: ignore[misc,assignment]
+from ..core.change_log_data import ChangeLogDisplayRow
 
 
 def write_change_log_xlsx(

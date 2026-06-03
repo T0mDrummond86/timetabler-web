@@ -502,7 +502,12 @@ def ensure_initial_block_group(session: Session, q: Qualification) -> Course:
         session.flush()
         return existing_by_code
 
-    course = Course(code=code, qualification_id=q.id, is_block_cohort=1)
+    course = Course(
+        code=code,
+        qualification_id=q.id,
+        is_block_cohort=1,
+        timetable_session_id=q.timetable_session_id,
+    )
     init_course_block_defaults(course, q)
     session.add(course)
     session.flush()
@@ -518,7 +523,11 @@ def create_block_delivery(session: Session, qual_id: int) -> tuple[Qualification
     if q is None:
         raise ValueError("Qualification not found")
     enable_block_delivery_mode(session, q)
+    # Flush before ensure_initial_block_group: its queries call expire_all() and would
+    # otherwise reload delivery_mode from the DB while it is still 'regular'.
+    session.flush()
     course = ensure_initial_block_group(session, q)
+    enable_block_delivery_mode(session, q)
     session.flush()
     session.commit()
     session.expire_all()
@@ -577,8 +586,15 @@ def duplicate_block_group(
     if effective_qual_id is None:
         raise ValueError("Source course must belong to a qualification")
     q = session.get(Qualification, effective_qual_id)
-    if q is None or not is_block_qualification(q):
-        raise ValueError("Not a block qualification")
+    if q is None:
+        raise ValueError("Qualification not found")
+    if not is_block_qualification(q):
+        if is_block_cohort(src) or looks_like_block_cohort_code(src.code):
+            enable_block_delivery_mode(session, q)
+            session.flush()
+            q = session.get(Qualification, effective_qual_id)
+        if q is None or not is_block_qualification(q):
+            raise ValueError("Not a block qualification")
     if src.qualification_id is None:
         link_course_to_qualification(src, q.id)
     code = new_code.strip()
@@ -592,6 +608,7 @@ def duplicate_block_group(
         name=src.name,
         qualification_id=q.id,
         is_block_cohort=1,
+        timetable_session_id=src.timetable_session_id,
         timetable_locked=getattr(src, "timetable_locked", 0) or 0,
         sidebar_order=next_course_sidebar_order(session),
         block_week_count=course_block_week_count(src, q),
