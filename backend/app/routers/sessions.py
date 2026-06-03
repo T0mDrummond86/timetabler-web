@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from timetable.core.tenancy_models import TimetableSession
+from timetable.core.tenancy_models import GlobalSessionMember, TimetableSession
 
 from ..auth.deps import AuthContext, get_auth_context, require_editor
 from ..database import get_db
@@ -12,6 +12,31 @@ from ..schemas import TimetableSessionCreate, TimetableSessionOut, TimetableSess
 from ..services.session_seed import seed_timetable_session_data
 
 router = APIRouter(tags=["sessions"])
+
+
+def _session_out(row: TimetableSession, db: Session) -> TimetableSessionOut:
+    member = (
+        db.query(GlobalSessionMember)
+        .filter(GlobalSessionMember.timetable_session_id == row.id)
+        .first()
+    )
+    gs_id = gs_name = None
+    if member is not None:
+        from timetable.core.tenancy_models import GlobalSession
+
+        gs = db.get(GlobalSession, member.global_session_id)
+        if gs is not None:
+            gs_id = gs.id
+            gs_name = gs.name
+    return TimetableSessionOut(
+        id=row.id,
+        organization_id=row.organization_id,
+        name=row.name,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        global_session_id=gs_id,
+        global_session_name=gs_name,
+    )
 
 
 def _session_in_org(db: Session, session_id: int, org_id: int) -> TimetableSession:
@@ -42,7 +67,7 @@ def list_sessions(
         .order_by(TimetableSession.name)
         .all()
     )
-    return rows
+    return [_session_out(r, db) for r in rows]
 
 
 @router.post(
@@ -84,7 +109,7 @@ def create_session(
     seed_timetable_session_data(db, row)
     db.commit()
     db.refresh(row)
-    return row
+    return _session_out(row, db)
 
 
 @router.get("/sessions/{session_id}", response_model=TimetableSessionOut)
@@ -93,7 +118,7 @@ def get_session(
     ctx: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
-    return _session_in_org(db, session_id, ctx.organization.id)
+    return _session_out(_session_in_org(db, session_id, ctx.organization.id), db)
 
 
 @router.patch("/sessions/{session_id}", response_model=TimetableSessionOut)
@@ -122,7 +147,7 @@ def update_session(
     row.name = name
     db.commit()
     db.refresh(row)
-    return row
+    return _session_out(row, db)
 
 
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)

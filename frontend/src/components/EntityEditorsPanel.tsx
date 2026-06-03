@@ -7,6 +7,7 @@ import {
   StaffAvailabilityGrid,
 } from "./StaffAvailabilityGrid";
 import { StaffHoursTable } from "./StaffHoursTable";
+import { LinkedSessionImportPanel } from "./LinkedSessionImportPanel";
 
 type Tab = "staff" | "rooms" | "units" | "courses" | "qualifications";
 
@@ -53,6 +54,8 @@ type Props = {
   onFocusConsumed?: () => void;
   /** Open the Classes tab for this unit (desktop navigateToClass). */
   onNavigateToUnit?: (unitId: number) => void;
+  /** Show import-from-linked panel on staff / qualifications tabs. */
+  showLinkedImport?: boolean;
 };
 
 export function EntityEditorsPanel({
@@ -67,6 +70,7 @@ export function EntityEditorsPanel({
   focusEntityId,
   onFocusConsumed,
   onNavigateToUnit,
+  showLinkedImport = false,
 }: Props) {
   const [tab, setTab] = useState<Tab>(fixedTab ?? "staff");
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -431,6 +435,15 @@ export function EntityEditorsPanel({
         <h2>Entity editors</h2>
       </div>
       )}
+      {showLinkedImport && (activeTab === "staff" || activeTab === "qualifications") && (
+        <LinkedSessionImportPanel
+          targetSessionId={sessionId}
+          onImported={() => onUpdated()}
+          importStaff={activeTab === "staff"}
+          importQualifications={activeTab === "qualifications"}
+        />
+      )}
+
       {!fixedTab && (
       <div className="entity-tabs">
         {(["staff", "rooms", "units", "courses", "qualifications"] as Tab[]).map((t) => (

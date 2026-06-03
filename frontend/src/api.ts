@@ -23,6 +23,33 @@ export type TimetableSession = {
   name: string;
   created_at: string;
   updated_at: string;
+  global_session_id?: number | null;
+  global_session_name?: string | null;
+};
+
+export type GlobalSessionSummary = {
+  id: number;
+  organization_id: number;
+  name: string;
+  member_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GlobalSession = {
+  id: number;
+  organization_id: number;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  member_sessions: { id: number; name: string }[];
+};
+
+export type TimetableGlobalLink = {
+  linked: boolean;
+  global_session_id?: number;
+  global_session_name?: string;
+  member_session_ids?: number[];
 };
 export type Course = {
   id: number;
@@ -68,6 +95,46 @@ export type Qualification = {
   name: string;
   num_groups?: number;
   schedule_period?: string;
+};
+
+export type GlobalAggregatedStaffRow = {
+  id: number;
+  session_id: number;
+  session_name: string;
+  name: string;
+  fte?: number | null;
+  max_hours_per_week?: number | null;
+  non_teaching_day?: number | null;
+};
+
+export type GlobalAggregatedRoomRow = {
+  id: number;
+  session_id: number;
+  session_name: string;
+  code: string;
+  name: string | null;
+  room_type?: string | null;
+  capacity?: number | null;
+};
+
+export type GlobalAggregatedUnitRow = {
+  id: number;
+  session_id: number;
+  session_name: string;
+  name: string;
+  length_slots?: number | null;
+  double_session?: number;
+  component_codes?: string | null;
+};
+
+export type GlobalAggregatedQualRow = {
+  id: number;
+  session_id: number;
+  session_name: string;
+  name: string;
+  num_groups?: number;
+  schedule_period?: string;
+  delivery_mode?: string;
 };
 
 const TOKEN_KEY = "timetabler_token";
@@ -162,6 +229,92 @@ export const api = {
   orgs: () => apiFetch<Organization[]>("/orgs"),
 
   sessions: (orgId: number) => apiFetch<TimetableSession[]>(`/orgs/${orgId}/sessions`),
+
+  globalSessions: (orgId: number) => apiFetch<GlobalSessionSummary[]>(`/orgs/${orgId}/global-sessions`),
+
+  globalSession: (globalSessionId: number) =>
+    apiFetch<GlobalSession>(`/global-sessions/${globalSessionId}`),
+
+  createGlobalSession: (orgId: number, name: string) =>
+    apiFetch<GlobalSession>(`/orgs/${orgId}/global-sessions`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
+  updateGlobalSession: (globalSessionId: number, name: string) =>
+    apiFetch<GlobalSession>(`/global-sessions/${globalSessionId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    }),
+
+  deleteGlobalSession: (globalSessionId: number) =>
+    apiFetch<void>(`/global-sessions/${globalSessionId}`, { method: "DELETE" }),
+
+  setGlobalSessionMembers: (globalSessionId: number, timetableSessionIds: number[]) =>
+    apiFetch<GlobalSession>(`/global-sessions/${globalSessionId}/members`, {
+      method: "PUT",
+      body: JSON.stringify({ timetable_session_ids: timetableSessionIds }),
+    }),
+
+  globalSessionStaff: (globalSessionId: number) =>
+    apiFetch<{ rows: GlobalAggregatedStaffRow[] }>(`/global-sessions/${globalSessionId}/staff`),
+
+  globalSessionRooms: (globalSessionId: number) =>
+    apiFetch<{ rows: GlobalAggregatedRoomRow[] }>(`/global-sessions/${globalSessionId}/rooms`),
+
+  globalSessionUnits: (globalSessionId: number) =>
+    apiFetch<{ rows: GlobalAggregatedUnitRow[] }>(`/global-sessions/${globalSessionId}/units`),
+
+  globalSessionQualifications: (globalSessionId: number) =>
+    apiFetch<{ rows: GlobalAggregatedQualRow[] }>(
+      `/global-sessions/${globalSessionId}/qualifications`,
+    ),
+
+  globalSessionClassCustodians: (globalSessionId: number) =>
+    apiFetch<import("./types").GlobalClassCustodians>(
+      `/global-sessions/${globalSessionId}/class-custodians`,
+    ),
+
+  timetableGlobalLink: (sessionId: number) =>
+    apiFetch<TimetableGlobalLink>(`/sessions/${sessionId}/global-link`),
+
+  linkedSessions: (sessionId: number) =>
+    apiFetch<{ sessions: { id: number; name: string }[] }>(
+      `/sessions/${sessionId}/linked-sessions`,
+    ),
+
+  linkedImportOptions: (targetSessionId: number, sourceSessionId: number) =>
+    apiFetch<{
+      staff: { id: number; name: string; already_in_target: boolean }[];
+      qualifications: {
+        id: number;
+        name: string;
+        linked_classes: string[];
+        already_in_target: boolean;
+      }[];
+    }>(
+      `/sessions/${targetSessionId}/import-from-linked/options?source_session_id=${sourceSessionId}`,
+    ),
+
+  importFromLinkedSession: (
+    targetSessionId: number,
+    body: {
+      source_session_id: number;
+      staff_ids?: number[];
+      qualification_ids?: number[];
+    },
+  ) =>
+    apiFetch<{
+      staff?: { added: string[]; skipped: { name: string; reason: string }[] };
+      qualifications?: {
+        added: string[];
+        classes_added: string[];
+        skipped: { name: string; reason: string }[];
+      };
+    }>(`/sessions/${targetSessionId}/import-from-linked`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   createSession: (orgId: number, name: string) =>
     apiFetch<TimetableSession>(`/orgs/${orgId}/sessions`, {

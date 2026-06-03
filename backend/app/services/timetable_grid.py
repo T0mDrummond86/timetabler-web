@@ -260,6 +260,8 @@ def _build_grid_payload(
     schedule_variants: list[dict] | None = None,
     preview_semester_week: int | None = None,
     unavailable_slots: dict[str, list[int]] | None = None,
+    linked_session_busy_slots: dict[str, list[int]] | None = None,
+    linked_session_busy_label: str | None = None,
     staff_hours: float | None = None,
     colour_by_class: bool = True,
     hide_dismissed: bool = True,
@@ -361,6 +363,8 @@ def _build_grid_payload(
         "schedule_variants": schedule_variants or [],
         "preview_semester_week": preview_semester_week,
         "unavailable_slots": unavailable_slots,
+        "linked_session_busy_slots": linked_session_busy_slots,
+        "linked_session_busy_label": linked_session_busy_label,
         "staff_hours": staff_hours,
     }
 
@@ -516,6 +520,13 @@ def build_staff_timetable(
     from timetable.core.staff_hours import safe_staff_tab_total_hours_by_staff_id
 
     hours = safe_staff_tab_total_hours_by_staff_id(db).get(staff.id, 0.0)
+    from .global_sessions import linked_session_busy_slots
+
+    linked_busy, linked_label = linked_session_busy_slots(
+        db,
+        timetable_session_id=timetable_session_id,
+        staff_id=staff.id,
+    )
     return _build_grid_payload(
         db,
         timetable_session_id=timetable_session_id,
@@ -527,6 +538,8 @@ def build_staff_timetable(
         columns=list(DAYS),
         column_kind="day",
         unavailable_slots=_staff_unavailable_slots(db, staff.id),
+        linked_session_busy_slots=linked_busy,
+        linked_session_busy_label=linked_label,
         staff_hours=hours,
         colour_by_class=colour_by_class,
         hide_dismissed=hide_dismissed,

@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from timetable.core.models import Base
 from timetable.core.tenancy_models import (  # noqa: F401 — register mappers
+    GlobalSession,
+    GlobalSessionMember,
     Membership,
     Organization,
     TimetableSession,

@@ -25,6 +25,9 @@ class Organization(Base):
     timetable_sessions: Mapped[list["TimetableSession"]] = relationship(
         back_populates="organization", cascade="all, delete-orphan"
     )
+    global_sessions: Mapped[list["GlobalSession"]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan"
+    )
 
 
 class User(Base):
@@ -82,6 +85,51 @@ class ViolationDismissal(Base):
     )
 
 
+class GlobalSession(Base):
+    """Groups multiple timetable sessions for shared staff visibility (no timetable of its own)."""
+
+    __tablename__ = "global_session"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organization.id", ondelete="CASCADE")
+    )
+    name: Mapped[str] = mapped_column(String(120))
+    created_at: Mapped[_dt.datetime] = mapped_column(
+        DateTime,
+        default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
+    )
+    updated_at: Mapped[_dt.datetime] = mapped_column(
+        DateTime,
+        default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
+        onupdate=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
+    )
+
+    organization: Mapped[Organization] = relationship(back_populates="global_sessions")
+    members: Mapped[list["GlobalSessionMember"]] = relationship(
+        back_populates="global_session", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("organization_id", "name", name="global_session_org_name_uk"),
+    )
+
+
+class GlobalSessionMember(Base):
+    """Links one timetable session into a global session."""
+
+    __tablename__ = "global_session_member"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    global_session_id: Mapped[int] = mapped_column(
+        ForeignKey("global_session.id", ondelete="CASCADE"), index=True
+    )
+    timetable_session_id: Mapped[int] = mapped_column(
+        ForeignKey("timetable_session.id", ondelete="CASCADE"), unique=True
+    )
+
+    global_session: Mapped[GlobalSession] = relationship(back_populates="members")
+    timetable_session: Mapped["TimetableSession"] = relationship(back_populates="global_membership")
+
+
 class TimetableSession(Base):
     """One editable timetable dataset within an organization (desktop ``*.db`` equivalent)."""
 
@@ -105,6 +153,9 @@ class TimetableSession(Base):
     )
 
     organization: Mapped[Organization] = relationship(back_populates="timetable_sessions")
+    global_membership: Mapped[GlobalSessionMember | None] = relationship(
+        back_populates="timetable_session", uselist=False
+    )
 
     __table_args__ = (
         UniqueConstraint("organization_id", "name", name="timetable_session_org_name_uk"),

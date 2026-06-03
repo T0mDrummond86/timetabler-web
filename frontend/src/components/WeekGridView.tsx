@@ -175,6 +175,14 @@ export function WeekGridView({
     return grid.unavailable_slots[String(day)] ?? [];
   }
 
+  function linkedBusyForColumn(colIdx: number): number[] {
+    if (!grid.linked_session_busy_slots) return [];
+    const day = dayForColumn(grid, colIdx);
+    const busy = new Set(grid.linked_session_busy_slots[String(day)] ?? []);
+    const blocked = new Set(unavailableForColumn(colIdx));
+    return [...busy].filter((s) => !blocked.has(s));
+  }
+
   return (
     <section className="timetable-grid-panel">
       <div className="timetable-grid-scroll">
@@ -234,6 +242,19 @@ export function WeekGridView({
                 <div
                   key={`u-${s}`}
                   className="grid-unavailable-slot"
+                  style={{ top: s * slotHeight, height: slotHeight }}
+                />
+              ))}
+
+              {linkedBusyForColumn(colIdx).map((s) => (
+                <div
+                  key={`l-${s}`}
+                  className="grid-linked-busy-slot"
+                  title={
+                    grid.linked_session_busy_label
+                      ? `Scheduled in linked session: ${grid.linked_session_busy_label}`
+                      : "Scheduled in a linked session"
+                  }
                   style={{ top: s * slotHeight, height: slotHeight }}
                 />
               ))}

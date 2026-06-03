@@ -77,7 +77,21 @@ export type TimetableGrid = {
   schedule_variants?: ScheduleVariant[];
   preview_semester_week?: number | null;
   unavailable_slots?: Record<string, number[]> | null;
+  linked_session_busy_slots?: Record<string, number[]> | null;
+  linked_session_busy_label?: string | null;
   staff_hours?: number | null;
+};
+
+export type GlobalClassCustodians = {
+  rows: {
+    unit_id: number;
+    unit_name: string;
+    lecturers: string;
+    custodian_name: string | null;
+    session_id: number;
+    session_name: string;
+  }[];
+  summary: string;
 };
 
 export type TimetableEntity = {

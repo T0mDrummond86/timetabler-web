@@ -51,6 +51,8 @@ class TimetableSessionOut(BaseModel):
     name: str
     created_at: datetime
     updated_at: datetime
+    global_session_id: int | None = None
+    global_session_name: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -61,6 +63,76 @@ class TimetableSessionCreate(BaseModel):
 
 class TimetableSessionPatch(BaseModel):
     name: str = Field(min_length=1, max_length=120)
+
+
+class TimetableSessionLinkOut(BaseModel):
+    id: int
+    name: str
+
+
+class GlobalSessionCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+class GlobalSessionSummaryOut(BaseModel):
+    id: int
+    organization_id: int
+    name: str
+    member_count: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class GlobalSessionOut(BaseModel):
+    id: int
+    organization_id: int
+    name: str
+    created_at: datetime
+    updated_at: datetime
+    member_sessions: list[TimetableSessionLinkOut] = Field(default_factory=list)
+
+    model_config = {"from_attributes": True}
+
+
+class GlobalSessionMembersPatch(BaseModel):
+    timetable_session_ids: list[int] = Field(default_factory=list)
+
+
+class LinkedImportStaffOptionOut(BaseModel):
+    id: int
+    name: str
+    already_in_target: bool = False
+
+
+class LinkedImportQualOptionOut(BaseModel):
+    id: int
+    name: str
+    linked_classes: list[str] = Field(default_factory=list)
+    already_in_target: bool = False
+
+
+class LinkedImportOptionsOut(BaseModel):
+    staff: list[LinkedImportStaffOptionOut] = Field(default_factory=list)
+    qualifications: list[LinkedImportQualOptionOut] = Field(default_factory=list)
+
+
+class LinkedSessionImportIn(BaseModel):
+    source_session_id: int
+    staff_ids: list[int] = Field(default_factory=list)
+    qualification_ids: list[int] = Field(default_factory=list)
+
+
+class LinkedImportResultOut(BaseModel):
+    added: list[str] = Field(default_factory=list)
+    classes_added: list[str] = Field(default_factory=list)
+    skipped: list[dict] = Field(default_factory=list)
+
+
+class LinkedSessionImportOut(BaseModel):
+    staff: LinkedImportResultOut | None = None
+    qualifications: LinkedImportResultOut | None = None
 
 
 class CourseOut(BaseModel):
@@ -139,6 +211,8 @@ class TimetableGridOut(BaseModel):
     schedule_variants: list[dict] = Field(default_factory=list)
     preview_semester_week: int | None = None
     unavailable_slots: dict[str, list[int]] | None = None
+    linked_session_busy_slots: dict[str, list[int]] | None = None
+    linked_session_busy_label: str | None = None
     staff_hours: float | None = None
 
 

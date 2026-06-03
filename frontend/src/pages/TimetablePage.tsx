@@ -8,6 +8,7 @@ import {
   Room,
   setToken,
   Staff,
+  TimetableGlobalLink,
   TimetableSession,
   Unit,
 } from "../api";
@@ -191,6 +192,7 @@ export function TimetablePage() {
   const [createDraft, setCreateDraft] = useState<CreateBookingDraft | null>(null);
   const externalViewsMenu = useDropdown();
   const [pendingEditBookingId, setPendingEditBookingId] = useState<number | null>(null);
+  const [globalLink, setGlobalLink] = useState<TimetableGlobalLink | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const colourByClassRef = useRef(colourByClass);
   colourByClassRef.current = colourByClass;
@@ -1308,6 +1310,11 @@ export function TimetablePage() {
       setPendingEditBookingId(null);
     }
   }, [grid, pendingEditBookingId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    void api.timetableGlobalLink(sessionId).then(setGlobalLink).catch(() => setGlobalLink(null));
+  }, [sessionId]);
   const canPlacePending = showsHoldingArea(viewKind) && editable;
   const canCreateOnGrid =
     editable &&
@@ -1336,6 +1343,13 @@ export function TimetablePage() {
             ) : (
               <span className="tt-readonly-badge" role="status">
                 Read-only — viewing only
+              </span>
+            )}
+            {globalLink?.linked && viewKind === "staff" && (
+              <span className="tt-global-link-hint muted">
+                Dark grey = scheduled in linked session
+                {globalLink.global_session_name ? ` (${globalLink.global_session_name})` : ""}.{" "}
+                <Link to={`/global/${globalLink.global_session_id}`}>Global group</Link>
               </span>
             )}
           </span>
@@ -1659,6 +1673,7 @@ export function TimetablePage() {
           qualifications={qualifications}
           onUpdated={onEntityUpdated}
           fixedTab="staff"
+          showLinkedImport={globalLink?.linked === true}
         />
       )}
       {sessionTab === "rooms" && courses.length > 0 && (
@@ -1701,6 +1716,7 @@ export function TimetablePage() {
             setFocusUnitId(unitId);
             setSessionTab("units");
           }}
+          showLinkedImport={globalLink?.linked === true}
         />
       )}
       {sessionTab === "changelog" && courses.length > 0 && (

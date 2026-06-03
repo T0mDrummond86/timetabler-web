@@ -10,7 +10,18 @@ from timetable.constants import NUM_DAYS, NUM_SLOTS
 
 from .config import settings
 from .database import check_database, create_all_tables
-from .routers import auth, bookings, changelog, entities, import_export, orgs, sessions, timetable, violations
+from .routers import (
+    auth,
+    bookings,
+    changelog,
+    entities,
+    global_sessions,
+    import_export,
+    orgs,
+    sessions,
+    timetable,
+    violations,
+)
 
 
 @asynccontextmanager
@@ -38,6 +49,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(orgs.router)
 app.include_router(sessions.router)
+app.include_router(global_sessions.router)
 app.include_router(entities.router)
 app.include_router(import_export.router)
 app.include_router(changelog.router)
@@ -52,7 +64,7 @@ def health():
         "status": "ok",
         "database": "up" if check_database() else "down",
         "grid": {"days": NUM_DAYS, "slots": NUM_SLOTS},
-        "phase": 8,
+        "phase": 9,
     }
 
 
