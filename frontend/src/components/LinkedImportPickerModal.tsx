@@ -137,7 +137,7 @@ export function LinkedImportPickerModal({
             disabled={loading || selected.size === 0}
             onClick={() => onConfirm([...selected])}
           >
-            Import {selected.size > 0 ? `(${selected.size})` : ""}
+            Use selection {selected.size > 0 ? `(${selected.size})` : ""}
           </button>
         </footer>
       </div>

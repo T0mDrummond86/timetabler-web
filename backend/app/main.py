@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from timetable.constants import NUM_DAYS, NUM_SLOTS
 
@@ -56,6 +57,12 @@ app.include_router(changelog.router)
 app.include_router(bookings.router)
 app.include_router(timetable.router)
 app.include_router(violations.router)
+
+
+@app.exception_handler(LookupError)
+async def lookup_error_handler(_request: Request, exc: LookupError):
+    """Map service-layer LookupError to 404 so clients get JSON, not opaque 500s."""
+    return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
 @app.get("/health")

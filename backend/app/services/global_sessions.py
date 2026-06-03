@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from typing import Callable
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
@@ -9,12 +10,92 @@ from sqlalchemy.orm import Session, joinedload
 from timetable.core.models import Booking, Course, Qualification, Room, Semester, Staff, Unit, Week
 from timetable.core.tenancy_models import GlobalSession, GlobalSessionMember, TimetableSession
 
-from .class_custodians import class_custodians_for_session
+from .class_custodians import class_custodians_for_session, qualification_names_by_unit
 from .timetable_grid import get_repeating_week
 
 
 def normalize_staff_name(name: str | None) -> str:
     return (name or "").strip().casefold()
+
+
+def _normalize_label(name: str | None) -> str:
+    return (name or "").strip().casefold()
+
+
+def _uniq_sorted_session_names(members: list[dict]) -> list[str]:
+    return sorted(
+        {str(m["session_name"]) for m in members if m.get("session_name")},
+        key=str.casefold,
+    )
+
+
+def _sum_int_field(members: list[dict], field: str) -> int:
+    """Sum a numeric field across amalgamated session members (e.g. group counts)."""
+    total = 0
+    for m in members:
+        v = m.get(field)
+        if v is None:
+            continue
+        total += int(v)
+    return total
+
+
+def _merge_field(members: list[dict], field: str):
+    """Return the shared value, or ``\"Varies\"`` when members disagree."""
+    vals: list = []
+    for m in members:
+        if field not in m:
+            continue
+        v = m[field]
+        if v is None:
+            continue
+        vals.append(v)
+    if not vals:
+        return None
+    first = vals[0]
+    if all(v == first for v in vals):
+        return first
+    return "Varies"
+
+
+def _amalgamate(
+    flat_rows: list[dict],
+    *,
+    key_fn,
+    label_field: str,
+    enrich: Callable[[list[dict]], dict] | None = None,
+) -> list[dict]:
+    """Collapse per-session rows that share the same logical entity (by *key_fn*)."""
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for row in flat_rows:
+        key = key_fn(row)
+        if not key:
+            continue
+        groups[key].append(row)
+
+    out: list[dict] = []
+    for members in groups.values():
+        members.sort(key=lambda m: (m.get("session_name") or "").lower())
+        label = (members[0].get(label_field) or "").strip() or members[0].get(label_field)
+        session_names = _uniq_sorted_session_names(members)
+        entry: dict = {
+            label_field: label,
+            "session_names": session_names,
+            "session_count": len(session_names),
+            "members": [
+                {
+                    "session_id": m["session_id"],
+                    "session_name": m["session_name"],
+                    "entity_id": m.get("id"),
+                }
+                for m in members
+            ],
+        }
+        if enrich is not None:
+            entry.update(enrich(members))
+        out.append(entry)
+    out.sort(key=lambda r: (str(r.get(label_field) or "")).lower())
+    return out
 
 
 def global_session_for_timetable(db: Session, timetable_session_id: int) -> GlobalSession | None:
@@ -179,7 +260,15 @@ def _session_name_map(db: Session, session_ids: list[int]) -> dict[int, str]:
 
 def aggregated_staff(db: Session, global_session_id: int) -> list[dict]:
     names = _session_name_map(db, member_session_ids(db, global_session_id))
-    rows: list[dict] = []
+    flat: list[dict] = []
+    from timetable.core.staff_hours import (
+        classify_staff_variance,
+        lecturing_hours_from_fte,
+        staff_tab_total_hours,
+    )
+
+    from .global_staff_hours import staff_hours_snapshot_for_staff_linked
+
     for sid in names:
         for s in (
             db.query(Staff)
@@ -187,7 +276,16 @@ def aggregated_staff(db: Session, global_session_id: int) -> list[dict]:
             .order_by(Staff.name)
             .all()
         ):
-            rows.append(
+            snap = staff_hours_snapshot_for_staff_linked(db, s)
+            lh = lecturing_hours_from_fte(s.fte)
+            total = staff_tab_total_hours(s, snap)
+            variance = (total - lh) if lh is not None else None
+            category = (
+                classify_staff_variance(fte=s.fte, lecturing_hours=lh, total_hours=total)
+                if lh is not None
+                else "unknown"
+            )
+            flat.append(
                 {
                     "id": s.id,
                     "session_id": sid,
@@ -196,15 +294,31 @@ def aggregated_staff(db: Session, global_session_id: int) -> list[dict]:
                     "fte": s.fte,
                     "max_hours_per_week": s.max_hours_per_week,
                     "non_teaching_day": s.non_teaching_day,
+                    "variance": variance,
+                    "variance_category": category,
                 }
             )
-    rows.sort(key=lambda r: (r["name"].lower(), r["session_name"].lower()))
-    return rows
+
+    def enrich(members: list[dict]) -> dict:
+        return {
+            "fte": _merge_field(members, "fte"),
+            "max_hours_per_week": _merge_field(members, "max_hours_per_week"),
+            "non_teaching_day": _merge_field(members, "non_teaching_day"),
+            "variance": _merge_field(members, "variance"),
+            "member_variances": [m.get("variance") for m in members],
+        }
+
+    return _amalgamate(
+        flat,
+        key_fn=lambda r: normalize_staff_name(r.get("name")),
+        label_field="name",
+        enrich=enrich,
+    )
 
 
 def aggregated_rooms(db: Session, global_session_id: int) -> list[dict]:
     names = _session_name_map(db, member_session_ids(db, global_session_id))
-    rows: list[dict] = []
+    flat: list[dict] = []
     for sid in names:
         for r in (
             db.query(Room)
@@ -212,7 +326,7 @@ def aggregated_rooms(db: Session, global_session_id: int) -> list[dict]:
             .order_by(Room.code)
             .all()
         ):
-            rows.append(
+            flat.append(
                 {
                     "id": r.id,
                     "session_id": sid,
@@ -223,38 +337,65 @@ def aggregated_rooms(db: Session, global_session_id: int) -> list[dict]:
                     "capacity": r.capacity,
                 }
             )
-    rows.sort(key=lambda r: (r["code"].lower(), r["session_name"].lower()))
-    return rows
+
+    def enrich(members: list[dict]) -> dict:
+        return {
+            "name": _merge_field(members, "name"),
+            "room_type": _merge_field(members, "room_type"),
+            "capacity": _merge_field(members, "capacity"),
+        }
+
+    return _amalgamate(
+        flat,
+        key_fn=lambda r: _normalize_label(r.get("code")),
+        label_field="code",
+        enrich=enrich,
+    )
 
 
 def aggregated_units(db: Session, global_session_id: int) -> list[dict]:
     names = _session_name_map(db, member_session_ids(db, global_session_id))
-    rows: list[dict] = []
+    flat: list[dict] = []
     for sid in names:
+        qual_by_unit = qualification_names_by_unit(db, timetable_session_id=sid)
         for u in (
             db.query(Unit)
             .filter(Unit.timetable_session_id == sid)
             .order_by(Unit.name)
             .all()
         ):
-            rows.append(
+            flat.append(
                 {
                     "id": u.id,
                     "session_id": sid,
                     "session_name": names[sid],
                     "name": u.name,
+                    "qualifications": qual_by_unit.get(u.id) or "—",
                     "length_slots": u.length_slots,
                     "double_session": getattr(u, "double_session", 0) or 0,
                     "component_codes": u.component_codes,
                 }
             )
-    rows.sort(key=lambda r: (r["name"].lower(), r["session_name"].lower()))
-    return rows
+
+    def enrich(members: list[dict]) -> dict:
+        return {
+            "qualifications": _merge_qualification_labels(members),
+            "length_slots": _merge_field(members, "length_slots"),
+            "double_session": _merge_field(members, "double_session"),
+            "component_codes": _merge_field(members, "component_codes"),
+        }
+
+    return _amalgamate(
+        flat,
+        key_fn=lambda r: _normalize_label(r.get("name")),
+        label_field="name",
+        enrich=enrich,
+    )
 
 
 def aggregated_qualifications(db: Session, global_session_id: int) -> list[dict]:
     names = _session_name_map(db, member_session_ids(db, global_session_id))
-    rows: list[dict] = []
+    flat: list[dict] = []
     for sid in names:
         for q in (
             db.query(Qualification)
@@ -262,7 +403,7 @@ def aggregated_qualifications(db: Session, global_session_id: int) -> list[dict]
             .order_by(Qualification.name)
             .all()
         ):
-            rows.append(
+            flat.append(
                 {
                     "id": q.id,
                     "session_id": sid,
@@ -273,24 +414,87 @@ def aggregated_qualifications(db: Session, global_session_id: int) -> list[dict]
                     "delivery_mode": getattr(q, "delivery_mode", "regular"),
                 }
             )
-    rows.sort(key=lambda r: (r["name"].lower(), r["session_name"].lower()))
-    return rows
+
+    def enrich(members: list[dict]) -> dict:
+        return {
+            "num_groups": _sum_int_field(members, "num_groups"),
+            "schedule_period": _merge_field(members, "schedule_period"),
+            "delivery_mode": _merge_field(members, "delivery_mode"),
+        }
+
+    return _amalgamate(
+        flat,
+        key_fn=lambda r: _normalize_label(r.get("name")),
+        label_field="name",
+        enrich=enrich,
+    )
+
+
+def _merge_qualification_labels(rows: list[dict]) -> str:
+    parts: list[str] = []
+    for row in rows:
+        raw = (row.get("qualifications") or "").strip()
+        if raw and raw != "—":
+            parts.extend(p.strip() for p in raw.split(",") if p.strip())
+    if not parts:
+        return "—"
+    return ", ".join(sorted(set(parts), key=str.casefold))
+
+
+def _merge_custodian_detail(rows: list[dict], field: str) -> str:
+    """Combine per-session values; prefix with session when they differ."""
+    if not rows:
+        return "—"
+    values = [(r.get("session_name") or "", (r.get(field) or "—").strip()) for r in rows]
+    bare = {v for _, v in values if v and v != "—"}
+    if len(bare) == 1:
+        return bare.pop()
+    if len(bare) == 0:
+        return "—"
+    return "; ".join(f"{sn}: {val}" for sn, val in values if val and val != "—")
 
 
 def aggregated_class_custodians(db: Session, global_session_id: int) -> dict:
     session_ids = member_session_ids(db, global_session_id)
     names = _session_name_map(db, session_ids)
-    all_rows: list[dict] = []
+    flat: list[dict] = []
     for sid in session_ids:
         report = class_custodians_for_session(db, timetable_session_id=sid)
         for row in report.get("rows", []):
-            all_rows.append(
+            flat.append(
                 {
                     **row,
                     "session_id": sid,
                     "session_name": names.get(sid, f"Session {sid}"),
                 }
             )
-    all_rows.sort(key=lambda r: (r["unit_name"].lower(), r["session_name"].lower()))
-    summary = f"{len(all_rows)} class row(s) across {len(session_ids)} linked session(s)"
-    return {"rows": all_rows, "summary": summary}
+
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for row in flat:
+        key = _normalize_label(row.get("unit_name"))
+        if key:
+            groups[key].append(row)
+
+    amalgamated: list[dict] = []
+    for members in groups.values():
+        members.sort(key=lambda m: (m.get("session_name") or "").lower())
+        session_names = _uniq_sorted_session_names(members)
+        amalgamated.append(
+            {
+                "unit_id": members[0].get("unit_id"),
+                "unit_name": (members[0].get("unit_name") or "").strip(),
+                "session_names": session_names,
+                "session_count": len(session_names),
+                "qualifications": _merge_qualification_labels(members),
+                "lecturers": _merge_custodian_detail(members, "lecturers"),
+                "custodian": _merge_custodian_detail(members, "custodian"),
+            }
+        )
+    amalgamated.sort(key=lambda r: (r["unit_name"] or "").lower())
+
+    raw_count = len(flat)
+    summary = (
+        f"{len(amalgamated)} class(es) amalgamated from {raw_count} row(s) "
+        f"across {len(session_ids)} linked session(s)"
+    )
+    return {"rows": amalgamated, "summary": summary}

@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   Course,
@@ -193,6 +193,7 @@ export function TimetablePage() {
   const externalViewsMenu = useDropdown();
   const [pendingEditBookingId, setPendingEditBookingId] = useState<number | null>(null);
   const [globalLink, setGlobalLink] = useState<TimetableGlobalLink | null>(null);
+  const [entitySyncToken, setEntitySyncToken] = useState(0);
   const importRef = useRef<HTMLInputElement>(null);
   const colourByClassRef = useRef(colourByClass);
   colourByClassRef.current = colourByClass;
@@ -389,9 +390,14 @@ export function TimetablePage() {
     previewSemesterWeek,
   ]);
 
+  const linkedSessionIds = useMemo(
+    () => (globalLink?.linked && globalLink.member_session_ids?.length ? globalLink.member_session_ids : undefined),
+    [globalLink?.linked, globalLink?.member_session_ids?.join(",")],
+  );
+
   const notifyPeers = useCallback(() => {
-    notifySessionChanged(sessionId);
-  }, [sessionId]);
+    notifySessionChanged(sessionId, linkedSessionIds);
+  }, [sessionId, linkedSessionIds]);
 
   useEffect(() => {
     writeDisplayPrefs({ colourByClass, showAlerts });
@@ -465,11 +471,17 @@ export function TimetablePage() {
     await loadHoldingForView(sessionId, viewState());
   }, [sessionId, loadHoldingForView, viewKind, courseId, blockCourseId, blockWeekIndex]);
 
-  useSessionSync(sessionId, () => {
-    void reloadView();
-    setChangeLogKey((k) => k + 1);
-    void refreshHolding();
-  });
+  useSessionSync(
+    sessionId,
+    () => {
+      void reloadView();
+      void loadSidebarEntities(sessionId, viewKind);
+      setEntitySyncToken((t) => t + 1);
+      setChangeLogKey((k) => k + 1);
+      void refreshHolding();
+    },
+    linkedSessionIds,
+  );
 
   useEffect(() => {
     if (!getToken()) {
@@ -549,8 +561,11 @@ export function TimetablePage() {
         }
         urlReadyRef.current = true;
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load");
-        if (String(err).includes("401")) {
+        const msg = err instanceof Error ? err.message : "Failed to load";
+        setError(msg);
+        if (msg.includes("Session not found")) {
+          navigate("/dashboard");
+        } else if (msg.includes("401") || msg.includes("Not authenticated")) {
           setToken(null);
           navigate("/login");
         }
@@ -1674,6 +1689,7 @@ export function TimetablePage() {
           onUpdated={onEntityUpdated}
           fixedTab="staff"
           showLinkedImport={globalLink?.linked === true}
+          syncToken={entitySyncToken}
         />
       )}
       {sessionTab === "rooms" && courses.length > 0 && (

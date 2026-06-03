@@ -43,24 +43,38 @@ function postMessage(msg: SessionSyncMessage): void {
   }
 }
 
-/** Call after a successful booking or session mutation in this tab. */
-export function notifySessionChanged(sessionId: number): void {
-  if (!sessionId) return;
-  postMessage({ sessionId, sourceTabId: tabId(), at: Date.now() });
+function watchSessionIds(sessionId: number, linkedSessionIds?: number[]): Set<number> {
+  const ids = new Set<number>([sessionId]);
+  for (const id of linkedSessionIds ?? []) {
+    if (id) ids.add(id);
+  }
+  return ids;
 }
 
-function isRemoteMessage(msg: unknown, sessionId: number): msg is SessionSyncMessage {
+/** Call after a successful booking or session mutation in this tab. */
+export function notifySessionChanged(sessionId: number, linkedSessionIds?: number[]): void {
+  if (!sessionId) return;
+  const msg = { sourceTabId: tabId(), at: Date.now() };
+  for (const id of watchSessionIds(sessionId, linkedSessionIds)) {
+    postMessage({ ...msg, sessionId: id });
+  }
+}
+
+function isRemoteMessage(msg: unknown, watchIds: Set<number>): msg is SessionSyncMessage {
   if (!msg || typeof msg !== "object") return false;
   const m = msg as SessionSyncMessage;
-  return m.sessionId === sessionId && m.sourceTabId !== tabId();
+  return watchIds.has(m.sessionId) && m.sourceTabId !== tabId();
 }
 
-/** Subscribe to timetable changes made in other tabs for the same session. */
+/** Subscribe to timetable changes made in other tabs for this session and linked peers. */
 export function subscribeSessionChanges(
   sessionId: number,
   onRemoteChange: () => void,
+  linkedSessionIds?: number[],
 ): () => void {
   if (!sessionId) return () => undefined;
+
+  const watchIds = watchSessionIds(sessionId, linkedSessionIds);
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   const schedule = () => {
@@ -72,7 +86,7 @@ export function subscribeSessionChanges(
   };
 
   const handle = (data: unknown) => {
-    if (isRemoteMessage(data, sessionId)) schedule();
+    if (isRemoteMessage(data, watchIds)) schedule();
   };
 
   let channel: BroadcastChannel | null = null;
@@ -100,11 +114,17 @@ export function subscribeSessionChanges(
   };
 }
 
-export function useSessionSync(sessionId: number, onRemoteChange: () => void): void {
+export function useSessionSync(
+  sessionId: number,
+  onRemoteChange: () => void,
+  linkedSessionIds?: number[],
+): void {
   const handlerRef = useRef(onRemoteChange);
   handlerRef.current = onRemoteChange;
+  const linkedKey = linkedSessionIds?.slice().sort((a, b) => a - b).join(",") ?? "";
   useEffect(() => {
     if (!sessionId) return;
-    return subscribeSessionChanges(sessionId, () => handlerRef.current());
-  }, [sessionId]);
+    const linked = linkedKey ? linkedKey.split(",").map((s) => Number(s)) : undefined;
+    return subscribeSessionChanges(sessionId, () => handlerRef.current(), linked);
+  }, [sessionId, linkedKey]);
 }

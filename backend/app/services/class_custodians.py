@@ -1,10 +1,27 @@
 """Class custodian report for a timetable session."""
 from __future__ import annotations
 
+from collections import defaultdict
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from timetable.core.models import Booking, Semester, Staff, Unit, Week
+from timetable.core.models import Booking, Qualification, Semester, Staff, Unit, UnitQualification, Week
+
+
+def qualification_names_by_unit(db: Session, *, timetable_session_id: int) -> dict[int, str]:
+    rows = (
+        db.query(UnitQualification.unit_id, Qualification.name)
+        .join(Qualification, UnitQualification.qualification_id == Qualification.id)
+        .join(Unit, UnitQualification.unit_id == Unit.id)
+        .filter(Unit.timetable_session_id == timetable_session_id)
+        .order_by(Qualification.name)
+        .all()
+    )
+    by_unit: dict[int, list[str]] = defaultdict(list)
+    for uid, name in rows:
+        by_unit[int(uid)].append((name or "").strip())
+    return {uid: ", ".join(names) for uid, names in by_unit.items() if names}
 
 
 def class_custodians_for_session(db: Session, *, timetable_session_id: int) -> dict:
@@ -23,6 +40,8 @@ def class_custodians_for_session(db: Session, *, timetable_session_id: int) -> d
     ]
     if not week_ids:
         return {"rows": [], "summary": "No timetable weeks in this session."}
+
+    qual_by_unit = qualification_names_by_unit(db, timetable_session_id=timetable_session_id)
 
     assigned = (
         db.query(Booking.unit_id, Booking.staff_id, func.count(Booking.id))
@@ -77,6 +96,7 @@ def class_custodians_for_session(db: Session, *, timetable_session_id: int) -> d
             {
                 "unit_id": u.id,
                 "unit_name": u.name or "(unnamed)",
+                "qualifications": qual_by_unit.get(u.id) or "—",
                 "lecturers": ", ".join(lecturer_parts) if lecturer_parts else "—",
                 "custodian": custodian["name"] if custodian else "—",
                 "custodian_deliveries": custodian["deliveries"] if custodian else 0,

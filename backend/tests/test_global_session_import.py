@@ -151,3 +151,52 @@ def test_import_staff_and_qualifications_between_linked_sessions(client):
         .first()
     )
     assert link is not None
+
+
+def test_import_into_second_member_not_first(client):
+    """Import target URL session_id must be the chosen target, not always member[0]."""
+    test_client, SessionLocal = client
+    token, org_id = _register(test_client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    id_first = test_client.post(
+        f"/orgs/{org_id}/sessions", headers=headers, json={"name": "Alpha"}
+    ).json()["id"]
+    id_second = test_client.post(
+        f"/orgs/{org_id}/sessions", headers=headers, json={"name": "Beta"}
+    ).json()["id"]
+    gid = test_client.post(
+        f"/orgs/{org_id}/global-sessions", headers=headers, json={"name": "Group"}
+    ).json()["id"]
+    test_client.put(
+        f"/global-sessions/{gid}/members",
+        headers=headers,
+        json={"timetable_session_ids": [id_first, id_second]},
+    )
+
+    db = SessionLocal()
+    staff = Staff(name="Beta Only Lecturer", timetable_session_id=id_first, fte=1.0)
+    db.add(staff)
+    db.commit()
+
+    imp = test_client.post(
+        f"/sessions/{id_second}/import-from-linked",
+        headers=headers,
+        json={"source_session_id": id_first, "staff_ids": [staff.id], "qualification_ids": []},
+    )
+    assert imp.status_code == 200, imp.text
+    assert imp.json()["staff"]["added"] == ["Beta Only Lecturer"]
+
+    db2 = SessionLocal()
+    in_second = (
+        db2.query(Staff)
+        .filter(Staff.timetable_session_id == id_second, Staff.name == "Beta Only Lecturer")
+        .count()
+    )
+    in_first = (
+        db2.query(Staff)
+        .filter(Staff.timetable_session_id == id_first, Staff.name == "Beta Only Lecturer")
+        .count()
+    )
+    assert in_second == 1
+    assert in_first == 1

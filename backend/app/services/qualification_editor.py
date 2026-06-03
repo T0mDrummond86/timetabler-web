@@ -92,7 +92,11 @@ def sync_qualification_regular_groups(db: Session, qual: Qualification, new_coun
     if new_count > existing_count:
         for i in range(existing_count, new_count):
             code = qualification_group_code(qual.name, i)
-            existing_by_code = db.query(Course).filter_by(code=code).first()
+            existing_by_code = (
+                db.query(Course)
+                .filter_by(code=code, timetable_session_id=qual.timetable_session_id)
+                .first()
+            )
             if existing_by_code is not None:
                 if existing_by_code.is_block_cohort:
                     continue

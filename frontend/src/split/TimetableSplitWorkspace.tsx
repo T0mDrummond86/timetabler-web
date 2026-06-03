@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, type Course, Room, Staff } from "../api";
+import { api, type Course, Room, Staff, TimetableGlobalLink } from "../api";
 import type { BookingCard, TimetableEntity, TimetableGrid } from "../types";
 import { BlockDeliveryPanel } from "../components/BlockDeliveryPanel";
 import { BookingEditDialog } from "../components/BookingEditDialog";
@@ -98,6 +98,20 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [mutating, setMutating] = useState(false);
   const [days, setDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri"]);
+  const [globalLink, setGlobalLink] = useState<TimetableGlobalLink | null>(null);
+
+  const linkedSessionIds = useMemo(
+    () => (globalLink?.linked && globalLink.member_session_ids?.length ? globalLink.member_session_ids : undefined),
+    [globalLink?.linked, globalLink?.member_session_ids?.join(",")],
+  );
+
+  const notifyLinked = useCallback(() => {
+    notifySessionChanged(sessionId, linkedSessionIds);
+  }, [sessionId, linkedSessionIds]);
+
+  useEffect(() => {
+    void api.timetableGlobalLink(sessionId).then(setGlobalLink).catch(() => setGlobalLink(null));
+  }, [sessionId]);
 
   const syncingRef = useRef(false);
   const gridsRef = useRef<(TimetableGrid | null)[]>(Array(count).fill(null));
@@ -172,23 +186,28 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
   const onGroupRenamed = useCallback(
     (_updated: Course) => {
       bumpRefresh();
-      notifySessionChanged(sessionId);
+      notifyLinked();
       const slot = slotsRef.current[activeIndex] ?? slotsRef.current[0];
       if (slot?.viewKind === "block_delivery" && slot.qualificationId) {
         void loadBlockPanel(slot);
       }
       if (slot) void loadSidebarEntities(slot.viewKind);
     },
-    [sessionId, bumpRefresh, activeIndex, loadBlockPanel, loadSidebarEntities],
+    [notifyLinked, bumpRefresh, activeIndex, loadBlockPanel, loadSidebarEntities],
   );
 
-  useSessionSync(sessionId, () => {
-    bumpRefresh();
-    const slot = slotsRef.current[activeIndex] ?? slotsRef.current[0];
-    if (slot?.viewKind === "block_delivery" && slot.qualificationId) {
-      void loadBlockPanel(slot);
-    }
-  });
+  useSessionSync(
+    sessionId,
+    () => {
+      bumpRefresh();
+      const slot = slotsRef.current[activeIndex] ?? slotsRef.current[0];
+      if (slot) void loadSidebarEntities(slot.viewKind);
+      if (slot?.viewKind === "block_delivery" && slot.qualificationId) {
+        void loadBlockPanel(slot);
+      }
+    },
+    linkedSessionIds,
+  );
 
   const initAllSlots = useCallback(async () => {
     setLoading(true);
@@ -352,7 +371,7 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
 
   async function afterMutation() {
     bumpRefresh();
-    notifySessionChanged(sessionId);
+    notifyLinked();
   }
 
   async function onMove(bookingId: number, column: number, startSlot: number) {
@@ -387,7 +406,7 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
     try {
       await api.dismissViolation(sessionId, bookingId, code);
       bumpRefresh(activeIndex);
-      notifySessionChanged(sessionId);
+      notifyLinked();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Dismiss failed");
     }
@@ -445,7 +464,7 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
               .then(() => {
                 void loadBlockPanel(activeSlot);
                 bumpRefresh(activeIndex);
-                notifySessionChanged(sessionId);
+                notifyLinked();
               });
           }}
           onBlockLengthChange={(w) => {
@@ -455,7 +474,7 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
               .then(() => {
                 void loadBlockPanel(activeSlot);
                 bumpRefresh(activeIndex);
-                notifySessionChanged(sessionId);
+                notifyLinked();
               });
           }}
         />

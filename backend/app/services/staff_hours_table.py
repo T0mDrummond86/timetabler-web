@@ -8,9 +8,10 @@ from timetable.core.staff_hours import (
     classify_staff_variance,
     lecturing_hours_from_fte,
     staff_hours_snapshot_for_bookings,
-    staff_hours_snapshots_by_staff_id,
     staff_tab_total_hours,
 )
+
+from .global_staff_hours import staff_hours_snapshot_for_staff
 
 
 def _prefs_text(prefs: dict[int, list[str]], priority: int) -> str:
@@ -27,7 +28,6 @@ def staff_hours_table_rows(db: Session, *, timetable_session_id: int) -> list[di
     if not rows:
         return []
 
-    snap_map = staff_hours_snapshots_by_staff_id(db)
     staff_ids = [s.id for s in rows]
     pref_rows = (
         db.query(StaffPreference)
@@ -45,7 +45,7 @@ def staff_hours_table_rows(db: Session, *, timetable_session_id: int) -> list[di
 
     out: list[dict] = []
     for s in rows:
-        snap = snap_map.get(s.id) or staff_hours_snapshot_for_bookings([])
+        snap = staff_hours_snapshot_for_staff(db, s)
         lh = lecturing_hours_from_fte(s.fte)
         total = staff_tab_total_hours(s, snap)
         variance = (total - lh) if lh is not None else None

@@ -22,7 +22,10 @@ export function LinkedSessionImportPanel({
   importQualifications = true,
 }: Props) {
   const [linked, setLinked] = useState<LinkedSession[]>([]);
-  const [targetId, setTargetId] = useState(targetSessionId);
+  const hasTargetPicker = Boolean(targetOptions && targetOptions.length > 1);
+  const [targetId, setTargetId] = useState(
+    () => targetOptions?.[0]?.id ?? targetSessionId,
+  );
   const [sourceId, setSourceId] = useState<number | "">("");
   const [wantStaff, setWantStaff] = useState(false);
   const [wantQual, setWantQual] = useState(false);
@@ -69,9 +72,17 @@ export function LinkedSessionImportPanel({
     }
   }, [targetId, sourceId]);
 
+  // Timetable page: follow the open session. Global page: keep user’s “Into session” choice.
   useEffect(() => {
+    if (hasTargetPicker) return;
     setTargetId(targetSessionId);
-  }, [targetSessionId]);
+  }, [targetSessionId, hasTargetPicker]);
+
+  useEffect(() => {
+    if (!targetOptions?.length) return;
+    if (targetOptions.some((t) => t.id === targetId)) return;
+    setTargetId(targetOptions[0].id);
+  }, [targetOptions, targetId]);
 
   useEffect(() => {
     void loadLinked();
@@ -82,8 +93,11 @@ export function LinkedSessionImportPanel({
     setSelectedQualIds([]);
     setWantStaff(false);
     setWantQual(false);
+  }, [sourceId, targetId]);
+
+  useEffect(() => {
     void loadOptions();
-  }, [loadOptions, sourceId, targetId]);
+  }, [loadOptions]);
 
   function openPicker(kind: PickerKind) {
     if (sourceId === "") {
@@ -105,8 +119,22 @@ export function LinkedSessionImportPanel({
     else setSelectedQualIds([]);
   }
 
+  function formatSkipped(skipped: { name: string; reason: string }[]): string {
+    if (!skipped.length) return "";
+    const detail = skipped
+      .slice(0, 3)
+      .map((s) => `${s.name} (${s.reason})`)
+      .join("; ");
+    const more = skipped.length > 3 ? `; +${skipped.length - 3} more` : "";
+    return ` — skipped: ${detail}${more}`;
+  }
+
   async function runImport() {
     if (sourceId === "") return;
+    if (!targetId) {
+      setError("Choose which session to import into.");
+      return;
+    }
     if (!selectedStaffIds.length && !selectedQualIds.length) {
       setError("Select staff and/or qualifications to import.");
       return;
@@ -114,37 +142,55 @@ export function LinkedSessionImportPanel({
     setBusy(true);
     setError(null);
     setMessage(null);
+    const targetName =
+      targetOptions?.find((t) => t.id === targetId)?.name ??
+      linked.find((s) => s.id === targetId)?.name ??
+      `session #${targetId}`;
+    const sourceName = linked.find((s) => s.id === sourceId)?.name ?? `session #${sourceId}`;
     try {
       const result = await api.importFromLinkedSession(targetId, {
         source_session_id: Number(sourceId),
         staff_ids: selectedStaffIds,
         qualification_ids: selectedQualIds,
       });
-      const parts: string[] = [];
+      const parts: string[] = [`Into “${targetName}” from “${sourceName}”`];
+      let anyAdded = false;
       if (result.staff) {
+        anyAdded = anyAdded || result.staff.added.length > 0;
         parts.push(
           `Staff: ${result.staff.added.length} added` +
-            (result.staff.skipped.length ? `, ${result.staff.skipped.length} skipped` : ""),
+            (result.staff.added.length ? ` (${result.staff.added.join(", ")})` : "") +
+            formatSkipped(result.staff.skipped),
         );
       }
       if (result.qualifications) {
+        anyAdded = anyAdded || result.qualifications.added.length > 0;
         let qualPart =
           `Qualifications: ${result.qualifications.added.length} added` +
-          (result.qualifications.skipped.length
-            ? `, ${result.qualifications.skipped.length} skipped`
-            : "");
+          (result.qualifications.added.length
+            ? ` (${result.qualifications.added.join(", ")})`
+            : "") +
+          formatSkipped(result.qualifications.skipped);
         if (result.qualifications.classes_added?.length) {
-          qualPart += `; ${result.qualifications.classes_added.length} class(es)`;
+          qualPart += `; classes: ${result.qualifications.classes_added.join(", ")}`;
         }
         parts.push(qualPart);
       }
-      setMessage(parts.join(" · ") || "Nothing imported.");
-      setSelectedStaffIds([]);
-      setSelectedQualIds([]);
-      setWantStaff(false);
-      setWantQual(false);
-      onImported?.();
-      void loadOptions();
+      if (!anyAdded) {
+        setError(
+          parts.slice(1).join(" · ") ||
+            "Nothing was imported — items may already exist in the target session.",
+        );
+        setMessage(null);
+      } else {
+        setMessage(parts.join(" · "));
+        setSelectedStaffIds([]);
+        setSelectedQualIds([]);
+        setWantStaff(false);
+        setWantQual(false);
+        onImported?.();
+        void loadOptions();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed");
     } finally {
@@ -168,15 +214,22 @@ export function LinkedSessionImportPanel({
   const targets = targetOptions?.length
     ? targetOptions
     : [{ id: targetSessionId, name: "This session" }];
+  const targetLabel = targets.find((t) => t.id === targetId)?.name ?? targets[0]?.name;
 
   return (
     <>
       <section className="linked-import-panel card">
         <h3>Import from linked session</h3>
         <p className="muted entity-hint">
-          Choose a source session, tick staff or qualifications, then pick exactly which rows to
-          copy. Qualifications are imported with one group and their linked classes.
+          Choose a source session, tick staff or qualifications, pick rows in each list, then
+          press <strong>Import selected</strong> below (the popup button only saves your
+          selection). Qualifications are imported with one group and their linked classes.
         </p>
+        {hasTargetPicker && targetLabel && (
+          <p className="linked-import-target-hint">
+            Importing into: <strong>{targetLabel}</strong>
+          </p>
+        )}
         <div className="linked-import-fields">
           {targetOptions && targetOptions.length > 1 && (
             <label>

@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   api,
   GlobalSession,
@@ -11,9 +11,50 @@ import {
 } from "../api";
 import type { GlobalClassCustodians } from "../types";
 import { AppShell } from "../components/AppShell";
+import { ClassCustodiansTable } from "../components/ClassCustodiansTable";
+import {
+  formatGlobalVariance,
+  GlobalFilteredAggregateTable,
+  qualificationListFilter,
+  sessionFilter,
+  uniqFieldFilter,
+  varianceSignFilter,
+} from "../components/GlobalFilteredAggregateTable";
 import { LinkedSessionImportPanel } from "../components/LinkedSessionImportPanel";
+import { useSessionSync } from "../lib/sessionSync";
 
 type Tab = "staff" | "rooms" | "units" | "qualifications" | "custodians" | "members";
+
+const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+
+function formatSessions(sessionNames: string[]): string {
+  return sessionNames.join(", ");
+}
+
+function formatNonTeachingDay(value: number | string | null | undefined): string | number {
+  if (value === "Varies") return "Varies";
+  if (value == null) return "—";
+  if (typeof value === "number" && value >= 0 && value <= 4) return DAY_NAMES[value] ?? value;
+  return String(value);
+}
+
+function formatLengthHours(slots: number | string | null | undefined): string | number {
+  if (slots === "Varies") return "Varies";
+  if (slots == null) return "—";
+  if (typeof slots === "number") return slots / 2;
+  return String(slots);
+}
+
+function formatDoubleSession(value: number | string | undefined): string {
+  if (value === "Varies") return "Varies";
+  return value ? "Yes" : "No";
+}
+
+function formatVaries(value: string | number | null | undefined): string | number {
+  if (value === "Varies") return "Varies";
+  if (value == null) return "—";
+  return value;
+}
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "members", label: "Linked sessions" },
@@ -40,6 +81,12 @@ export function GlobalSessionPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tabSyncToken, setTabSyncToken] = useState(0);
+
+  const memberSessionIds = useMemo(
+    () => global?.member_sessions.map((m) => m.id) ?? [],
+    [global?.member_sessions.map((m) => m.id).join(",")],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,6 +111,12 @@ export function GlobalSessionPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useSessionSync(
+    memberSessionIds[0] ?? 0,
+    () => setTabSyncToken((t) => t + 1),
+    memberSessionIds.length ? memberSessionIds : undefined,
+  );
 
   useEffect(() => {
     if (tab === "members" || loading) return;
@@ -93,7 +146,7 @@ export function GlobalSessionPage() {
     return () => {
       cancelled = true;
     };
-  }, [tab, globalSessionId, loading]);
+  }, [tab, globalSessionId, loading, tabSyncToken]);
 
   async function saveMembers() {
     setSaving(true);
@@ -163,7 +216,12 @@ export function GlobalSessionPage() {
           targetOptions={global.member_sessions}
           onImported={() => {
             void load();
-            if (tab !== "members") return;
+            void api.globalSessionStaff(globalSessionId).then((d) => setStaff(d.rows)).catch(() => {});
+            void api
+              .globalSessionQualifications(globalSessionId)
+              .then((d) => setQuals(d.rows))
+              .catch(() => {});
+            void api.globalSessionUnits(globalSessionId).then((d) => setUnits(d.rows)).catch(() => {});
           }}
         />
       )}
@@ -216,71 +274,120 @@ export function GlobalSessionPage() {
       )}
 
       {tab === "staff" && (
-        <AggregatedTable
-          headers={["Session", "Name", "FTE", "Non-teaching day"]}
+        <GlobalFilteredAggregateTable
+          rows={staff}
           empty="No staff in linked sessions."
-          rows={staff.map((r) => [
-            r.session_name,
-            r.name,
-            r.fte ?? "—",
-            r.non_teaching_day != null ? ["Mon", "Tue", "Wed", "Thu", "Fri"][r.non_teaching_day] ?? r.non_teaching_day : "—",
-          ])}
+          filters={[
+            sessionFilter<GlobalAggregatedStaffRow>(),
+            uniqFieldFilter<GlobalAggregatedStaffRow>("fte", "FTE", (r) => r.fte),
+            uniqFieldFilter<GlobalAggregatedStaffRow>(
+              "non_teaching_day",
+              "Non-teaching day",
+              (r) => r.non_teaching_day,
+              (v) => {
+                if (v === "—" || v === "Varies") return v;
+                return String(formatNonTeachingDay(Number(v)));
+              },
+            ),
+            varianceSignFilter<GlobalAggregatedStaffRow>(),
+          ]}
+          columns={[
+            { header: "Name", cell: (r) => r.name },
+            { header: "Used in sessions", cell: (r) => formatSessions(r.session_names) },
+            { header: "FTE", cell: (r) => formatVaries(r.fte) },
+            {
+              header: "Non-teaching day",
+              cell: (r) => formatNonTeachingDay(r.non_teaching_day),
+            },
+            {
+              header: "Variance",
+              cell: (r) => formatGlobalVariance(r.variance),
+              cellClassName: (r) => {
+                const v = r.variance;
+                if (typeof v !== "number") return undefined;
+                if (v < -0.001) return "variance-cell variance-full-fte-shortfall";
+                if (v > 0.001) return "variance-cell variance-full-fte-overtime";
+                return "variance-cell";
+              },
+            },
+          ]}
         />
       )}
 
       {tab === "rooms" && (
         <AggregatedTable
-          headers={["Session", "Code", "Name", "Type", "Capacity"]}
+          headers={["Code", "Used in sessions", "Name", "Type", "Capacity"]}
           empty="No rooms in linked sessions."
           rows={rooms.map((r) => [
-            r.session_name,
             r.code,
-            r.name ?? "—",
-            r.room_type ?? "—",
-            r.capacity ?? "—",
+            formatSessions(r.session_names),
+            formatVaries(r.name),
+            formatVaries(r.room_type),
+            formatVaries(r.capacity),
           ])}
         />
       )}
 
       {tab === "units" && (
-        <AggregatedTable
-          headers={["Session", "Class", "Length (h)", "Double session"]}
+        <GlobalFilteredAggregateTable
+          rows={units}
           empty="No classes in linked sessions."
-          rows={units.map((r) => [
-            r.session_name,
-            r.name,
-            r.length_slots ? r.length_slots / 2 : "—",
-            r.double_session ? "Yes" : "—",
-          ])}
+          filters={[
+            sessionFilter<GlobalAggregatedUnitRow>(),
+            qualificationListFilter<GlobalAggregatedUnitRow>(
+              (r: GlobalAggregatedUnitRow) => r.qualifications ?? "—",
+            ),
+          ]}
+          columns={[
+            { header: "Class", cell: (r) => r.name },
+            { header: "Used in sessions", cell: (r) => formatSessions(r.session_names) },
+            { header: "Linked qualifications", cell: (r) => r.qualifications ?? "—" },
+            { header: "Length (h)", cell: (r) => formatLengthHours(r.length_slots) },
+            { header: "Double session", cell: (r) => formatDoubleSession(r.double_session) },
+          ]}
         />
       )}
 
       {tab === "qualifications" && (
-        <AggregatedTable
-          headers={["Session", "Qualification", "Groups", "Period"]}
+        <GlobalFilteredAggregateTable
+          rows={quals}
           empty="No qualifications in linked sessions."
-          rows={quals.map((r) => [
-            r.session_name,
-            r.name,
-            r.num_groups ?? "—",
-            r.schedule_period ?? "—",
-          ])}
+          filters={[
+            sessionFilter<GlobalAggregatedQualRow>(),
+            uniqFieldFilter<GlobalAggregatedQualRow>(
+              "period",
+              "Period",
+              (r: GlobalAggregatedQualRow) => r.schedule_period,
+            ),
+          ]}
+          columns={[
+            { header: "Qualification", cell: (r) => r.name },
+            { header: "Used in sessions", cell: (r) => formatSessions(r.session_names) },
+            { header: "Groups", cell: (r) => formatVaries(r.num_groups) },
+            { header: "Period", cell: (r) => formatVaries(r.schedule_period) },
+          ]}
         />
       )}
 
       {tab === "custodians" && (
-        <section className="card">
-          <p className="muted">{custodians?.summary ?? "Loading…"}</p>
-          <AggregatedTable
-            headers={["Session", "Class", "Lecturers", "Custodian"]}
-            empty="No class custodian data."
-            rows={(custodians?.rows ?? []).map((r) => [
-              r.session_name,
-              r.unit_name,
-              r.lecturers,
-              r.custodian_name ?? "—",
-            ])}
-          />
+        <section className="card class-custodians-panel">
+          {loading && !custodians ? (
+            <p className="muted">Loading…</p>
+          ) : (
+            <ClassCustodiansTable
+              amalgamatedSessions
+              summary={custodians?.summary}
+              emptyMessage="No class custodian rows match the current filters."
+              rows={(custodians?.rows ?? []).map((r) => ({
+                unit_id: r.unit_id,
+                unit_name: r.unit_name,
+                qualifications: r.qualifications ?? "—",
+                lecturers: r.lecturers,
+                custodian: r.custodian,
+                session_names: r.session_names,
+              }))}
+            />
+          )}
         </section>
       )}
 

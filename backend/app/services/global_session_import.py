@@ -17,6 +17,11 @@ from timetable.core.sidebar_order import next_staff_sidebar_order
 
 from .entity_crud import set_unit_qualifications
 from .global_sessions import global_session_for_timetable, normalize_staff_name
+from .global_staff_hours import (
+    copy_staff_online_overrides,
+    propagate_staff_hours_profile,
+    propagate_staff_online_overrides,
+)
 from .qualification_editor import sync_qualification_regular_groups
 from .timetable_grid import assert_session_in_org
 
@@ -270,6 +275,16 @@ def import_staff_from_linked_session(
                     unit_id=None,
                 )
             )
+        copy_staff_online_overrides(
+            db,
+            source_staff_id=src.id,
+            source_session_id=source_session_id,
+            target_staff_id=row.id,
+            target_session_id=target_session_id,
+        )
+        db.flush()
+        propagate_staff_hours_profile(db, src)
+        propagate_staff_online_overrides(db, src)
         existing.add(key)
         added.append(row.name)
     db.flush()

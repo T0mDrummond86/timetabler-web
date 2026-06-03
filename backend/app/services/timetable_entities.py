@@ -9,7 +9,7 @@ from timetable.core.booking_staff import sfs_co_teacher_booking_filter
 from timetable.core.models import Booking, Course, Qualification, Staff, Week
 from timetable.core.pending_classes import pending_classes_for_week
 from timetable.core.sidebar_order import ordered_courses, ordered_staff, set_course_sidebar_order, set_staff_sidebar_order
-from timetable.core.staff_hours import safe_staff_tab_total_hours_by_staff_id
+from .global_staff_hours import staff_tab_total_hours_for_staff
 from timetable.core.unassigned_lecturer import bookings_without_lecturer
 
 from .timetable_grid import count_bookings_on_day, get_repeating_week, scheduled_hours_on_day
@@ -120,11 +120,10 @@ def _block_qual_entities(db: Session, timetable_session_id: int) -> list[dict]:
 
 
 def _staff_entities(db: Session, timetable_session_id: int) -> list[dict]:
-    hours_map = safe_staff_tab_total_hours_by_staff_id(db)
     staff = [s for s in ordered_staff(db) if s.timetable_session_id == timetable_session_id]
     rows: list[dict] = []
     for s in staff:
-        h = hours_map.get(s.id, 0.0)
+        h = staff_tab_total_hours_for_staff(db, s)
         label = f"{s.name}  ·  {h:.1f} h"
         if getattr(s, "timetable_locked", 0):
             label = f"{_LOCK_PREFIX}{label}"

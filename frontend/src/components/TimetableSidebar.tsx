@@ -153,9 +153,6 @@ export function TimetableSidebar({
           value={viewKind}
           onChange={onViewKindChange}
         />
-        <p className="tt-sidebar-hint muted">
-          Switches this pane. Use <strong>Open in new tab</strong> in the toolbar for a separate window or split layout.
-        </p>
       </div>
 
       {viewExtras}

@@ -1,17 +1,16 @@
 """Extended staff detail payloads (hours, preferences, online students)."""
 from __future__ import annotations
 
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
-from timetable.core.booking_staff import staff_booking_filter_sql
-from timetable.core.models import Booking, Staff, StaffPreference
+from timetable.core.models import Staff, StaffPreference
 from timetable.core.staff_hours import (
     classify_staff_variance,
     lecturing_hours_from_fte,
-    staff_hours_snapshot_for_bookings,
-    staff_hours_snapshots_by_staff_id,
     staff_tab_total_hours,
 )
+
+from .global_staff_hours import staff_hours_snapshot_for_staff
 
 
 def staff_detail(db: Session, *, timetable_session_id: int, staff_id: int) -> dict:
@@ -23,16 +22,7 @@ def staff_detail(db: Session, *, timetable_session_id: int, staff_id: int) -> di
     if row is None:
         raise LookupError("Staff not found")
 
-    snap_map = staff_hours_snapshots_by_staff_id(db)
-    snap = snap_map.get(staff_id)
-    if snap is None:
-        bookings = (
-            db.query(Booking)
-            .options(joinedload(Booking.room), joinedload(Booking.unit))
-            .filter(staff_booking_filter_sql(staff_id, "all"))
-            .all()
-        )
-        snap = staff_hours_snapshot_for_bookings(bookings, staff=row)
+    snap = staff_hours_snapshot_for_staff(db, row)
 
     prefs = (
         db.query(StaffPreference)

@@ -63,6 +63,10 @@ from ..services.course_lifecycle import (
 from ..services.qualification_editor import qualification_detail, sync_qualification_regular_groups
 from ..services.staff_details import staff_detail
 from ..services.staff_editor import save_staff_preferences, save_staff_unit_online_students
+from ..services.global_staff_hours import (
+    propagate_staff_hours_profile,
+    propagate_staff_online_overrides,
+)
 from ..services.staff_hours_table import staff_hours_table_rows
 from ..services.class_constraints import (
     set_staff_competencies,
@@ -145,6 +149,8 @@ def update_staff_online_students(
             staff_id=staff_id,
             counts=[c.model_dump() for c in body.counts],
         )
+        db.flush()
+        propagate_staff_online_overrides(db, row)
         db.commit()
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -317,6 +323,8 @@ def update_staff(
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Staff not found")
     _patch_fields(row, body)
+    db.flush()
+    propagate_staff_hours_profile(db, row)
     db.commit()
     db.refresh(row)
     return row

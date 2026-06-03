@@ -517,9 +517,9 @@ def build_staff_timetable(
     if week is None:
         raise RuntimeError("No repeating week for session")
     bookings = _fetch_bookings(db, week.id, "staff", staff_id=staff_id)
-    from timetable.core.staff_hours import safe_staff_tab_total_hours_by_staff_id
+    from .global_staff_hours import staff_tab_total_hours_for_staff
 
-    hours = safe_staff_tab_total_hours_by_staff_id(db).get(staff.id, 0.0)
+    hours = staff_tab_total_hours_for_staff(db, staff)
     from .global_sessions import linked_session_busy_slots
 
     linked_busy, linked_label = linked_session_busy_slots(

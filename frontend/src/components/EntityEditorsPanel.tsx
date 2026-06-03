@@ -56,6 +56,8 @@ type Props = {
   onNavigateToUnit?: (unitId: number) => void;
   /** Show import-from-linked panel on staff / qualifications tabs. */
   showLinkedImport?: boolean;
+  /** Increment to reload staff hours/detail after a change in a linked session tab. */
+  syncToken?: number;
 };
 
 export function EntityEditorsPanel({
@@ -71,6 +73,7 @@ export function EntityEditorsPanel({
   onFocusConsumed,
   onNavigateToUnit,
   showLinkedImport = false,
+  syncToken = 0,
 }: Props) {
   const [tab, setTab] = useState<Tab>(fixedTab ?? "staff");
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -116,7 +119,7 @@ export function EntityEditorsPanel({
 
   useEffect(() => {
     void reloadStaffHours();
-  }, [reloadStaffHours]);
+  }, [reloadStaffHours, syncToken]);
 
   useEffect(() => {
     if (focusEntityId == null) return;
@@ -159,7 +162,7 @@ export function EntityEditorsPanel({
     } else {
       setStaffDetail(null);
     }
-  }, [sessionId, activeTab, selectedId]);
+  }, [sessionId, activeTab, selectedId, syncToken]);
 
   useEffect(() => {
     if (!staffDetail) {

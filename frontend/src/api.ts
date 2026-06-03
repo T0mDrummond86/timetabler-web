@@ -97,42 +97,51 @@ export type Qualification = {
   schedule_period?: string;
 };
 
-export type GlobalAggregatedStaffRow = {
-  id: number;
+export type GlobalAmalgamatedMember = {
   session_id: number;
   session_name: string;
+  entity_id?: number | null;
+};
+
+export type GlobalAggregatedStaffRow = {
   name: string;
-  fte?: number | null;
-  max_hours_per_week?: number | null;
-  non_teaching_day?: number | null;
+  session_names: string[];
+  session_count: number;
+  members?: GlobalAmalgamatedMember[];
+  fte?: number | null | string;
+  max_hours_per_week?: number | null | string;
+  non_teaching_day?: number | null | string;
+  variance?: number | null | string;
+  member_variances?: (number | null)[];
 };
 
 export type GlobalAggregatedRoomRow = {
-  id: number;
-  session_id: number;
-  session_name: string;
   code: string;
-  name: string | null;
+  session_names: string[];
+  session_count: number;
+  members?: GlobalAmalgamatedMember[];
+  name?: string | null;
   room_type?: string | null;
   capacity?: number | null;
 };
 
 export type GlobalAggregatedUnitRow = {
-  id: number;
-  session_id: number;
-  session_name: string;
   name: string;
-  length_slots?: number | null;
-  double_session?: number;
-  component_codes?: string | null;
+  session_names: string[];
+  session_count: number;
+  members?: GlobalAmalgamatedMember[];
+  qualifications?: string;
+  length_slots?: number | null | string;
+  double_session?: number | string;
+  component_codes?: string | null | string;
 };
 
 export type GlobalAggregatedQualRow = {
-  id: number;
-  session_id: number;
-  session_name: string;
   name: string;
-  num_groups?: number;
+  session_names: string[];
+  session_count: number;
+  members?: GlobalAmalgamatedMember[];
+  num_groups?: number | string;
   schedule_period?: string;
   delivery_mode?: string;
 };
@@ -161,7 +170,17 @@ async function apiFetch<T>(
     const token = getToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  } catch (err) {
+    const base = API_BASE || "(same origin — set VITE_API_URL)";
+    const hint =
+      err instanceof TypeError
+        ? `Cannot reach the API at ${base}. Check that the API is running (docker compose up) and you are using the app at http://localhost:5173.`
+        : "Network error";
+    throw new Error(hint);
+  }
   if (!res.ok) {
     let detail = res.statusText;
     try {

@@ -646,6 +646,7 @@ class AlternateSlotsOut(BaseModel):
 class ClassCustodianRowOut(BaseModel):
     unit_id: int
     unit_name: str
+    qualifications: str = "—"
     lecturers: str
     custodian: str
     custodian_deliveries: int

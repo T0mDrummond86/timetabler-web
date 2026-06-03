@@ -86,10 +86,11 @@ export type GlobalClassCustodians = {
   rows: {
     unit_id: number;
     unit_name: string;
+    qualifications: string;
     lecturers: string;
-    custodian_name: string | null;
-    session_id: number;
-    session_name: string;
+    custodian: string;
+    session_names: string[];
+    session_count?: number;
   }[];
   summary: string;
 };
@@ -250,6 +251,7 @@ export type ClassCustodians = {
   rows: {
     unit_id: number;
     unit_name: string;
+    qualifications: string;
     lecturers: string;
     custodian: string;
     custodian_deliveries: number;

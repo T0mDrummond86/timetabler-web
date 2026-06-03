@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import type { ClassCustodians } from "../types";
+import { ClassCustodiansTable } from "./ClassCustodiansTable";
 
 type Props = {
   sessionId: number;
@@ -28,6 +29,16 @@ export function ClassCustodiansPanel({ sessionId, refreshKey = 0 }: Props) {
     void load();
   }, [load, refreshKey]);
 
+  const tableRows =
+    data?.rows.map((row) => ({
+      unit_id: row.unit_id,
+      unit_name: row.unit_name,
+      qualifications: row.qualifications ?? "—",
+      lecturers: row.lecturers,
+      custodian: row.custodian,
+      custodian_deliveries: row.custodian_deliveries,
+    })) ?? [];
+
   return (
     <section className="panel class-custodians-panel">
       <div className="panel-header">
@@ -40,38 +51,7 @@ export function ClassCustodiansPanel({ sessionId, refreshKey = 0 }: Props) {
         {error && <p className="error">{error}</p>}
         {loading && !data && <p className="muted">Loading…</p>}
         {data && (
-          <>
-            <p className="violations-summary">{data.summary}</p>
-            {!data.rows.length ? (
-              <p className="muted">No classes in this session.</p>
-            ) : (
-              <div className="violations-table-scroll">
-                <table className="violations-table class-custodians-table">
-                  <thead>
-                    <tr>
-                      <th>Class</th>
-                      <th>Lecturers (deliveries)</th>
-                      <th>Custodian</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.rows.map((row) => (
-                      <tr key={row.unit_id}>
-                        <td>{row.unit_name}</td>
-                        <td>{row.lecturers}</td>
-                        <td>
-                          {row.custodian}
-                          {row.custodian !== "—" && (
-                            <span className="muted"> ({row.custodian_deliveries})</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
+          <ClassCustodiansTable rows={tableRows} summary={data.summary} />
         )}
       </div>
     </section>
