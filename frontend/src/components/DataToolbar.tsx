@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { api } from "../api";
 import { useDropdown } from "../hooks/useDropdown";
+import { TimetablePrintDialog } from "./TimetablePrintDialog";
 
 type Props = {
   sessionId: number;
@@ -25,6 +26,7 @@ export function DataToolbar({
   const importMenu = useDropdown();
   const importRef = useRef<HTMLInputElement>(null);
   const [importKind, setImportKind] = useState<Props["onImport"] extends (k: infer K, f: File) => void ? K : never>("session");
+  const [printOpen, setPrintOpen] = useState(false);
 
   async function exportPath(path: string, filename: string) {
     exportMenu.close();
@@ -156,6 +158,20 @@ export function DataToolbar({
               <span className="ctx-item-hint">Lecturer hours spreadsheet</span>
             </button>
             <div className="ctx-divider" />
+            <span className="ctx-label">Print</span>
+            <button
+              type="button"
+              className="ctx-item ctx-item-desc"
+              role="menuitem"
+              onClick={() => {
+                exportMenu.close();
+                setPrintOpen(true);
+              }}
+            >
+              <span className="ctx-item-title">Print timetables…</span>
+              <span className="ctx-item-hint">PDF — course, staff, or room (A4 landscape)</span>
+            </button>
+            <div className="ctx-divider" />
             <span className="ctx-label">Reports</span>
             <button
               type="button"
@@ -206,6 +222,13 @@ export function DataToolbar({
           </div>
         )}
       </div>
+      {printOpen && (
+        <TimetablePrintDialog
+          sessionId={sessionId}
+          colourByClass={colourByClass}
+          onClose={() => setPrintOpen(false)}
+        />
+      )}
     </>
   );
 }

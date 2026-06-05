@@ -51,6 +51,15 @@ export type TimetableGlobalLink = {
   global_session_name?: string;
   member_session_ids?: number[];
 };
+
+export type TimetablePrintKind = "course" | "staff" | "room";
+
+export type TimetablePrintEntity = { id: number; label: string };
+
+export type TimetablePrintInfo = {
+  week_label: string | null;
+  entities: TimetablePrintEntity[];
+};
 export type Course = {
   id: number;
   code: string;
@@ -853,6 +862,55 @@ export const api = {
 
   roomTypeChoices: () =>
     apiFetch<{ choices: [string, string][] }>("/room-type-choices"),
+
+  timetablePrintInfo: (sessionId: number, kind: TimetablePrintKind) =>
+    apiFetch<TimetablePrintInfo>(
+      `/sessions/${sessionId}/print/timetables/info?kind=${encodeURIComponent(kind)}`,
+    ),
+
+  async downloadTimetablePrintPdf(
+    sessionId: number,
+    body: {
+      kind: TimetablePrintKind;
+      term_filter: "all" | "t1" | "t2";
+      colour_by_class: boolean;
+      include_index?: boolean;
+      entities: TimetablePrintEntity[];
+    },
+  ): Promise<void> {
+    const token = getToken();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}/sessions/${sessionId}/print/timetables`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+    } catch {
+      throw new Error(
+        "Cannot reach the API. Check that the API is running and you are using http://localhost:5173.",
+      );
+    }
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const j = await res.json();
+        if (j.detail) detail = typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail);
+      } catch {
+        /* ignore */
+      }
+      throw new Error(detail);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "timetables_print.pdf";
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 
   async downloadExport(path: string, filename: string): Promise<void> {
     const token = getToken();

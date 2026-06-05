@@ -1,7 +1,7 @@
 """Authentication routes."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from timetable.core.tenancy_models import (
@@ -12,7 +12,9 @@ from timetable.core.tenancy_models import (
 )
 
 from ..auth.deps import get_current_user
+from ..auth.rate_limit import auth_rate_limiter, client_ip
 from ..auth.security import create_access_token, hash_password, verify_password
+from ..config import settings
 from ..database import get_db
 from ..schemas import (
     LoginRequest,
@@ -59,7 +61,10 @@ def _token_for_user(db: Session, user: User, org_id: int | None) -> TokenRespons
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def register(body: RegisterRequest, db: Session = Depends(get_db)):
+def register(body: RegisterRequest, request: Request, db: Session = Depends(get_db)):
+    if not settings.allow_registration:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Registration is disabled")
+    auth_rate_limiter.check(client_ip(request))
     if db.query(User).filter(User.email == body.email.lower()).first() is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
@@ -88,7 +93,8 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest, db: Session = Depends(get_db)):
+def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    auth_rate_limiter.check(client_ip(request))
     user = db.query(User).filter(User.email == body.email.lower()).first()
     if user is None or not verify_password(body.password, user.password_hash):
         raise HTTPException(

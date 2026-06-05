@@ -779,3 +779,26 @@ class ViolationDismissRequest(BaseModel):
 
 class RoomTypeChoicesOut(BaseModel):
     choices: list[tuple[str, str]]
+
+
+class TimetablePrintEntityOut(BaseModel):
+    id: int
+    label: str
+
+
+class TimetablePrintInfoOut(BaseModel):
+    week_label: str | None
+    entities: list[TimetablePrintEntityOut]
+
+
+class TimetablePrintEntityIn(BaseModel):
+    id: int
+    label: str = Field(min_length=1, max_length=200)
+
+
+class TimetablePrintRequest(BaseModel):
+    kind: str = Field(pattern="^(course|staff|room)$")
+    term_filter: str = Field(default="all", pattern="^(all|t1|t2)$")
+    colour_by_class: bool = True
+    include_index: bool = True
+    entities: list[TimetablePrintEntityIn] = Field(min_length=1)

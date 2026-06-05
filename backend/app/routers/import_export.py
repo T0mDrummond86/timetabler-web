@@ -8,8 +8,9 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from ..auth.deps import AuthContext, require_editor
+from ..config import settings
 from ..database import get_db
-from ..schemas import ImportReportOut
+from ..schemas import ImportReportOut, TimetablePrintInfoOut, TimetablePrintRequest
 from ..services.session_import_export import (
     cleanup_temp,
     export_json,
@@ -29,6 +30,11 @@ from ..services.session_excel_export import (
     export_warnings_xlsx,
 )
 from ..services.timetable_grid import assert_session_in_org
+from ..services.timetable_print import (
+    export_print_timetables_pdf,
+    print_entity_list,
+    week_label_for_print,
+)
 
 router = APIRouter(tags=["import-export"])
 
@@ -46,6 +52,12 @@ async def _upload_to_temp(file: UploadFile, default_suffix: str = ".xlsx") -> st
     if file.filename and "." in file.filename:
         suffix = "." + file.filename.rsplit(".", 1)[-1].lower()
     data = await file.read()
+    if len(data) > settings.max_upload_bytes:
+        max_mb = settings.max_upload_bytes // (1024 * 1024)
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File too large (max {max_mb} MB)",
+        )
     if not data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file")
     return save_upload_to_temp(data, suffix)
@@ -262,3 +274,50 @@ def export_lecturer_prefs_template(
         filename,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+
+@router.get("/sessions/{session_id}/print/timetables/info", response_model=TimetablePrintInfoOut)
+def print_timetables_info(
+    session_id: int,
+    kind: str = Query("course", pattern="^(course|staff|room)$"),
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    """List printable entities and current week label for the print dialog."""
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    from timetable.io.timetable_print_layout import PrintKind
+
+    pk: PrintKind = kind  # type: ignore[assignment]
+    return TimetablePrintInfoOut(
+        week_label=week_label_for_print(db, session_id),
+        entities=print_entity_list(db, timetable_session_id=session_id, kind=pk),
+    )
+
+
+@router.post("/sessions/{session_id}/print/timetables")
+def print_timetables_pdf(
+    session_id: int,
+    body: TimetablePrintRequest,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    """Render selected course/staff/room timetables as a multi-page PDF (A4 landscape)."""
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    from timetable.io.timetable_print_layout import PrintKind
+
+    pk: PrintKind = body.kind  # type: ignore[assignment]
+    try:
+        content = export_print_timetables_pdf(
+            db,
+            timetable_session_id=session_id,
+            kind=pk,
+            entities=[(e.id, e.label) for e in body.entities],
+            term_filter=body.term_filter,
+            colour_by_class=body.colour_by_class,
+            include_index=body.include_index,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return _file_response(content, "timetables_print.pdf", "application/pdf")

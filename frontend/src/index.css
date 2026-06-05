@@ -2506,3 +2506,73 @@ button.danger {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
+
+.timetable-print-dialog {
+  width: min(480px, 100%);
+  padding: 1.15rem 1.25rem 1rem;
+}
+
+.timetable-print-dialog h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.timetable-print-hint {
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+.timetable-print-kinds {
+  border: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.timetable-print-term {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.timetable-print-index {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.timetable-print-list-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.timetable-print-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.timetable-print-list li {
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.timetable-print-list li:last-child {
+  border-bottom: none;
+}
+
+.timetable-print-dialog .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}

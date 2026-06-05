@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from ..auth.deps import AuthContext, get_auth_context, require_editor
+from ..config import settings
 from ..database import get_db
 from ..schemas import (
     BlockDeliveryPanelOut,
@@ -363,6 +364,8 @@ def seed_demo(
     db: Session = Depends(get_db),
 ):
     """Create sample course + bookings for UI testing (no-op if data already exists)."""
+    if settings.is_production:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     assert_session_in_org(db, session_id, ctx.organization.id)
     result = seed_demo_timetable(db, session_id)
     db.commit()
