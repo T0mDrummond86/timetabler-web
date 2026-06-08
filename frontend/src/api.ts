@@ -25,6 +25,8 @@ export type TimetableSession = {
   updated_at: string;
   global_session_id?: number | null;
   global_session_name?: string | null;
+  course_count?: number;
+  booking_count?: number;
 };
 
 export type GlobalSessionSummary = {
@@ -797,6 +799,12 @@ export const api = {
   deleteSession: (sessionId: number) =>
     apiFetch<void>(`/sessions/${sessionId}`, { method: "DELETE" }),
 
+  duplicateSession: (sessionId: number, name: string) =>
+    apiFetch<TimetableSession>(`/sessions/${sessionId}/duplicate`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
   dismissViolation: (sessionId: number, bookingId: number, code: string) =>
     apiFetch<{ ok: boolean }>(`/sessions/${sessionId}/violation-dismissals`, {
       method: "POST",
@@ -936,7 +944,7 @@ export const api = {
     URL.revokeObjectURL(url);
   },
 
-  async importFile(sessionId: number, kind: "session" | "qualifications" | "lecturer-preferences" | "overall-visual", file: File) {
+  async importFile(sessionId: number, kind: "session" | "qualifications" | "lecturer-preferences" | "overall-visual" | "admin-visual", file: File) {
     const token = getToken();
     const headers: Record<string, string> = {};
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -947,6 +955,7 @@ export const api = {
       qualifications: `/sessions/${sessionId}/import/qualifications`,
       "lecturer-preferences": `/sessions/${sessionId}/import/lecturer-preferences`,
       "overall-visual": `/sessions/${sessionId}/import/overall-visual`,
+      "admin-visual": `/sessions/${sessionId}/import/admin-visual`,
     };
     const res = await fetch(`${API_BASE}${paths[kind]}`, { method: "POST", headers, body: form });
     if (!res.ok) {

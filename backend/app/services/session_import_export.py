@@ -59,7 +59,7 @@ def import_lecturer_preferences_workbook(db: Session, timetable_session_id: int,
 def import_overall_visual_workbook(db: Session, timetable_session_id: int, file_path: str) -> dict:
     from timetable.io.overall_visual_import import import_overall_visual
 
-    rep = import_overall_visual(db, file_path)
+    rep = import_overall_visual(db, file_path, timetable_session_id=timetable_session_id)
     clear_all_dismissals(db, timetable_session_id=timetable_session_id)
     db.commit()
     return {
@@ -67,8 +67,32 @@ def import_overall_visual_workbook(db: Session, timetable_session_id: int, file_
         "courses_created": rep.courses_touched,
         "qualifications_created": rep.qualifications_created,
         "units_created": rep.units_created,
+        "staff_created": rep.staff_created,
+        "rooms_created": rep.rooms_created,
         "warnings": rep.warnings,
         "source": "overall_visual",
+    }
+
+
+def import_admin_visual_workbook(db: Session, timetable_session_id: int, file_path: str) -> dict:
+    from timetable.io.admin_visual_import import import_admin_visual
+
+    try:
+        rep = import_admin_visual(db, file_path, timetable_session_id=timetable_session_id)
+        clear_all_dismissals(db, timetable_session_id=timetable_session_id)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return {
+        "bookings_written": rep.bookings_created,
+        "courses_created": rep.courses_touched,
+        "qualifications_created": rep.qualifications_created,
+        "units_created": rep.units_created,
+        "staff_created": rep.staff_created,
+        "rooms_created": rep.rooms_created,
+        "warnings": rep.warnings,
+        "source": "admin_visual",
     }
 
 

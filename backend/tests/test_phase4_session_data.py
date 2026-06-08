@@ -206,3 +206,55 @@ def test_import_into_second_session_avoids_global_id_clash(client: TestClient):
     )
     assert grid.status_code == 200
     assert len(grid.json()["bookings"]) == 2
+
+
+def test_duplicate_session_save_as(client: TestClient):
+    token, session_id = _auth(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    _seed(client, session_id, headers)
+
+    dup = client.post(
+        f"/sessions/{session_id}/duplicate",
+        headers=headers,
+        json={"name": "Copied session"},
+    )
+    assert dup.status_code == 201, dup.text
+    copy_id = dup.json()["id"]
+    assert copy_id != session_id
+
+    courses = client.get(f"/sessions/{copy_id}/courses", headers=headers).json()
+    assert len(courses) == 1
+    grid = client.get(
+        f"/sessions/{copy_id}/timetable",
+        params={"course_id": courses[0]["id"]},
+        headers=headers,
+    )
+    assert grid.status_code == 200
+    assert len(grid.json()["bookings"]) == 2
+
+    clash = client.post(
+        f"/sessions/{session_id}/duplicate",
+        headers=headers,
+        json={"name": "Copied session"},
+    )
+    assert clash.status_code == 409
+
+
+def test_delete_session(client: TestClient):
+    token, session_id = _auth(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    org_id = client.get("/orgs", headers=headers).json()[0]["id"]
+
+    created = client.post(
+        f"/orgs/{org_id}/sessions",
+        headers=headers,
+        json={"name": "Disposable"},
+    )
+    assert created.status_code == 201
+    disposable_id = created.json()["id"]
+
+    deleted = client.delete(f"/sessions/{disposable_id}", headers=headers)
+    assert deleted.status_code == 204
+
+    sessions = client.get(f"/orgs/{org_id}/sessions", headers=headers).json()
+    assert disposable_id not in {s["id"] for s in sessions}

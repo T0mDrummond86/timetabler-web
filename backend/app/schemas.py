@@ -53,6 +53,8 @@ class TimetableSessionOut(BaseModel):
     updated_at: datetime
     global_session_id: int | None = None
     global_session_name: str | None = None
+    course_count: int = 0
+    booking_count: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -62,6 +64,10 @@ class TimetableSessionCreate(BaseModel):
 
 
 class TimetableSessionPatch(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+class TimetableSessionDuplicate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
 
 

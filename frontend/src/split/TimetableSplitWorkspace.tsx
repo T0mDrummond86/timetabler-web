@@ -29,6 +29,7 @@ import {
   zoomOut,
 } from "../lib/gridZoom";
 import { notifySessionChanged, useSessionSync } from "../lib/sessionSync";
+import { useConfirmPrompt } from "../hooks/useConfirmPrompt";
 
 const DISPLAY_STORAGE_KEY = "timetabler-display";
 const COURSE_VIEWS = COURSE_VIEW_KINDS;
@@ -99,6 +100,7 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
   const [mutating, setMutating] = useState(false);
   const [days, setDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri"]);
   const [globalLink, setGlobalLink] = useState<TimetableGlobalLink | null>(null);
+  const { confirm, dialogs } = useConfirmPrompt();
 
   const linkedSessionIds = useMemo(
     () => (globalLink?.linked && globalLink.member_session_ids?.length ? globalLink.member_session_ids : undefined),
@@ -414,7 +416,16 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
 
   async function onDeleteBooking(booking: BookingCard) {
     const cid = mutationCourseId(booking);
-    if (!cid || !window.confirm("Delete this booking?")) return;
+    if (
+      !cid ||
+      !(await confirm({
+        title: "Delete booking",
+        message: "Delete this booking? This cannot be undone.",
+        confirmLabel: "Delete",
+        danger: true,
+      }))
+    )
+      return;
     try {
       await api.deleteBooking(sessionId, booking.id, cid);
       await afterMutation();
@@ -594,6 +605,7 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
           }
         />
       )}
+      {dialogs}
     </div>
   );
 }

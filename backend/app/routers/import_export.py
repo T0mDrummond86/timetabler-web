@@ -14,6 +14,7 @@ from ..schemas import ImportReportOut, TimetablePrintInfoOut, TimetablePrintRequ
 from ..services.session_import_export import (
     cleanup_temp,
     export_json,
+    import_admin_visual_workbook,
     import_json_payload,
     import_lecturer_preferences_workbook,
     import_overall_visual_workbook,
@@ -132,6 +133,33 @@ async def import_overall_visual(
     tmp = await _upload_to_temp(file, ".xlsm")
     try:
         return import_overall_visual_workbook(db, session_id, tmp)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    finally:
+        cleanup_temp(tmp)
+
+
+@router.post("/sessions/{session_id}/import/admin-visual")
+async def import_admin_visual(
+    session_id: int,
+    file: UploadFile = File(...),
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    tmp = await _upload_to_temp(file, ".xlsx")
+    try:
+        from timetable.io.admin_visual_import import is_admin_visual_workbook
+
+        if not is_admin_visual_workbook(tmp):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Workbook does not look like an admin export (expected course tabs with "
+                    "TIME/Lecturer/Room rows and week bands)."
+                ),
+            )
+        return import_admin_visual_workbook(db, session_id, tmp)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     finally:

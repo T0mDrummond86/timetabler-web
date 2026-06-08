@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import type { ChangeLogRow } from "../types";
+import { useConfirmPrompt } from "../hooks/useConfirmPrompt";
 
 const ACTION_COLOURS: Record<string, string> = {
   change: "#0c4a6e",
@@ -23,6 +24,7 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
   const [error, setError] = useState<string | null>(null);
   const [savingNote, setSavingNote] = useState<number | null>(null);
   const [rollingBack, setRollingBack] = useState<number | null>(null);
+  const { confirm, dialogs } = useConfirmPrompt();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,7 +60,15 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
       setError("Could not determine course for rollback.");
       return;
     }
-    if (!window.confirm("Roll this booking back to its earliest logged state?")) return;
+    if (
+      !(await confirm({
+        title: "Rollback booking",
+        message: "Roll this booking back to its earliest logged state?",
+        confirmLabel: "Rollback",
+        danger: true,
+      }))
+    )
+      return;
     setRollingBack(bookingId);
     setError(null);
     try {
@@ -195,6 +205,7 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
           </table>
         </div>
       )}
+      {dialogs}
     </section>
   );
 }

@@ -8,6 +8,7 @@ import {
 } from "./StaffAvailabilityGrid";
 import { StaffHoursTable } from "./StaffHoursTable";
 import { LinkedSessionImportPanel } from "./LinkedSessionImportPanel";
+import { useConfirmPrompt } from "../hooks/useConfirmPrompt";
 
 type Tab = "staff" | "rooms" | "units" | "courses" | "qualifications";
 
@@ -98,6 +99,7 @@ export function EntityEditorsPanel({
   const [staffHoursRows, setStaffHoursRows] = useState<StaffHoursRow[]>([]);
   const [staffHoursLoading, setStaffHoursLoading] = useState(false);
   const [unitDoubleSession, setUnitDoubleSession] = useState(false);
+  const { confirm, prompt, dialogs } = useConfirmPrompt();
 
   useEffect(() => {
     if (fixedTab) setTab(fixedTab);
@@ -378,15 +380,23 @@ export function EntityEditorsPanel({
   }
 
   async function addEntity() {
-    const label = window.prompt(
+    const promptTitle =
       activeTab === "staff"
-        ? "Staff name:"
+        ? "New staff member"
         : activeTab === "rooms"
-          ? "Room code:"
+          ? "New room"
           : activeTab === "units"
-            ? "Class name:"
-            : "Qualification name:",
-    );
+            ? "New class"
+            : "New qualification";
+    const placeholder =
+      activeTab === "staff"
+        ? "Staff name"
+        : activeTab === "rooms"
+          ? "Room code"
+          : activeTab === "units"
+            ? "Class name"
+            : "Qualification name";
+    const label = await prompt({ title: promptTitle, placeholder });
     if (!label?.trim()) return;
     setSaving(true);
     setError(null);
@@ -410,7 +420,15 @@ export function EntityEditorsPanel({
   async function deleteEntity() {
     if (selectedId == null) return;
     const row = rows.find((r) => r.id === selectedId);
-    if (!window.confirm(`Delete ${row?.label ?? "this item"}?`)) return;
+    if (
+      !(await confirm({
+        title: "Delete item",
+        message: `Delete ${row?.label ?? "this item"}? This cannot be undone.`,
+        confirmLabel: "Delete",
+        danger: true,
+      }))
+    )
+      return;
     setSaving(true);
     setError(null);
     try {
@@ -1019,6 +1037,7 @@ export function EntityEditorsPanel({
           {message && <p className="muted">{message}</p>}
         </div>
       </div>
+      {dialogs}
     </section>
   );
 }

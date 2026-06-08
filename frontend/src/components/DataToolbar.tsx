@@ -9,8 +9,9 @@ type Props = {
   onColourByClassChange: (v: boolean) => void;
   showAlerts: boolean;
   onShowAlertsChange: (v: boolean) => void;
-  onImport: (kind: "session" | "qualifications" | "lecturer-preferences" | "overall-visual", file: File) => void;
+  onImport: (kind: "session" | "qualifications" | "lecturer-preferences" | "overall-visual" | "admin-visual", file: File) => void;
   importing?: boolean;
+  showDisplay?: boolean;
 };
 
 export function DataToolbar({
@@ -21,6 +22,7 @@ export function DataToolbar({
   onShowAlertsChange,
   onImport,
   importing,
+  showDisplay = true,
 }: Props) {
   const exportMenu = useDropdown();
   const importMenu = useDropdown();
@@ -52,27 +54,30 @@ export function DataToolbar({
           e.target.value = "";
         }}
       />
+      {showDisplay && (
+        <div className="tt-toolbar-group">
+          <span className="tt-toolbar-label">View</span>
+          <label className="checkbox tt-toolbar-check">
+            <input
+              type="checkbox"
+              checked={colourByClass}
+              onChange={(e) => onColourByClassChange(e.target.checked)}
+            />
+            Class colours
+          </label>
+          <label className="checkbox tt-toolbar-check">
+            <input
+              type="checkbox"
+              checked={showAlerts}
+              onChange={(e) => onShowAlertsChange(e.target.checked)}
+            />
+            Alerts
+          </label>
+        </div>
+      )}
       <div className="tt-toolbar-group">
-        <span className="tt-toolbar-label">Display</span>
-        <label className="checkbox tt-toolbar-check">
-          <input
-            type="checkbox"
-            checked={colourByClass}
-            onChange={(e) => onColourByClassChange(e.target.checked)}
-          />
-          Class colours
-        </label>
-        <label className="checkbox tt-toolbar-check">
-          <input
-            type="checkbox"
-            checked={showAlerts}
-            onChange={(e) => onShowAlertsChange(e.target.checked)}
-          />
-          Alerts
-        </label>
-      </div>
-      <div className="tt-toolbar-group tt-dropdown-wrap" ref={importMenu.wrapRef}>
-        <span className="tt-toolbar-label">Import</span>
+        <span className="tt-toolbar-label">Data</span>
+        <span className="tt-dropdown-wrap" ref={importMenu.wrapRef}>
         <button
           type="button"
           className="btn-secondary"
@@ -84,24 +89,31 @@ export function DataToolbar({
           {importing ? "Importing…" : "Import ▾"}
         </button>
         {importMenu.open && (
-          <div className="tt-dropdown-menu" role="menu">
-            <button type="button" className="ctx-item" role="menuitem" onClick={() => pickImport("session")}>
-              Session backup (.xlsm/.xlsx)
+          <div className="tt-dropdown-menu tt-dropdown-menu-wide" role="menu">
+            <button type="button" className="ctx-item ctx-item-desc" role="menuitem" onClick={() => pickImport("session")}>
+              <span className="ctx-item-title">Session backup</span>
+              <span className="ctx-item-hint">Full round-trip restore (.xlsm / .xlsx)</span>
             </button>
-            <button type="button" className="ctx-item" role="menuitem" onClick={() => pickImport("qualifications")}>
-              Qualifications template
+            <button type="button" className="ctx-item ctx-item-desc" role="menuitem" onClick={() => pickImport("qualifications")}>
+              <span className="ctx-item-title">Qualifications template</span>
+              <span className="ctx-item-hint">QInputTemplate classes &amp; quals</span>
             </button>
-            <button type="button" className="ctx-item" role="menuitem" onClick={() => pickImport("lecturer-preferences")}>
-              Lecturer preferences
+            <button type="button" className="ctx-item ctx-item-desc" role="menuitem" onClick={() => pickImport("lecturer-preferences")}>
+              <span className="ctx-item-title">Lecturer preferences</span>
+              <span className="ctx-item-hint">Availability &amp; competency spreadsheet</span>
             </button>
-            <button type="button" className="ctx-item" role="menuitem" onClick={() => pickImport("overall-visual")}>
-              Overall visual grid
+            <button type="button" className="ctx-item ctx-item-desc" role="menuitem" onClick={() => pickImport("overall-visual")}>
+              <span className="ctx-item-title">Overall visual grid</span>
+              <span className="ctx-item-hint">Legacy Joondalup Overall sheet</span>
+            </button>
+            <button type="button" className="ctx-item ctx-item-desc" role="menuitem" onClick={() => pickImport("admin-visual")}>
+              <span className="ctx-item-title">Admin export (visual grid)</span>
+              <span className="ctx-item-hint">Course tabs with week bands — replaces bookings</span>
             </button>
           </div>
         )}
-      </div>
-      <div className="tt-toolbar-group tt-dropdown-wrap" ref={exportMenu.wrapRef}>
-        <span className="tt-toolbar-label">Export</span>
+        </span>
+        <span className="tt-dropdown-wrap" ref={exportMenu.wrapRef}>
         <button
           type="button"
           className="btn-secondary"
@@ -221,6 +233,7 @@ export function DataToolbar({
             </button>
           </div>
         )}
+        </span>
       </div>
       {printOpen && (
         <TimetablePrintDialog

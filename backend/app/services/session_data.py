@@ -25,8 +25,11 @@ from timetable.core.models import (
     UnitQualification,
     Week,
 )
+from timetable.core.tenancy_models import TimetableSession
 from timetable.core.unit_brackets import apply_unit_bracket_fields_from_names
 from timetable.io.backup_payload import PAYLOAD_VERSION, _prepare_units_for_restore
+
+from .session_seed import seed_timetable_session_data
 
 
 def _semester_ids(db: Session, timetable_session_id: int) -> list[int]:
@@ -612,3 +615,39 @@ def restore_session(db: Session, timetable_session_id: int, payload: dict[str, A
         "rooms": len(payload.get("rooms", [])),
         "bookings": len(payload.get("bookings", [])),
     }
+
+
+def duplicate_timetable_session(
+    db: Session,
+    *,
+    source_session_id: int,
+    organization_id: int,
+    name: str,
+    created_by_id: int | None,
+) -> TimetableSession:
+    """Copy all timetable data into a new session (desktop Save As)."""
+    clean_name = name.strip()
+    existing = (
+        db.query(TimetableSession)
+        .filter(
+            TimetableSession.organization_id == organization_id,
+            TimetableSession.name == clean_name,
+        )
+        .first()
+    )
+    if existing is not None:
+        raise ValueError(f"Session {clean_name!r} already exists")
+
+    payload = serialize_session(db, source_session_id)
+    row = TimetableSession(
+        organization_id=organization_id,
+        name=clean_name,
+        created_by_id=created_by_id,
+    )
+    db.add(row)
+    db.flush()
+    seed_timetable_session_data(db, row)
+    restore_session(db, row.id, payload)
+    db.commit()
+    db.refresh(row)
+    return row

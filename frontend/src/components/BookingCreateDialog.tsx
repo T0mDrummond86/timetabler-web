@@ -79,13 +79,13 @@ export function BookingCreateDialog({
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
       <div className="modal dialog" role="dialog" aria-modal onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-header">
+        <div className="modal-header">
           <h2>New booking</h2>
           <button type="button" className="btn-secondary btn-xs" onClick={onClose}>
             Close
           </button>
         </div>
-        <form className="form dialog-body" onSubmit={submit}>
+        <form className="modal-form" onSubmit={submit}>
           <p className="muted">
             {grid.days[slotDay] ?? `Day ${slotDay}`} · {slotRangeLabel(slotStart, slotEnd)} · course #{courseId}
           </p>

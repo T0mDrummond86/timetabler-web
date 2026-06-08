@@ -10,6 +10,7 @@ type Props = {
   loading?: boolean;
   acceptBookingDrop?: boolean;
   onBookingDrop?: (bookingId: number) => void;
+  sticky?: boolean;
 };
 
 export function HoldingAreaPanel({
@@ -17,8 +18,10 @@ export function HoldingAreaPanel({
   loading = false,
   acceptBookingDrop = false,
   onBookingDrop,
+  sticky = false,
 }: Props) {
   const [dropHover, setDropHover] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   function acceptsDrag(e: React.DragEvent) {
     return acceptBookingDrop && e.dataTransfer.types.includes(MIME_BOOKING);
@@ -49,49 +52,75 @@ export function HoldingAreaPanel({
 
   return (
     <section
-      className={`panel holding-panel${dropHover ? " holding-drop-hover" : ""}`}
+      className={`panel holding-panel${dropHover ? " holding-drop-hover" : ""}${
+        sticky ? " holding-panel--sticky" : ""
+      }${collapsed ? " holding-panel--collapsed" : ""}`}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
-      <div className="panel-header">
-        <h2>Holding area</h2>
-        <p className="panel-hint">
-          Drag classes onto the grid to schedule · drag placecards here to unschedule
-        </p>
+      <div className="panel-header holding-panel-header">
+        <div>
+          <h2>
+            Holding area
+            {items.length > 0 && (
+              <span className="holding-count-badge" aria-label={`${items.length} unscheduled`}>
+                {items.length}
+              </span>
+            )}
+          </h2>
+          {!collapsed && (
+            <p className="panel-hint">
+              Drag classes onto the grid to schedule · drag placecards here to unschedule
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          className="btn-ghost btn-xs holding-collapse-btn"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? "Expand holding area" : "Collapse holding area"}
+        >
+          {collapsed ? "Show" : "Hide"}
+        </button>
       </div>
 
-      {loading && !items.length ? (
-        <p className="panel-empty">Loading unscheduled classes…</p>
-      ) : !items.length ? (
-        <p className="panel-empty">
-          {acceptBookingDrop
-            ? "All classes scheduled — drop a placecard here to return it to holding"
-            : "All classes for this course are scheduled."}
-        </p>
-      ) : (
-        <ul className="holding-list">
-          {items.map((item) => (
-            <li key={`${item.unit_id}-${item.session_part}`}>
-              <div
-                className="holding-chip"
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData(MIME_PENDING, JSON.stringify(item));
-                  e.dataTransfer.effectAllowed = "copy";
-                }}
-              >
-                <span className="holding-chip-name">
-                  {item.unit_name ?? `Unit #${item.unit_id}`}
-                </span>
-                <span className="holding-chip-meta">
-                  {slotsToDurationLabel(item.duration_slots)}
-                  {item.session_part > 1 ? ` · Part ${item.session_part}` : ""}
-                </span>
-              </div>
-            </li>
-          ))}
-        </ul>
+      {!collapsed && (
+        <div className="holding-panel-body">
+          {loading && !items.length ? (
+            <p className="panel-empty">Loading unscheduled classes…</p>
+          ) : !items.length ? (
+            <p className="panel-empty">
+              {acceptBookingDrop
+                ? "All classes scheduled — drop a placecard here to return it to holding"
+                : "All classes for this course are scheduled."}
+            </p>
+          ) : (
+            <ul className="holding-list">
+              {items.map((item) => (
+                <li key={`${item.unit_id}-${item.session_part}`}>
+                  <div
+                    className="holding-chip"
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(MIME_PENDING, JSON.stringify(item));
+                      e.dataTransfer.effectAllowed = "copy";
+                    }}
+                  >
+                    <span className="holding-chip-name">
+                      {item.unit_name ?? `Unit #${item.unit_id}`}
+                    </span>
+                    <span className="holding-chip-meta">
+                      {slotsToDurationLabel(item.duration_slots)}
+                      {item.session_part > 1 ? ` · Part ${item.session_part}` : ""}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </section>
   );

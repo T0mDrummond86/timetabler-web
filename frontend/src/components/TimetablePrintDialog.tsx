@@ -13,7 +13,7 @@ const KIND_OPTIONS: { id: TimetablePrintKind; label: string }[] = [
   { id: "room", label: "Room timetables" },
 ];
 
-export function TimetablePrintDialog({ sessionId, colourByClass, onClose }: Props) {
+export function TimetablePrintDialog({ sessionId, colourByClass: _colourByClass, onClose }: Props) {
   const [kind, setKind] = useState<TimetablePrintKind>("course");
   const [weekLabel, setWeekLabel] = useState<string | null>(null);
   const [entities, setEntities] = useState<TimetablePrintEntity[]>([]);

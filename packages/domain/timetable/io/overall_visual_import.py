@@ -44,6 +44,7 @@ from .xlsm_export import (
     _course_columns_in_template,
     _scan_row1_markers,
 )
+from .visual_import_session import VisualImportContext
 
 
 def _normalized_unit_codes_equivalent(a: str, b: str) -> bool:
@@ -63,7 +64,7 @@ def _day_first_row(day: int) -> int:
 
 _DURATION_RE = re.compile(r"^\d+\s*hrs?$", re.I)
 _EXTERNAL_TAG_RE = re.compile(r"^\s*\[([^\]]+)\]\s*(.*)$", re.S)
-_PLACE_CARD_ID_RE = re.compile(r"\bID:\s*(\d{7})\b", re.IGNORECASE)
+_PLACE_CARD_ID_RE = re.compile(r"\bID:?\s*(\d{7})\b", re.IGNORECASE)
 _PLACEHOLDER_LECTURER_NAMES = frozenset({"—", "-", "n/a", "tbc", "tba"})
 _GROUP_SUFFIX_RE = re.compile(r"\s+Grp[0-9A-Za-z]+$", re.I)
 
@@ -145,7 +146,11 @@ def _join_unit_parts(parts: list[str]) -> str:
 
 
 def _resolve_unit_storage_name(
-    session: Session, title: str, suffix: str | None
+    session: Session,
+    title: str,
+    suffix: str | None,
+    *,
+    timetable_session_id: int | None = None,
 ) -> tuple[str, str | None]:
     """Return ``(Unit.name, component_codes)`` for create/lookup.
 
@@ -161,7 +166,10 @@ def _resolve_unit_storage_name(
     c = (normalize_component_codes_commas(c_raw) or c_raw) if c_raw else ""
     if not c:
         return t, None
-    row = session.query(Unit).filter(Unit.name == t).one_or_none()
+    q = session.query(Unit).filter(Unit.name == t)
+    if timetable_session_id is not None:
+        q = q.filter(Unit.timetable_session_id == timetable_session_id)
+    row = q.one_or_none()
     if row is None:
         return t, c
     existing = (row.component_codes or "").strip()
@@ -305,8 +313,14 @@ class OverallVisualImportReport:
     warnings: list[str] = field(default_factory=list)
 
 
-def import_overall_visual(session: Session, xlsm_path: str) -> OverallVisualImportReport:
+def import_overall_visual(
+    session: Session,
+    xlsm_path: str,
+    *,
+    timetable_session_id: int | None = None,
+) -> OverallVisualImportReport:
     """Parse ``Overall`` and replace all bookings for the first week."""
+    ctx = VisualImportContext(timetable_session_id)
     wb = load_workbook(xlsm_path, data_only=True, keep_vba=False)
     if "Overall" not in wb.sheetnames:
         raise ValueError("Workbook has no 'Overall' sheet.")
@@ -317,9 +331,7 @@ def import_overall_visual(session: Session, xlsm_path: str) -> OverallVisualImpo
     if not course_cols:
         raise ValueError("No course columns found between Facilitation and Staff!.")
 
-    week = session.query(Week).order_by(Week.id).first()
-    if week is None:
-        raise RuntimeError("No week in session.")
+    week = ctx.first_week(session)
 
     report = OverallVisualImportReport()
     report.courses_touched = len(course_cols)
@@ -335,9 +347,9 @@ def import_overall_visual(session: Session, xlsm_path: str) -> OverallVisualImpo
         key = name.strip()
         if key in staff_cache:
             return staff_cache[key]
-        row = session.query(Staff).filter(Staff.name == key).one_or_none()
+        row = ctx.staff_by_name(session, key)
         if row is None:
-            row = Staff(name=key, max_hours_per_week=30.0)
+            row = ctx.new_staff(key)
             session.add(row)
             session.flush()
             report.staff_created += 1
@@ -355,11 +367,11 @@ def import_overall_visual(session: Session, xlsm_path: str) -> OverallVisualImpo
         key = code.strip()
         if key in room_cache:
             return room_cache[key]
-        row = session.query(Room).filter(Room.code == key).one_or_none()
+        row = ctx.room_by_code(session, key)
         if row is None:
             from ..core.room_types import ROOM_TYPE_ON_CAMPUS
 
-            row = Room(code=key, room_type=ROOM_TYPE_ON_CAMPUS)
+            row = ctx.new_room(key, room_type=ROOM_TYPE_ON_CAMPUS)
             session.add(row)
             session.flush()
             report.rooms_created += 1
@@ -372,7 +384,12 @@ def import_overall_visual(session: Session, xlsm_path: str) -> OverallVisualImpo
             return None
 
         split_title, suffix = split_class_title_and_unit_codes(display_name)
-        name_key, comp_codes = _resolve_unit_storage_name(session, split_title, suffix)
+        name_key, comp_codes = _resolve_unit_storage_name(
+            session,
+            split_title,
+            suffix,
+            timetable_session_id=ctx.timetable_session_id,
+        )
 
         for key in (display_name, name_key):
             if key in unit_cache:
@@ -398,16 +415,12 @@ def import_overall_visual(session: Session, xlsm_path: str) -> OverallVisualImpo
             for cand in {display_name, normalize_class_label_for_parse(display_name)}:
                 if not cand:
                     continue
-                leg = session.query(Unit).filter(Unit.name == cand).one_or_none()
+                leg = ctx.unit_by_name(session, cand)
                 if leg is not None:
                     break
             if leg is not None:
-                other = (
-                    session.query(Unit)
-                    .filter(Unit.name == name_key, Unit.id != leg.id)
-                    .first()
-                )
-                if other is None:
+                other = ctx.unit_by_name(session, name_key)
+                if other is None or other.id == leg.id:
                     leg.name = name_key
                     if comp_codes:
                         ex = (leg.component_codes or "").strip()
@@ -426,10 +439,10 @@ def import_overall_visual(session: Session, xlsm_path: str) -> OverallVisualImpo
                 unit_cache[name_key] = leg.id
                 return leg.id
 
-        row = session.query(Unit).filter(Unit.name == name_key).one_or_none()
+        row = ctx.unit_by_name(session, name_key)
         if row is None:
-            row = Unit(
-                name=name_key,
+            row = ctx.new_unit(
+                name_key,
                 length_slots=max(span_slots, 1),
                 component_codes=comp_codes,
             )
@@ -450,8 +463,13 @@ def import_overall_visual(session: Session, xlsm_path: str) -> OverallVisualImpo
         unit_cache[display_name] = row.id
         return row.id
 
+    linked_course_units: set[tuple[int, int]] = set()
+
     def ensure_course_unit(course_id: int, unit_id: int | None) -> None:
         if unit_id is None:
+            return
+        key = (course_id, unit_id)
+        if key in linked_course_units:
             return
         exists = (
             session.query(CourseUnit)
@@ -460,12 +478,13 @@ def import_overall_visual(session: Session, xlsm_path: str) -> OverallVisualImpo
         )
         if not exists:
             session.add(CourseUnit(course_id=course_id, unit_id=unit_id))
+        linked_course_units.add(key)
 
     for course_code, base_col in course_cols.items():
         course_code = (course_code or "").strip() or "Untitled"
-        course = session.query(Course).filter(Course.code == course_code).one_or_none()
+        course = ctx.course_by_code(session, course_code)
         if course is None:
-            course = Course(code=course_code)
+            course = ctx.new_course(course_code)
             session.add(course)
             session.flush()
 
@@ -514,6 +533,7 @@ def import_overall_visual(session: Session, xlsm_path: str) -> OverallVisualImpo
         sig_to_courses[frozenset(units)].append(cc)
 
     used_qual_names: set[str] = set()
+    linked_unit_quals: set[tuple[int, int]] = set()
     for sig, course_codes in sig_to_courses.items():
         if not sig:
             # No classes parsed for these courses; leave unqualified.
@@ -526,9 +546,9 @@ def import_overall_visual(session: Session, xlsm_path: str) -> OverallVisualImpo
             qual_name = f"{base_name} ({n})"
         used_qual_names.add(qual_name)
 
-        q = session.query(Qualification).filter(Qualification.name == qual_name).one_or_none()
+        q = ctx.qualification_by_name(session, qual_name)
         if q is None:
-            q = Qualification(
+            q = ctx.new_qualification(
                 name=qual_name,
                 num_groups=len(course_codes),
                 schedule_period=SCHEDULE_PERIOD_DAY,
@@ -541,10 +561,13 @@ def import_overall_visual(session: Session, xlsm_path: str) -> OverallVisualImpo
             q.num_groups = len(course_codes)
 
         for cc in course_codes:
-            c = session.query(Course).filter(Course.code == cc).one_or_none()
+            c = ctx.course_by_code(session, cc)
             if c is not None:
                 c.qualification_id = q.id
         for uid in sig:
+            uq_key = (uid, q.id)
+            if uq_key in linked_unit_quals:
+                continue
             exists = (
                 session.query(UnitQualification)
                 .filter_by(unit_id=uid, qualification_id=q.id)
@@ -552,7 +575,10 @@ def import_overall_visual(session: Session, xlsm_path: str) -> OverallVisualImpo
             )
             if not exists:
                 session.add(UnitQualification(unit_id=uid, qualification_id=q.id))
+            linked_unit_quals.add(uq_key)
 
-    apply_unit_bracket_fields_from_names(session)
+    apply_unit_bracket_fields_from_names(
+        session, timetable_session_id=timetable_session_id
+    )
     session.commit()
     return report

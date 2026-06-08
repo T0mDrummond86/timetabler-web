@@ -8,13 +8,25 @@ from timetable.core.tenancy_models import GlobalSessionMember, TimetableSession
 
 from ..auth.deps import AuthContext, get_auth_context, require_editor
 from ..database import get_db
-from ..schemas import TimetableSessionCreate, TimetableSessionOut, TimetableSessionPatch
+from ..schemas import (
+    TimetableSessionCreate,
+    TimetableSessionDuplicate,
+    TimetableSessionOut,
+    TimetableSessionPatch,
+)
+from ..services.session_data import duplicate_timetable_session
 from ..services.session_seed import seed_timetable_session_data
+from ..services.session_stats import session_stats_map
 
 router = APIRouter(tags=["sessions"])
 
 
-def _session_out(row: TimetableSession, db: Session) -> TimetableSessionOut:
+def _session_out(
+    row: TimetableSession,
+    db: Session,
+    *,
+    stats: dict[str, int] | None = None,
+) -> TimetableSessionOut:
     member = (
         db.query(GlobalSessionMember)
         .filter(GlobalSessionMember.timetable_session_id == row.id)
@@ -28,6 +40,7 @@ def _session_out(row: TimetableSession, db: Session) -> TimetableSessionOut:
         if gs is not None:
             gs_id = gs.id
             gs_name = gs.name
+    counts = stats or {}
     return TimetableSessionOut(
         id=row.id,
         organization_id=row.organization_id,
@@ -36,7 +49,14 @@ def _session_out(row: TimetableSession, db: Session) -> TimetableSessionOut:
         updated_at=row.updated_at,
         global_session_id=gs_id,
         global_session_name=gs_name,
+        course_count=counts.get("course_count", 0),
+        booking_count=counts.get("booking_count", 0),
     )
+
+
+def _session_out_with_stats(row: TimetableSession, db: Session) -> TimetableSessionOut:
+    stats = session_stats_map(db, [row.id])
+    return _session_out(row, db, stats=stats.get(row.id))
 
 
 def _session_in_org(db: Session, session_id: int, org_id: int) -> TimetableSession:
@@ -67,7 +87,8 @@ def list_sessions(
         .order_by(TimetableSession.name)
         .all()
     )
-    return [_session_out(r, db) for r in rows]
+    stats = session_stats_map(db, [r.id for r in rows])
+    return [_session_out(r, db, stats=stats.get(r.id)) for r in rows]
 
 
 @router.post(
@@ -118,7 +139,7 @@ def get_session(
     ctx: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
-    return _session_out(_session_in_org(db, session_id, ctx.organization.id), db)
+    return _session_out_with_stats(_session_in_org(db, session_id, ctx.organization.id), db)
 
 
 @router.patch("/sessions/{session_id}", response_model=TimetableSessionOut)
@@ -147,7 +168,32 @@ def update_session(
     row.name = name
     db.commit()
     db.refresh(row)
-    return _session_out(row, db)
+    return _session_out_with_stats(row, db)
+
+
+@router.post(
+    "/sessions/{session_id}/duplicate",
+    response_model=TimetableSessionOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def duplicate_session(
+    session_id: int,
+    body: TimetableSessionDuplicate,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    _session_in_org(db, session_id, ctx.organization.id)
+    try:
+        row = duplicate_timetable_session(
+            db,
+            source_session_id=session_id,
+            organization_id=ctx.organization.id,
+            name=body.name,
+            created_by_id=ctx.user.id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
+    return _session_out_with_stats(row, db)
 
 
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)

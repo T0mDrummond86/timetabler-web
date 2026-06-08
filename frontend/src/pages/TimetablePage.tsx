@@ -35,6 +35,7 @@ import { DataToolbar } from "../components/DataToolbar";
 import { EditableGroupTitle } from "../components/EditableGroupTitle";
 import { DropdownGroup } from "../components/DropdownGroup";
 import { useDropdown } from "../hooks/useDropdown";
+import { useConfirmPrompt } from "../hooks/useConfirmPrompt";
 import type { ViolationRow } from "../types";
 import { ClassCustodiansPanel } from "../components/ClassCustodiansPanel";
 import { ChangeLogPanel } from "../components/ChangeLogPanel";
@@ -44,6 +45,7 @@ import { HoldingAreaPanel } from "../components/HoldingAreaPanel";
 import { TimetableSidebar } from "../components/TimetableSidebar";
 import { UsageDashboard } from "../components/UsageDashboard";
 import { WeekGridView } from "../components/WeekGridView";
+import { recordSessionOpen } from "../lib/recentSessions";
 import type { TimetableMode, ViewKind } from "../viewKinds";
 import {
   canLoadTimetableGrid,
@@ -80,16 +82,16 @@ type ViewState = {
   previewSemesterWeek: number | null;
 };
 
-const SESSION_TABS: { id: SessionTab; label: string }[] = [
+const SESSION_TABS: { id: SessionTab; label: string; secondary?: boolean }[] = [
   { id: "timetable", label: "Timetable" },
-  { id: "staff", label: "Staff" },
-  { id: "rooms", label: "Rooms" },
-  { id: "units", label: "Classes" },
-  { id: "qualifications", label: "Qualifications" },
-  { id: "changelog", label: "Change log" },
   { id: "warnings", label: "Warnings" },
-  { id: "custodians", label: "Class custodians" },
-  { id: "usage", label: "Usage" },
+  { id: "changelog", label: "Change log" },
+  { id: "staff", label: "Staff", secondary: true },
+  { id: "rooms", label: "Rooms", secondary: true },
+  { id: "units", label: "Classes", secondary: true },
+  { id: "qualifications", label: "Qualifications", secondary: true },
+  { id: "custodians", label: "Class custodians", secondary: true },
+  { id: "usage", label: "Usage", secondary: true },
 ];
 
 const DISPLAY_STORAGE_KEY = "timetabler-display";
@@ -185,12 +187,15 @@ export function TimetablePage() {
   const [redoStack, setRedoStack] = useState<BookingChange[]>([]);
   const [holding, setHolding] = useState<HoldingClass[]>([]);
   const [importing, setImporting] = useState(false);
+  const [importFileName, setImportFileName] = useState<string | null>(null);
+  const [importSuccess, setImportSuccess] = useState<string | null>(null);
   const [holdingLoading, setHoldingLoading] = useState(false);
   const [auxLoading, setAuxLoading] = useState(false);
   const [colourByClass, setColourByClass] = useState(() => readDisplayPrefs().colourByClass);
   const [showAlerts, setShowAlerts] = useState(() => readDisplayPrefs().showAlerts);
   const [createDraft, setCreateDraft] = useState<CreateBookingDraft | null>(null);
   const externalViewsMenu = useDropdown();
+  const { confirm, prompt, dialogs } = useConfirmPrompt();
   const [pendingEditBookingId, setPendingEditBookingId] = useState<number | null>(null);
   const [globalLink, setGlobalLink] = useState<TimetableGlobalLink | null>(null);
   const [entitySyncToken, setEntitySyncToken] = useState(0);
@@ -200,6 +205,13 @@ export function TimetablePage() {
   const urlReadyRef = useRef(false);
   const applyingUrlRef = useRef(false);
   const sessionInitIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const flash = (location.state as { flash?: string } | null)?.flash;
+    if (!flash) return;
+    setImportSuccess(flash);
+    navigate(location.pathname + location.search, { replace: true, state: null });
+  }, [location.pathname, location.search, location.state, navigate]);
 
   const viewState = (): ViewState => ({
     viewKind,
@@ -495,6 +507,7 @@ export function TimetablePage() {
     }
     if (sessionInitIdRef.current === sessionId) return;
     sessionInitIdRef.current = sessionId;
+    recordSessionOpen(sessionId);
     urlReadyRef.current = false;
 
     (async () => {
@@ -792,7 +805,15 @@ export function TimetablePage() {
 
   async function onDeleteBlockGroup() {
     if (!blockCourseId) return;
-    if (!window.confirm("Delete this block group and its timetable?")) return;
+    if (
+      !(await confirm({
+        title: "Delete block group",
+        message: "Delete this block group and its timetable? This cannot be undone.",
+        confirmLabel: "Delete",
+        danger: true,
+      }))
+    )
+      return;
     setMutating(true);
     setError(null);
     try {
@@ -946,7 +967,16 @@ export function TimetablePage() {
     const target = booking ?? editBooking;
     const cid = mutationCourseId(target);
     if (!cid || !target) return;
-    if (booking && !window.confirm("Delete this booking?")) return;
+    if (
+      booking &&
+      !(await confirm({
+        title: "Delete booking",
+        message: "Remove this booking from the timetable?",
+        confirmLabel: "Delete",
+        danger: true,
+      }))
+    )
+      return;
     setMutating(true);
     setError(null);
     try {
@@ -962,11 +992,12 @@ export function TimetablePage() {
   }
 
   async function onImportFile(
-    kind: "session" | "qualifications" | "lecturer-preferences" | "overall-visual",
+    kind: "session" | "qualifications" | "lecturer-preferences" | "overall-visual" | "admin-visual",
     file: File,
   ) {
     setImporting(true);
-    setLoading(true);
+    setImportFileName(file.name);
+    setImportSuccess(null);
     setError(null);
     try {
       if (kind === "session") {
@@ -978,22 +1009,36 @@ export function TimetablePage() {
           courseId: courseList[0]?.id ?? null,
           staffId: staffList[0]?.id ?? null,
         });
-        alert(
-          `Imported ${report.bookings} bookings, ${report.courses} courses, ${report.staff} staff.`,
+        setImportSuccess(
+          `Imported ${report.bookings} bookings, ${report.courses} courses, ${report.staff} staff from ${file.name}.`,
         );
         notifyPeers();
       } else {
-        await api.importFile(sessionId, kind, file);
+        const report = (await api.importFile(sessionId, kind, file)) as Record<string, unknown>;
         await loadEntities(sessionId);
         await reloadView();
         setChangeLogKey((k) => k + 1);
         notifyPeers();
+        const bookings = report.bookings_written ?? report.bookings;
+        const parts: string[] = [];
+        if (typeof bookings === "number") parts.push(`${bookings} bookings`);
+        if (typeof report.units_created === "number" && report.units_created > 0) {
+          parts.push(`${report.units_created} new classes`);
+        }
+        if (typeof report.qualifications_created === "number" && report.qualifications_created > 0) {
+          parts.push(`${report.qualifications_created} qualifications`);
+        }
+        setImportSuccess(
+          parts.length
+            ? `Import complete: ${parts.join(", ")} from ${file.name}.`
+            : `Import from ${file.name} completed successfully.`,
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed");
     } finally {
       setImporting(false);
-      setLoading(false);
+      setImportFileName(null);
     }
   }
 
@@ -1110,8 +1155,8 @@ export function TimetablePage() {
   }
 
   async function onCourseAdd() {
-    const code = window.prompt("New course code:");
-    if (!code?.trim()) return;
+    const code = await prompt({ title: "New course", placeholder: "Course code" });
+    if (!code) return;
     setMutating(true);
     try {
       const row = await api.createCourse(sessionId, code.trim());
@@ -1126,8 +1171,12 @@ export function TimetablePage() {
   async function onCourseDuplicate() {
     if (!courseId) return;
     const src = courses.find((c) => c.id === courseId);
-    const newCode = window.prompt("Duplicate course code:", src ? `${src.code} (copy)` : "");
-    if (!newCode?.trim()) return;
+    const newCode = await prompt({
+      title: "Duplicate course",
+      defaultValue: src ? `${src.code} (copy)` : "",
+      placeholder: "Course code",
+    });
+    if (!newCode) return;
     setMutating(true);
     try {
       const row = await api.duplicateCourse(sessionId, courseId, newCode.trim());
@@ -1142,7 +1191,15 @@ export function TimetablePage() {
   async function onCourseDelete() {
     if (!courseId) return;
     const src = courses.find((c) => c.id === courseId);
-    if (!window.confirm(`Delete course ${src?.code ?? courseId}?`)) return;
+    if (
+      !(await confirm({
+        title: "Delete course",
+        message: `Delete course ${src?.code ?? courseId} and all its bookings?`,
+        confirmLabel: "Delete",
+        danger: true,
+      }))
+    )
+      return;
     setMutating(true);
     try {
       await api.deleteCourse(sessionId, courseId);
@@ -1336,6 +1393,7 @@ export function TimetablePage() {
     (isCourseViewKind(viewKind) || viewKind === "block_delivery");
 
   const isEmbedded = searchParams.get("embed") === "1";
+  const warningCount = grid?.violations?.length ?? 0;
 
   return (
     <AppShell
@@ -1380,8 +1438,9 @@ export function TimetablePage() {
     >
       <DropdownGroup>
       <div className="tt-toolbar">
+        {sessionTab === "timetable" && (
         <div className="tt-toolbar-group">
-          <span className="tt-toolbar-label">Edit</span>
+          <span className="tt-toolbar-label">Schedule</span>
           <button
             type="button"
             className="btn-secondary"
@@ -1470,7 +1529,41 @@ export function TimetablePage() {
               )}
             </span>
           )}
+          {showsWeekGrid(viewKind) && (
+            <>
+              <span className="tt-toolbar-sep" aria-hidden />
+              <button
+                type="button"
+                className="btn-secondary btn-xs"
+                onClick={() => setGridZoom((z) => zoomOut(z))}
+                aria-label="Zoom out"
+                title="Zoom out"
+              >
+                −
+              </button>
+              <span className="tt-zoom-label">{displayZoomPercent(gridZoom)}%</span>
+              <button
+                type="button"
+                className="btn-secondary btn-xs"
+                onClick={() => setGridZoom((z) => zoomIn(z))}
+                aria-label="Zoom in"
+                title="Zoom in"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                className="btn-secondary btn-xs"
+                onClick={() => setGridZoom(resetGridZoom())}
+                aria-label="Reset zoom"
+                title="Reset zoom"
+              >
+                100%
+              </button>
+            </>
+          )}
         </div>
+        )}
         <DataToolbar
           sessionId={sessionId}
           colourByClass={colourByClass}
@@ -1479,54 +1572,57 @@ export function TimetablePage() {
           onShowAlertsChange={setShowAlerts}
           onImport={(kind, file) => void onImportFile(kind, file)}
           importing={importing}
+          showDisplay={sessionTab === "timetable"}
         />
-        {sessionTab === "timetable" && showsWeekGrid(viewKind) && (
-          <div className="tt-toolbar-group">
-            <span className="tt-toolbar-label">Zoom</span>
-            <button
-              type="button"
-              className="btn-secondary btn-xs"
-              onClick={() => setGridZoom((z) => zoomOut(z))}
-              aria-label="Zoom out"
-            >
-              −
-            </button>
-            <span className="tt-zoom-label">{displayZoomPercent(gridZoom)}%</span>
-            <button
-              type="button"
-              className="btn-secondary btn-xs"
-              onClick={() => setGridZoom((z) => zoomIn(z))}
-              aria-label="Zoom in"
-            >
-              +
-            </button>
-            <button
-              type="button"
-              className="btn-secondary btn-xs"
-              onClick={() => setGridZoom(resetGridZoom())}
-              aria-label="Reset zoom"
-            >
-              100%
-            </button>
-          </div>
-        )}
       </div>
       </DropdownGroup>
 
       <nav className="session-tabs" aria-label="Session views">
-        {SESSION_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={`session-tab${sessionTab === tab.id ? " active" : ""}`}
-            onClick={() => setSessionTab(tab.id)}
-          >
-            {tab.label}
-          </button>
+        {SESSION_TABS.map((tab, index) => (
+          <span key={tab.id} style={{ display: "contents" }}>
+            {index === 3 && <span className="session-tab-divider" aria-hidden />}
+            <button
+              type="button"
+              className={`session-tab${sessionTab === tab.id ? " active" : ""}${
+                tab.secondary ? " session-tab--secondary" : ""
+              }`}
+              aria-current={sessionTab === tab.id ? "page" : undefined}
+              onClick={() => setSessionTab(tab.id)}
+            >
+              {tab.label}
+              {tab.id === "warnings" && warningCount > 0 && (
+                <span className="session-tab-badge">{warningCount}</span>
+              )}
+            </button>
+          </span>
         ))}
       </nav>
 
+      {importSuccess && (
+        <div className="success-banner" role="status">
+          <span>{importSuccess}</span>
+          <button
+            type="button"
+            className="success-banner-dismiss"
+            aria-label="Dismiss"
+            onClick={() => setImportSuccess(null)}
+          >
+            ×
+          </button>
+        </div>
+      )}
       {error && <div className="error-banner">{error}</div>}
+      {importing && (
+        <div className="import-overlay" role="alertdialog" aria-busy="true" aria-labelledby="import-overlay-title">
+          <div className="import-overlay-card">
+            <div className="import-overlay-spinner" aria-hidden />
+            <h2 id="import-overlay-title">Importing timetable…</h2>
+            <p>
+              {importFileName ? `Processing ${importFileName}` : "This may take up to a minute for large files."}
+            </p>
+          </div>
+        </div>
+      )}
       {loading && sessionTab === "timetable" && !grid && viewKind !== "block_overview" && (
         <div className="loading-state">
           <span className="loading-dot" />
@@ -1656,21 +1752,23 @@ export function TimetablePage() {
                 loading={holdingLoading}
                 acceptBookingDrop={editable}
                 onBookingDrop={editable ? (id) => void onReturnToHolding(id) : undefined}
+                sticky
               />
             )}
             {grid && showAlerts && grid.violations.length > 0 && (
-              <section className="panel violations-panel">
-                <div className="panel-header">
-                  <h2>Warnings ({grid.violations.length})</h2>
-                </div>
-                <div className="panel-body">
-                  <ul>
-                    {grid.violations.slice(0, 8).map((v, i) => (
-                      <li key={i} className={v.severity}>
-                        {v.message}
-                      </li>
-                    ))}
-                  </ul>
+              <section className="panel violations-panel violations-panel--compact">
+                <div className="panel-body violations-summary">
+                  <p>
+                    <strong>{grid.violations.length}</strong> scheduling warning
+                    {grid.violations.length !== 1 ? "s" : ""} on this view.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-xs"
+                    onClick={() => setSessionTab("warnings")}
+                  >
+                    View all warnings
+                  </button>
                 </div>
               </section>
             )}
@@ -1792,6 +1890,7 @@ export function TimetablePage() {
           }
         />
       )}
+      {dialogs}
     </AppShell>
   );
 }

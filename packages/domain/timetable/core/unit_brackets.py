@@ -190,21 +190,28 @@ def normalize_component_codes_commas(text: str | None) -> str | None:
     return joined if joined else None
 
 
-def apply_unit_bracket_fields_from_names(session: Session) -> int:
+def apply_unit_bracket_fields_from_names(
+    session: Session,
+    *,
+    timetable_session_id: int | None = None,
+) -> int:
     """Move bracketed code segment(s) from each ``Unit.name`` into ``component_codes``."""
     touched = 0
-    for u in list(session.query(Unit).order_by(Unit.id)):
+    unit_q = session.query(Unit).order_by(Unit.id)
+    if timetable_session_id is not None:
+        unit_q = unit_q.filter(Unit.timetable_session_id == timetable_session_id)
+    units = list(unit_q)
+    for u in units:
         raw = (u.name or "").strip()
         if not raw:
             continue
         final_title, segments = peel_all_unit_segments_from_name(raw)
         if not segments:
             continue
-        other = (
-            session.query(Unit)
-            .filter(Unit.name == final_title, Unit.id != u.id)
-            .first()
-        )
+        other_q = session.query(Unit).filter(Unit.name == final_title, Unit.id != u.id)
+        if timetable_session_id is not None:
+            other_q = other_q.filter(Unit.timetable_session_id == timetable_session_id)
+        other = other_q.first()
         row_changed = False
         prev_codes = (u.component_codes or "").strip()
         merged = prev_codes
@@ -223,7 +230,7 @@ def apply_unit_bracket_fields_from_names(session: Session) -> int:
                 row_changed = True
         if row_changed:
             touched += 1
-    for u in list(session.query(Unit).order_by(Unit.id)):
+    for u in units:
         if not u.component_codes:
             continue
         nn = normalize_component_codes_commas(u.component_codes)

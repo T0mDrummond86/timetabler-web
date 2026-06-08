@@ -35,7 +35,7 @@ from ..core.booking_staff import sfs_co_teacher_booking_filter
 from ..core.booking_sessions import active_session_weeks_in_term
 from ..core.models import Booking, Course, Week
 from .backup_payload import write_backup_sheet
-from .xlsm_export import _class_title_line, _component_codes_line
+from .xlsm_export import _component_codes_line
 
 ADMIN_TEMPLATE_PATH = resource_path("templates", "admin_export_base.xlsx")
 ADMIN_STYLE_GUIDE_PATH = resource_path("adminExportStyleGuide.xlsx")
@@ -234,12 +234,28 @@ def _set_cell_value(ws, row: int, col: int, value) -> None:
     ws.cell(row=row, column=col).value = value
 
 
+def _admin_class_title_line(b: Booking) -> str:
+    """Class title for admin week cells (event id is appended separately)."""
+    name = (b.unit.name if b.unit else "") or ""
+    part = getattr(b, "session_part", 1) or 1
+    if part > 1:
+        name = f"{name} ({part}/2)".strip()
+    elif b.unit and getattr(b.unit, "double_session", 0):
+        name = f"{name} (1/2)".strip()
+    return name
+
+
 def _admin_week_cell_text(b: Booking) -> str:
-    title = _class_title_line(b)
+    title = _admin_class_title_line(b)
     codes = _component_codes_line(b)
     if codes:
-        return f"{title} ({codes})" if title else codes
-    return title
+        text = f"{title} ({codes})" if title else codes
+    else:
+        text = title
+    eid = (b.external_id or "").strip()
+    if eid:
+        text = f"{text} ID: {eid}".strip()
+    return text
 
 
 def _writable_week_cols(ws, row: int, week_cols: tuple[int, ...]) -> list[int]:
