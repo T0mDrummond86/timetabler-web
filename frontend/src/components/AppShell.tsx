@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
+import { ThemeToggle } from "./ThemeToggle";
 
 type Props = {
   children: ReactNode;
@@ -29,7 +30,10 @@ export function AppShell({
               Timetabler
             </Link>
           </div>
-          <div className="app-topbar-end">{actions}</div>
+          <div className="app-topbar-end">
+            <ThemeToggle />
+            {actions}
+          </div>
         </header>
       )}
 

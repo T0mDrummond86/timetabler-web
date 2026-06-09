@@ -45,8 +45,75 @@
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
 
+  --grid-gutter-bg: #fafbfc;
+  --grid-body-bg: #ffffff;
+  --grid-slot-line: #f1f5f9;
+  --grid-slot-line-hour: #e2e8f0;
+  --booking-card-text: rgba(15, 23, 42, 0.75);
+  --booking-card-meta: rgba(15, 23, 42, 0.65);
+  --booking-card-notes: rgba(15, 23, 42, 0.55);
+  --modal-backdrop: rgba(15, 23, 42, 0.45);
+  --import-overlay-bg: rgba(15, 23, 42, 0.45);
+  --badge-global-color: #6d28d9;
+  --badge-global-bg: #ede9fe;
+  --holding-drop-header: #dbeafe;
+  --violation-hard-bg: #fef2f2;
+  --violation-soft-bg: #fffbeb;
+  --session-tab-badge-fg: #fff;
+
   --slot-h: 28px;
   --grid-header-h: 40px;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0f172a;
+  --bg-elevated: #1e293b;
+  --bg-subtle: #334155;
+  --bg-muted: #475569;
+  --surface: #1e293b;
+
+  --text: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+
+  --border: #334155;
+  --border-strong: #475569;
+
+  --primary: #60a5fa;
+  --primary-hover: #93c5fd;
+  --primary-soft: #1e3a5f;
+
+  --danger: #f87171;
+  --danger-soft: #450a0a;
+  --danger-border: #991b1b;
+
+  --warning: #fbbf24;
+  --warning-soft: #422006;
+
+  --success: #34d399;
+  --success-soft: #064e3b;
+  --success-border: #047857;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+
+  --grid-gutter-bg: #1e293b;
+  --grid-body-bg: #0f172a;
+  --grid-slot-line: #334155;
+  --grid-slot-line-hour: #475569;
+  --booking-card-text: rgba(241, 245, 249, 0.85);
+  --booking-card-meta: rgba(241, 245, 249, 0.72);
+  --booking-card-notes: rgba(241, 245, 249, 0.6);
+  --modal-backdrop: rgba(0, 0, 0, 0.65);
+  --import-overlay-bg: rgba(0, 0, 0, 0.65);
+  --badge-global-color: #c4b5fd;
+  --badge-global-bg: #4c1d95;
+  --holding-drop-header: #1e3a5f;
+  --violation-hard-bg: #450a0a;
+  --violation-soft-bg: #422006;
+  --session-tab-badge-fg: #0f172a;
 }
 
 * {
@@ -118,6 +185,12 @@ code {
 .app-brand:hover {
   color: var(--primary);
   text-decoration: none;
+}
+
+.app-topbar-end {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .app-main {
@@ -654,7 +727,7 @@ button.danger {
   font-size: 0.72rem;
   font-weight: 700;
   line-height: 1;
-  color: #fff;
+  color: var(--session-tab-badge-fg);
   background: var(--warning);
   border-radius: 999px;
 }
@@ -674,7 +747,7 @@ button.danger {
   align-items: center;
   justify-content: center;
   padding: var(--space-4);
-  background: rgba(15, 23, 42, 0.45);
+  background: var(--import-overlay-bg);
   backdrop-filter: blur(2px);
 }
 
@@ -959,7 +1032,7 @@ button.danger {
   position: sticky;
   left: 0;
   z-index: 2;
-  background: #fafbfc;
+  background: var(--grid-gutter-bg);
   border-right: 1px solid var(--border);
 }
 
@@ -987,7 +1060,7 @@ button.danger {
 .grid-col-body {
   position: relative;
   border-right: 1px solid var(--border);
-  background: #fff;
+  background: var(--grid-body-bg);
 }
 
 .grid-slot-line {
@@ -995,12 +1068,12 @@ button.danger {
   left: 0;
   right: 0;
   height: 0;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--grid-slot-line);
   pointer-events: none;
 }
 
 .grid-slot-line.hour {
-  border-top-color: #e2e8f0;
+  border-top-color: var(--grid-slot-line-hour);
 }
 
 .booking-card {
@@ -1050,7 +1123,7 @@ button.danger {
   font-size: 0.65rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: rgba(15, 23, 42, 0.75);
+  color: var(--booking-card-text);
 }
 
 .booking-card-title {
@@ -1061,7 +1134,7 @@ button.danger {
 }
 
 .booking-card-meta {
-  color: rgba(15, 23, 42, 0.65);
+  color: var(--booking-card-meta);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1072,7 +1145,7 @@ button.danger {
 .booking-card-notes {
   font-size: 0.65rem;
   font-style: italic;
-  color: rgba(15, 23, 42, 0.55);
+  color: var(--booking-card-notes);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1224,11 +1297,11 @@ button.danger {
 }
 
 .violations-table tr.hard td {
-  background: #fef2f2;
+  background: var(--violation-hard-bg);
 }
 
 .violations-table tr.soft td {
-  background: #fffbeb;
+  background: var(--violation-soft-bg);
 }
 
 .block-panel-actions {
@@ -1246,7 +1319,7 @@ button.danger {
 }
 
 .btn-danger-text {
-  color: #b91c1c;
+  color: var(--danger);
 }
 
 .entity-hint {
@@ -1411,7 +1484,7 @@ button.danger {
 }
 
 .holding-panel.holding-drop-hover .panel-header {
-  background: #dbeafe;
+  background: var(--holding-drop-header);
 }
 
 .holding-panel--sticky {
@@ -1502,7 +1575,7 @@ button.danger {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: var(--modal-backdrop);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1710,8 +1783,8 @@ button.danger {
 }
 
 .session-badge--global {
-  color: #6d28d9;
-  background: #ede9fe;
+  color: var(--badge-global-color);
+  background: var(--badge-global-bg);
 }
 
 .dashboard-row-menu {
