@@ -73,6 +73,7 @@ export type Course = {
 export type Staff = {
   id: number;
   name: string;
+  cost_centre?: string | null;
   max_hours_per_week?: number | null;
   fte?: number | null;
   non_teaching_day?: number | null;
@@ -920,28 +921,19 @@ export const api = {
     URL.revokeObjectURL(url);
   },
 
-  async downloadExport(path: string, filename: string): Promise<void> {
+  /** Start a file download in the same user gesture (avoids multi-click blob downloads). */
+  downloadExport(path: string, _filename: string): void {
     const token = getToken();
-    const headers: Record<string, string> = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await fetch(`${API_BASE}${path}`, { headers });
-    if (!res.ok) {
-      let detail = res.statusText;
-      try {
-        const body = await res.json();
-        if (body.detail) detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
-      } catch {
-        /* ignore */
-      }
-      throw new Error(detail);
-    }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    const url = new URL(`${API_BASE}${path}`, window.location.origin);
+    if (token) url.searchParams.set("access_token", token);
+    const iframe = document.createElement("iframe");
+    iframe.style.display = "none";
+    iframe.setAttribute("aria-hidden", "true");
+    document.body.appendChild(iframe);
+    iframe.src = url.toString();
+    window.setTimeout(() => {
+      iframe.remove();
+    }, 120_000);
   },
 
   async importFile(sessionId: number, kind: "session" | "qualifications" | "lecturer-preferences" | "overall-visual" | "admin-visual", file: File) {

@@ -42,6 +42,7 @@ def _member_session_ids(db: Session, global_session_id: int) -> list[int]:
 
 
 STAFF_HOURS_PROFILE_FIELDS = (
+    "cost_centre",
     "fte",
     "max_hours_per_week",
     "non_teaching_day",

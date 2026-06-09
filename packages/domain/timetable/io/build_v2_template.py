@@ -19,17 +19,19 @@ from .xlsm_export_v2 import (
     V2_TEMPLATE_SHEETS,
 )
 
-STYLEGUIDE_FALLBACK = Path("/Users/tomdrummond/Documents/styleguide2.xlsx")
+STYLEGUIDE_BUNDLED = Path(__file__).resolve().parents[2] / "templates" / "timetable_template_styleguide.xlsx"
 
 
 def _styleguide_path() -> Path:
     for p in (
-        STYLEGUIDE_FALLBACK,
+        STYLEGUIDE_BUNDLED,
+        Path("/Users/tomdrummond/Downloads/timetableTemplate.xlsx"),
         Path(__file__).resolve().parents[2] / "styleguide2.xlsx",
+        Path("/Users/tomdrummond/Documents/styleguide2.xlsx"),
     ):
         if p.is_file():
             return p
-    raise FileNotFoundError("styleguide2.xlsx not found")
+    raise FileNotFoundError("timetable_template_styleguide.xlsx not found")
 
 
 def _copy_sheet(src, dst, title: str) -> None:

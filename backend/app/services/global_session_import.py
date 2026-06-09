@@ -241,6 +241,7 @@ def import_staff_from_linked_session(
         row = Staff(
             name=src.name.strip(),
             timetable_session_id=target_session_id,
+            cost_centre=getattr(src, "cost_centre", None),
             max_hours_per_week=src.max_hours_per_week,
             non_teaching_day=src.non_teaching_day,
             fte=src.fte,

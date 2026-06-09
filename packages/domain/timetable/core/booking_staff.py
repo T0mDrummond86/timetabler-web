@@ -1,11 +1,17 @@
 """Staff roles attached to a scheduled booking."""
 from __future__ import annotations
 
+import re
 from typing import Literal
 
 from sqlalchemy import and_, or_
 
 from .models import Booking
+
+_IMPORT_LECTURER_SCOPE_RE = re.compile(
+    r"\s*\(\s*(T1(?:\s*\+\s*T2)?|T2(?:\s*\+\s*T1)?)\s*\)\s*$",
+    re.I,
+)
 
 TermFilter = Literal["all", "t1", "t2"]
 
@@ -115,6 +121,69 @@ def export_lecturer_label(
     if scope_parts and line:
         return f"{line} ({'+'.join(scope_parts)})"
     return line
+
+
+def parse_import_lecturer_label(
+    text: str,
+) -> tuple[str | None, str | None, bool | None, bool | None]:
+    """Parse admin/overall export lecturer cells written by :func:`export_lecturer_label`.
+
+    Returns ``(primary_name, co_teacher_name, co_in_term_1, co_in_term_2)``.
+    Co-teach term flags are ``None`` when no co-teacher is present, or when the
+    co-teacher applies to the same terms as the class (inherit from booking).
+    """
+    s = (text or "").strip()
+    if not s:
+        return None, None, None, None
+
+    co_t1: bool | None = None
+    co_t2: bool | None = None
+    scope_match = _IMPORT_LECTURER_SCOPE_RE.search(s)
+    if scope_match:
+        scope = scope_match.group(1).upper().replace(" ", "")
+        s = s[: scope_match.start()].strip()
+        if "T1" in scope:
+            co_t1 = True
+        if "T2" in scope:
+            co_t2 = True
+        if co_t1 and not co_t2:
+            co_t2 = False
+        elif co_t2 and not co_t1:
+            co_t1 = False
+
+    parts = [p.strip() for p in re.split(r"\s+\+\s+", s) if p.strip()]
+    if not parts:
+        return None, None, None, None
+
+    primary = parts[0]
+    co = parts[1] if len(parts) > 1 else None
+    if co is None:
+        return primary, None, None, None
+    if co_t1 is None and co_t2 is None:
+        return primary, co, None, None
+    return primary, co, co_t1, co_t2
+
+
+def apply_parsed_lecturers_to_booking(
+    booking: Booking,
+    *,
+    primary_name: str | None,
+    co_teacher_name: str | None,
+    co_in_term_1: bool | None,
+    co_in_term_2: bool | None,
+    resolve_staff_id,
+) -> None:
+    """Set ``staff_id`` and optional SFS co-teacher fields on a new booking."""
+    booking.staff_id = resolve_staff_id(primary_name) if primary_name else None
+    if not co_teacher_name:
+        return
+    booking.sfs_co_teacher_staff_id = resolve_staff_id(co_teacher_name)
+    if co_in_term_1 is not None and co_in_term_2 is not None:
+        booking.sfs_co_teacher_in_term_1 = 1 if co_in_term_1 else 0
+        booking.sfs_co_teacher_in_term_2 = 1 if co_in_term_2 else 0
+    else:
+        booking.sfs_co_teacher_in_term_1 = 0
+        booking.sfs_co_teacher_in_term_2 = 0
 
 
 def sfs_co_teacher_term_labels(booking: Booking) -> str:

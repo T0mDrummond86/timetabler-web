@@ -1,4 +1,5 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { nonNegIntFromInput, sanitizeNonNegIntInput } from "../lib/numericInput";
 import { api, Course, Qualification, Room, Staff, Unit } from "../api";
 import type { QualificationDetail, StaffHoursRow, StaffOnlineStudentRow } from "../types";
 import {
@@ -11,6 +12,22 @@ import { LinkedSessionImportPanel } from "./LinkedSessionImportPanel";
 import { useConfirmPrompt } from "../hooks/useConfirmPrompt";
 
 type Tab = "staff" | "rooms" | "units" | "courses" | "qualifications";
+
+const STAFF_TABLE_WIDTH_KEY = "staff-editor-table-pct";
+const STAFF_TABLE_WIDTH_DEFAULT = 48;
+const STAFF_TABLE_WIDTH_MIN = 28;
+const STAFF_TABLE_WIDTH_MAX = 72;
+
+function readStaffTableWidthPct(): number {
+  try {
+    const raw = localStorage.getItem(STAFF_TABLE_WIDTH_KEY);
+    const n = raw ? Number(raw) : STAFF_TABLE_WIDTH_DEFAULT;
+    if (!Number.isFinite(n)) return STAFF_TABLE_WIDTH_DEFAULT;
+    return Math.min(STAFF_TABLE_WIDTH_MAX, Math.max(STAFF_TABLE_WIDTH_MIN, n));
+  } catch {
+    return STAFF_TABLE_WIDTH_DEFAULT;
+  }
+}
 
 function parsePrefClasses(raw: string): string[] {
   return raw
@@ -98,6 +115,9 @@ export function EntityEditorsPanel({
   const [roomTypeChoices, setRoomTypeChoices] = useState<[string, string][]>([]);
   const [staffHoursRows, setStaffHoursRows] = useState<StaffHoursRow[]>([]);
   const [staffHoursLoading, setStaffHoursLoading] = useState(false);
+  const [staffTableWidthPct, setStaffTableWidthPct] = useState(readStaffTableWidthPct);
+  const staffLayoutRef = useRef<HTMLDivElement>(null);
+  const staffResizeActiveRef = useRef(false);
   const [unitDoubleSession, setUnitDoubleSession] = useState(false);
   const { confirm, prompt, dialogs } = useConfirmPrompt();
 
@@ -122,6 +142,40 @@ export function EntityEditorsPanel({
   useEffect(() => {
     void reloadStaffHours();
   }, [reloadStaffHours, syncToken]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STAFF_TABLE_WIDTH_KEY, String(staffTableWidthPct));
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }, [staffTableWidthPct]);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!staffResizeActiveRef.current || !staffLayoutRef.current) return;
+      const rect = staffLayoutRef.current.getBoundingClientRect();
+      const pct = ((e.clientX - rect.left) / rect.width) * 100;
+      setStaffTableWidthPct(
+        Math.min(STAFF_TABLE_WIDTH_MAX, Math.max(STAFF_TABLE_WIDTH_MIN, pct)),
+      );
+    };
+    const onUp = () => {
+      staffResizeActiveRef.current = false;
+      document.body.classList.remove("staff-editor-resizing");
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  const beginStaffResize = useCallback(() => {
+    staffResizeActiveRef.current = true;
+    document.body.classList.add("staff-editor-resizing");
+  }, []);
 
   useEffect(() => {
     if (focusEntityId == null) return;
@@ -276,6 +330,7 @@ export function EntityEditorsPanel({
       if (activeTab === "staff" && selectedStaff) {
         await api.patchStaff(sessionId, selectedId, {
           name: String(form.get("name") || selectedStaff.name),
+          cost_centre: String(form.get("cost_centre") || "") || null,
           fte: form.get("fte") ? Number(form.get("fte")) : null,
           non_teaching_day: form.get("non_teaching_day")
             ? Number(form.get("non_teaching_day"))
@@ -289,9 +344,11 @@ export function EntityEditorsPanel({
           supervision_hours: form.get("supervision_hours")
             ? Number(form.get("supervision_hours"))
             : null,
-          default_online_students_per_class: form.get("default_online_students_per_class")
-            ? Number(form.get("default_online_students_per_class"))
-            : null,
+          default_online_students_per_class: (() => {
+            const raw = String(form.get("default_online_students_per_class") ?? "").trim();
+            if (!raw) return null;
+            return nonNegIntFromInput(raw, 0);
+          })(),
           timetable_locked: form.get("timetable_locked") === "on" ? 1 : 0,
         });
         await api.saveStaffAvailability(sessionId, selectedId, blockedApiFromSet(blockedSlots));
@@ -480,8 +537,16 @@ export function EntityEditorsPanel({
       </div>
       )}
       <div
+        ref={activeTab === "staff" ? staffLayoutRef : undefined}
         className={
-          activeTab === "staff" ? "entity-editor-layout staff-editor-layout" : "entity-editor-layout"
+          activeTab === "staff"
+            ? "entity-editor-layout staff-editor-layout staff-editor-resizable"
+            : "entity-editor-layout"
+        }
+        style={
+          activeTab === "staff"
+            ? ({ ["--staff-table-col" as string]: `${staffTableWidthPct}%` } as CSSProperties)
+            : undefined
         }
       >
         <div className={activeTab === "staff" ? "entity-list-col staff-hours-list-col" : "entity-list-col"}>
@@ -559,6 +624,31 @@ export function EntityEditorsPanel({
             </ul>
           )}
         </div>
+        {activeTab === "staff" && (
+          <div
+            className="staff-editor-resize-handle"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize staff table and editor"
+            aria-valuemin={STAFF_TABLE_WIDTH_MIN}
+            aria-valuemax={STAFF_TABLE_WIDTH_MAX}
+            aria-valuenow={Math.round(staffTableWidthPct)}
+            tabIndex={0}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              beginStaffResize();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                setStaffTableWidthPct((p) => Math.max(STAFF_TABLE_WIDTH_MIN, p - 2));
+              } else if (e.key === "ArrowRight") {
+                e.preventDefault();
+                setStaffTableWidthPct((p) => Math.min(STAFF_TABLE_WIDTH_MAX, p + 2));
+              }
+            }}
+          />
+        )}
         <div className="entity-form-wrap">
           {selectedId == null && <p className="muted">Select an item to edit.</p>}
           {selectedStaff && activeTab === "staff" && (
@@ -566,6 +656,14 @@ export function EntityEditorsPanel({
               <label>
                 Name
                 <input name="name" defaultValue={selectedStaff.name} required />
+              </label>
+              <label>
+                Cost centre
+                <input
+                  name="cost_centre"
+                  defaultValue={selectedStaff.cost_centre ?? ""}
+                  placeholder="e.g. 12345"
+                />
               </label>
               <label>
                 FTE
@@ -615,9 +713,18 @@ export function EntityEditorsPanel({
                 Default online students / class
                 <input
                   name="default_online_students_per_class"
-                  type="number"
-                  min={0}
-                  defaultValue={selectedStaff.default_online_students_per_class ?? ""}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  className="input-numeric-plain"
+                  defaultValue={
+                    selectedStaff.default_online_students_per_class != null
+                      ? String(selectedStaff.default_online_students_per_class)
+                      : ""
+                  }
+                  onChange={(e) => {
+                    e.target.value = sanitizeNonNegIntInput(e.target.value);
+                  }}
                 />
               </label>
               <fieldset className="qual-link-fieldset">
@@ -663,15 +770,20 @@ export function EntityEditorsPanel({
                           <td>{row.session_count}</td>
                           <td>
                             <input
-                              type="number"
-                              min={0}
-                              value={row.student_count}
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              className="input-numeric-plain"
+                              value={row.student_count === 0 ? "0" : String(row.student_count)}
                               onChange={(e) => {
-                                const n = Number(e.target.value);
+                                const digits = sanitizeNonNegIntInput(e.target.value);
                                 setOnlineRows((prev) =>
                                   prev.map((r) =>
                                     r.unit_id === row.unit_id
-                                      ? { ...r, student_count: Number.isFinite(n) ? n : r.student_count }
+                                      ? {
+                                          ...r,
+                                          student_count: nonNegIntFromInput(digits, 0),
+                                        }
                                       : r,
                                   ),
                                 );

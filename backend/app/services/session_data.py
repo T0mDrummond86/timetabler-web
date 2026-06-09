@@ -269,6 +269,7 @@ def serialize_session(db: Session, timetable_session_id: int) -> dict[str, Any]:
             {
                 "id": s.id,
                 "name": s.name,
+                "cost_centre": getattr(s, "cost_centre", None),
                 "max_hours_per_week": s.max_hours_per_week,
                 "non_teaching_day": s.non_teaching_day,
                 "fte": getattr(s, "fte", None),
@@ -455,6 +456,7 @@ def restore_session(db: Session, timetable_session_id: int, payload: dict[str, A
         row = Staff(
             timetable_session_id=timetable_session_id,
             name=s["name"],
+            cost_centre=s.get("cost_centre"),
             max_hours_per_week=s.get("max_hours_per_week"),
             non_teaching_day=s.get("non_teaching_day"),
             fte=s.get("fte"),

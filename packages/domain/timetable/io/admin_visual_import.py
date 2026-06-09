@@ -19,6 +19,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 from sqlalchemy.orm import Session
 
 from ..constants import NUM_DAYS, time_to_slot
+from ..core.booking_staff import apply_parsed_lecturers_to_booking, parse_import_lecturer_label
 from ..core.booking_sessions import initialize_session_weeks, serialize_session_weeks
 from ..core.models import Booking, Course, CourseUnit, Qualification, Room, Staff, Unit, UnitQualification
 from ..core.qualification_schedule import SCHEDULE_PERIOD_DAY, replace_qualification_time_windows
@@ -319,8 +320,9 @@ def _parse_course_tab(
         lec_raw = _strip_cell(ws.cell(row, TERM1_LABEL_COLS[1]).value)
         if _lecturer_placeholder(lec_raw):
             lec_raw = _strip_cell(ws.cell(row, TERM2_LABEL_COLS[1]).value)
-        lec_name = _normalize_lecturer_name(lec_raw)
-        if _lecturer_placeholder(lec_raw):
+        primary, co_name, co_t1, co_t2 = parse_import_lecturer_label(lec_raw)
+        primary_norm = _normalize_lecturer_name(primary or "")
+        if not primary_norm or _lecturer_placeholder(primary or ""):
             continue
 
         room_raw = _strip_cell(ws.cell(row, TERM1_LABEL_COLS[2]).value)
@@ -359,7 +361,7 @@ def _parse_course_tab(
 
         uid = get_unit(display, span)
         rid = get_room(room_raw)
-        sid = resolve_staff_id(lec_name)
+        co_norm = _normalize_lecturer_name(co_name or "") if co_name else None
         ensure_course_unit(uid)
         if uid is not None:
             course_unit_sets[course_code].add(int(uid))
@@ -368,7 +370,6 @@ def _parse_course_tab(
             week_id=week_id,
             course_id=course.id,
             unit_id=uid,
-            staff_id=sid,
             room_id=rid,
             day=day,
             start_slot=start_slot,
@@ -376,6 +377,14 @@ def _parse_course_tab(
             external_id=ext,
             in_term_1=1 if in_term_1 else 0,
             in_term_2=1 if in_term_2 else 0,
+        )
+        apply_parsed_lecturers_to_booking(
+            booking,
+            primary_name=primary_norm,
+            co_teacher_name=co_norm if co_norm and not _lecturer_placeholder(co_norm) else None,
+            co_in_term_1=co_t1,
+            co_in_term_2=co_t2,
+            resolve_staff_id=resolve_staff_id,
         )
         if active_weeks:
             booking.session_weeks = serialize_session_weeks(active_weeks)

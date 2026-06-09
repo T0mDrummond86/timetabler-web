@@ -261,10 +261,12 @@ export function BookingEditDialog({
             <label>
               Online students
               <input
-                type="number"
-                min={0}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                className="input-numeric-plain"
                 value={onlineStudents}
-                onChange={(e) => setOnlineStudents(e.target.value)}
+                onChange={(e) => setOnlineStudents(e.target.value.replace(/\D/g, ""))}
                 placeholder="Default 20"
               />
             </label>

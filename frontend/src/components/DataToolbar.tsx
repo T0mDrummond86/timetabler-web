@@ -10,6 +10,7 @@ type Props = {
   showAlerts: boolean;
   onShowAlertsChange: (v: boolean) => void;
   onImport: (kind: "session" | "qualifications" | "lecturer-preferences" | "overall-visual" | "admin-visual", file: File) => void;
+  onError?: (message: string) => void;
   importing?: boolean;
   showDisplay?: boolean;
 };
@@ -21,6 +22,7 @@ export function DataToolbar({
   showAlerts,
   onShowAlertsChange,
   onImport,
+  onError,
   importing,
   showDisplay = true,
 }: Props) {
@@ -30,9 +32,9 @@ export function DataToolbar({
   const [importKind, setImportKind] = useState<Props["onImport"] extends (k: infer K, f: File) => void ? K : never>("session");
   const [printOpen, setPrintOpen] = useState(false);
 
-  async function exportPath(path: string, filename: string) {
+  function exportPath(path: string, filename: string) {
     exportMenu.close();
-    await api.downloadExport(path, filename);
+    api.downloadExport(path, filename);
   }
 
   function pickImport(kind: typeof importKind) {
@@ -131,7 +133,7 @@ export function DataToolbar({
               className="ctx-item ctx-item-desc"
               role="menuitem"
               onClick={() =>
-                void exportPath(
+                exportPath(
                   `/sessions/${sessionId}/export/timetable?variant=v2&colour_by_class=${colourByClass}`,
                   "timetable_export.xlsm",
                 )

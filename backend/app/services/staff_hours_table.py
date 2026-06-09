@@ -59,6 +59,7 @@ def staff_hours_table_rows(db: Session, *, timetable_session_id: int) -> list[di
             {
                 "id": s.id,
                 "name": s.name,
+                "cost_centre": getattr(s, "cost_centre", None),
                 "fte": s.fte,
                 "lecturing_hours": lh,
                 "in_class_timetabled_hours": snap.regular_avg if snap else None,

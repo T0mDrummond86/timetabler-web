@@ -3,12 +3,17 @@
 Grid styling (borders, fills, headers, time column) lives in ``templates/export_v2_base.xlsm``
 and must be edited in Excel. This module only writes data: sheet titles and merged placecards.
 
+Layout and grid borders come from ``timetable_template_styleguide.xlsx``. Placecards restore
+per-cell template borders before applying a coloured edge; empty grid cells are reset from the
+template after painting. The staff summary table clones row styles from the styleguide as it grows.
+
 Each weekday block is four columns wide. Course placecards use two columns (T1 left, T2 right)
 or all four when the booking is in both terms.
 """
 from __future__ import annotations
 
 import shutil
+from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,14 +27,13 @@ from ..constants import NUM_DAYS, NUM_SLOTS
 from ..core.class_colour import booking_colour_key
 from ..core.models import Booking, Course, Room, Staff
 from ..core.room_types import room_is_physical
-from ..core.auto_timetable_constraints import blocked_slots_from_availability
 from .backup_payload import write_backup_sheet
+from ..core.screen_colours import assign_screen_colours, screen_border_xlsx, screen_fill_xlsx
 from .xlsm_export import (
     ExportReport,
     _bookings_by_slot,
     _bookings_for_staff_tab,
-    _course_border_hex,
-    _course_fill_hex,
+    _copy_worksheet_layout,
     _entity_values,
     _staff_lane_subgroups,
     _staff_placecard_lines,
@@ -51,7 +55,7 @@ V2_TEMPLATE_SHEETS = (
 
 V2_TITLE_ROW = 1
 V2_FIRST_SLOT_ROW = 3
-V2_DAY_STRIDE = 5  # 4 day columns + 1 gap
+V2_DAY_STRIDE = 4  # 4 contiguous day columns (Mon–Fri), no spacer
 V2_NUM_DAYS = NUM_DAYS  # Mon–Fri (no Saturday)
 V2_DAY_FIRST_COL = 2
 V2_DAY_FIRST_COLS = tuple(V2_DAY_FIRST_COL + day * V2_DAY_STRIDE for day in range(V2_NUM_DAYS))
@@ -61,12 +65,16 @@ V2_LAST_COL = V2_DAY_FIRST_COLS[-1] + V2_DAY_BLOCK_WIDTH - 1
 V2_GRID_LAST_ROW = V2_FIRST_SLOT_ROW + NUM_SLOTS - 1
 V2_FOOTER_START_ROW = V2_GRID_LAST_ROW + 1
 
-# Staff sheet: lecturer hours summary in columns AA / AB (top of sheet, row 1).
-V2_SUMMARY_CLASS_COL = 27
-V2_SUMMARY_HOURS_COL = 28
-V2_STAFF_HOURS_SUMMARY_HEADER_ROW = 1
+# Staff sheet: hours summary beside the grid — title row 2 (cols W/X), table from row 3.
+V2_SUMMARY_TITLE_ROW = 2
+V2_SUMMARY_CLASS_COL = 23
+V2_SUMMARY_HOURS_COL = 24
+V2_STAFF_HOURS_SUMMARY_HEADER_ROW = 3
 V2_SUMMARY_HEADER_ROW = V2_STAFF_HOURS_SUMMARY_HEADER_ROW
 V2_SUMMARY_FIRST_DATA_ROW = V2_STAFF_HOURS_SUMMARY_HEADER_ROW + 1
+# Template rows whose cell styles are cloned when the summary table grows.
+V2_SUMMARY_DATA_STYLE_ROW = 4
+V2_SUMMARY_TOTAL_STYLE_ROW = 9
 
 # Placecard styling only (booking cards, not the grid template).
 V2_PLACECARD_FONT = Font(name="Calibri", size=12, bold=True, color="FF1A1A1A")
@@ -91,10 +99,6 @@ V2_SUMMARY_HOURS_ALIGN = Alignment(horizontal="right", vertical="center")
 V2_SUMMARY_CLASS_COL_WIDTH = 32
 V2_SUMMARY_HOURS_COL_WIDTH = 11
 
-# Staff timetable: blocked-times grid only (not non-teaching day).
-V2_BLOCKED_SLOT_FILL = PatternFill(
-    start_color="FFF3E8FF", end_color="FFF3E8FF", fill_type="solid"
-)
 _SUMMARY_BORDER_COLOR = "FFD1D5DB"
 _SUMMARY_BORDER_STRONG = "FF9CA3AF"
 
@@ -185,15 +189,77 @@ def _clear_v2_cell_value(ws, row: int, col: int) -> None:
     cell.value = None
 
 
-def _unmerge_v2_body(ws) -> None:
-    """Remove booking-area merges from the slot grid."""
-    min_col, max_col = _v2_body_col_range()
-    top, bot = V2_FIRST_SLOT_ROW, _v2_last_slot_row()
-    for merged in list(ws.merged_cells.ranges):
-        if _ranges_intersect(merged.min_row, merged.max_row, top, bot) and _ranges_intersect(
-            merged.min_col, merged.max_col, min_col, max_col
-        ):
-            ws.unmerge_cells(str(merged))
+def _copy_cell_style(ref_cell, cell) -> None:
+    """Copy one cell's display style (openpyxl does not preserve these when values change)."""
+    if not ref_cell.has_style:
+        return
+    cell.font = copy(ref_cell.font)
+    cell.border = copy(ref_cell.border)
+    cell.fill = copy(ref_cell.fill)
+    cell.number_format = copy(ref_cell.number_format)
+    cell.protection = copy(ref_cell.protection)
+    cell.alignment = copy(ref_cell.alignment)
+
+
+def _set_cell_border(
+    cell,
+    *,
+    top: Side | None = None,
+    bottom: Side | None = None,
+    left: Side | None = None,
+    right: Side | None = None,
+) -> None:
+    """Update selected border sides without clearing the rest."""
+    b = cell.border
+    cell.border = Border(
+        top=top if top is not None else b.top,
+        bottom=bottom if bottom is not None else b.bottom,
+        left=left if left is not None else b.left,
+        right=right if right is not None else b.right,
+        diagonal=b.diagonal,
+        diagonal_direction=b.diagonal_direction,
+        outline=b.outline,
+        vertical=b.vertical,
+        horizontal=b.horizontal,
+    )
+
+
+def _placecard_anchor(ws, row: int, col: int) -> bool:
+    """True when this cell is the anchor of a painted booking placecard."""
+    cell = ws.cell(row=row, column=col)
+    if cell.value in (None, ""):
+        return False
+    if cell.fill.fill_type != "solid":
+        return False
+    rgb = str(getattr(cell.fill.start_color, "rgb", None) or "").upper()
+    if rgb in ("", "00000000", "FFFFFFFF"):
+        return False
+    if rgb.endswith("F3E8FF") or "F3E8FF" in rgb:
+        return False
+    for merged in ws.merged_cells.ranges:
+        if merged.min_row == row and merged.min_col == col:
+            return merged.max_row > merged.min_row or merged.max_col > merged.min_col
+    return False
+
+
+def _reapply_template_grid_borders(ws, ref_ws) -> None:
+    """Restore timetable grid borders from the template except on placecard anchors."""
+    cols = (1,) + _v2_slot_content_cols()
+    for row in range(V2_FIRST_SLOT_ROW, _v2_last_slot_row() + 1):
+        for col in cols:
+            cell = ws.cell(row=row, column=col)
+            if isinstance(cell, MergedCell):
+                continue
+            if _placecard_anchor(ws, row, col):
+                continue
+            cell.border = copy(ref_ws.cell(row=row, column=col).border)
+
+
+def _clone_v2_template_sheet(wb, template_ws, title: str, used_names: set[str]):
+    """Copy a v2 template tab with full grid styling (copy_worksheet can drop layout)."""
+    ws = wb.create_sheet(_safe_sheet_name(title, used_names))
+    _copy_worksheet_layout(template_ws, ws)
+    return ws
 
 
 def _clear_v2_body(ws) -> None:
@@ -211,111 +277,97 @@ def _clear_v2_footer(ws) -> None:
             _clear_v2_cell_value(ws, row, col)
 
 
-def _unmerge_v2_staff_summary(ws) -> None:
+def _unmerge_v2_summary_cols(ws, *, keep_title_merge: bool) -> None:
     for merged in list(ws.merged_cells.ranges):
         if merged.min_col >= V2_SUMMARY_CLASS_COL and merged.max_col <= V2_SUMMARY_HOURS_COL:
+            if (
+                keep_title_merge
+                and merged.min_row <= V2_SUMMARY_TITLE_ROW <= merged.max_row
+            ):
+                continue
             ws.unmerge_cells(str(merged))
 
 
-def _clear_v2_staff_summary(ws) -> None:
-    """Clear staff hours summary columns (AA–AB), including legacy copies below the grid."""
-    _unmerge_v2_staff_summary(ws)
-    last_row = max(ws.max_row, V2_SUMMARY_HEADER_ROW + 40)
-    for row in range(1, last_row + 1):
-        for col in (V2_SUMMARY_CLASS_COL, V2_SUMMARY_HOURS_COL):
-            _clear_v2_cell_value(ws, row, col)
+def _unmerge_v2_staff_summary(ws) -> None:
+    _unmerge_v2_summary_cols(ws, keep_title_merge=True)
 
 
-def _summary_border(
+def _copy_summary_row_style(
+    ws,
+    ref_ws,
+    template_row: int,
+    target_row: int,
     *,
-    top=None,
-    bottom=None,
-    left=None,
-    right=None,
-) -> Border:
-    thin = Side(style="thin", color=_SUMMARY_BORDER_COLOR)
-    return Border(
-        top=top or thin,
-        bottom=bottom or thin,
-        left=left or thin,
-        right=right or thin,
-    )
+    clear_values: bool = True,
+) -> None:
+    """Clone summary table formatting from the styleguide row."""
+    for col in (V2_SUMMARY_CLASS_COL, V2_SUMMARY_HOURS_COL):
+        dst = ws.cell(row=target_row, column=col)
+        if clear_values:
+            dst.value = None
+        _copy_cell_style(ref_ws.cell(template_row, col), dst)
+
+
+def _clear_v2_staff_summary(ws, ref_ws) -> None:
+    """Clear summary body values and reset row styles from the template band."""
+    _unmerge_v2_staff_summary(ws)
+    last_row = max(ws.max_row, V2_SUMMARY_FIRST_DATA_ROW + 40)
+    for row in range(V2_SUMMARY_FIRST_DATA_ROW, last_row + 1):
+        style_row = (
+            V2_SUMMARY_TOTAL_STYLE_ROW
+            if row == V2_SUMMARY_TOTAL_STYLE_ROW
+            else V2_SUMMARY_DATA_STYLE_ROW
+        )
+        _copy_summary_row_style(ws, ref_ws, style_row, row)
 
 
 def _summary_cols() -> tuple[int, int]:
     return V2_SUMMARY_CLASS_COL, V2_SUMMARY_HOURS_COL
 
 
-def _apply_v2_summary_cell(
-    cell,
+def _blank_v2_summary_cell(ws, row: int, col: int) -> None:
+    """Remove summary values, borders, and template fills from one cell."""
+    cell = ws.cell(row=row, column=col)
+    if isinstance(cell, MergedCell):
+        return
+    cell.value = None
+    cell.border = Border()
+    cell.fill = PatternFill()
+    cell.font = Font(name="Calibri", size=11)
+
+
+def _clear_v2_hours_summary_panel(ws) -> None:
+    """Remove the hours summary table (course/room tabs must not show lecturer summaries)."""
+    _unmerge_v2_summary_cols(ws, keep_title_merge=False)
+    last_row = max(ws.max_row, V2_SUMMARY_FIRST_DATA_ROW + 40)
+    for row in range(V2_SUMMARY_TITLE_ROW, last_row + 1):
+        for col in (V2_SUMMARY_CLASS_COL, V2_SUMMARY_HOURS_COL):
+            _blank_v2_summary_cell(ws, row, col)
+
+
+def _trim_v2_summary_below(ws, last_row: int) -> None:
+    """Clear template summary borders/values below the last written row."""
+    end_row = max(ws.max_row, V2_SUMMARY_FIRST_DATA_ROW + 40)
+    for row in range(last_row + 1, end_row + 1):
+        for col in (V2_SUMMARY_CLASS_COL, V2_SUMMARY_HOURS_COL):
+            _blank_v2_summary_cell(ws, row, col)
+
+
+def _colour_map_for_bookings(
+    bookings: list[Booking],
     *,
-    role: str,
-    data_index: int = 0,
-    table_top: bool = False,
-    table_bottom: bool = False,
-    is_left: bool = False,
-    is_right: bool = False,
-) -> None:
-    """Apply fills, fonts, borders for one cell in the hours summary table."""
-    strong = Side(style="thin", color=_SUMMARY_BORDER_STRONG)
-    thin = Side(style="thin", color=_SUMMARY_BORDER_COLOR)
-    top = strong if table_top else thin
-    bottom = strong if table_bottom else thin
-    left = strong if is_left else thin
-    right = strong if is_right else thin
-
-    if role == "header":
-        cell.font = V2_SUMMARY_HEADER_FONT
-        cell.fill = V2_SUMMARY_HEADER_FILL
-        cell.alignment = (
-            V2_SUMMARY_ALIGN if cell.column == V2_SUMMARY_CLASS_COL else V2_SUMMARY_HOURS_ALIGN
-        )
-        cell.border = _summary_border(top=top, bottom=bottom, left=left, right=right)
-        return
-
-    if role == "total":
-        cell.font = V2_SUMMARY_TOTAL_FONT
-        cell.fill = V2_SUMMARY_TOTAL_FILL
-        cell.alignment = (
-            V2_SUMMARY_ALIGN if cell.column == V2_SUMMARY_CLASS_COL else V2_SUMMARY_HOURS_ALIGN
-        )
-        cell.border = _summary_border(top=strong, bottom=bottom, left=left, right=right)
-        return
-
-    if role == "spacer":
-        cell.font = V2_SUMMARY_BODY_FONT
-        cell.fill = V2_SUMMARY_DATA_FILL
-        cell.alignment = V2_SUMMARY_ALIGN
-        cell.border = Border(left=left, right=right)
-        return
-
-    # data row
-    cell.font = V2_SUMMARY_BODY_FONT
-    cell.fill = V2_SUMMARY_DATA_ALT_FILL if data_index % 2 else V2_SUMMARY_DATA_FILL
-    cell.alignment = (
-        V2_SUMMARY_ALIGN if cell.column == V2_SUMMARY_CLASS_COL else V2_SUMMARY_HOURS_ALIGN
-    )
-    cell.border = _summary_border(top=top, bottom=bottom, left=left, right=right)
+    colour_by_class: bool,
+) -> dict[str, tuple[str, str]]:
+    keys = {booking_colour_key(b, by_class=colour_by_class) for b in bookings}
+    return assign_screen_colours(keys)
 
 
-def _format_v2_summary_columns(ws) -> None:
-    from openpyxl.utils import get_column_letter
-
-    for col in (V2_SUMMARY_CLASS_COL, V2_SUMMARY_HOURS_COL):
-        letter = get_column_letter(col)
-        dim = ws.column_dimensions[letter]
-        dim.hidden = False
-        dim.width = (
-            V2_SUMMARY_CLASS_COL_WIDTH
-            if col == V2_SUMMARY_CLASS_COL
-            else V2_SUMMARY_HOURS_COL_WIDTH
-        )
-
-
-def _v2_summary_spacer_row(ws, row: int, col_l: int, col_r: int) -> int:
-    for col, is_left, is_right in ((col_l, True, False), (col_r, False, True)):
-        spacer = ws.cell(row=row, column=col, value=None)
-        _apply_v2_summary_cell(spacer, role="spacer", is_left=is_left, is_right=is_right)
+def _v2_summary_spacer_row(
+    ws, ref_ws, row: int, col_l: int, col_r: int
+) -> int:
+    _copy_summary_row_style(ws, ref_ws, V2_SUMMARY_DATA_STYLE_ROW, row)
+    _clear_v2_cell_value(ws, row, col_l)
+    _clear_v2_cell_value(ws, row, col_r)
     return row + 1
 
 
@@ -326,32 +378,11 @@ def _v2_summary_hours_row(
     col_r: int,
     label: str,
     hours: float | None,
-    *,
-    role: str = "data",
-    data_index: int = 0,
-    table_top: bool = False,
-    table_bottom: bool = False,
 ) -> int:
-    c_cell = ws.cell(row=row, column=col_l, value=label)
-    _apply_v2_summary_cell(
-        c_cell,
-        role=role,
-        data_index=data_index,
-        table_top=table_top,
-        table_bottom=table_bottom,
-        is_left=True,
-    )
+    ws.cell(row=row, column=col_l, value=label)
     h_cell = ws.cell(row=row, column=col_r, value=None if hours is None else round(hours, 2))
     if hours is not None:
         h_cell.number_format = "0.00"
-    _apply_v2_summary_cell(
-        h_cell,
-        role=role,
-        data_index=data_index,
-        table_top=table_top,
-        table_bottom=table_bottom,
-        is_right=True,
-    )
     return row + 1
 
 
@@ -360,80 +391,46 @@ def _render_v2_staff_hours_summary(
     session: Session,
     staff_id: int,
     bookings: list[Booking],
-) -> None:
-    """Class / hours table in columns AA–AB with workload footer and FTE variance."""
+    *,
+    grid_ref_ws,
+) -> int:
+    """Class / hours table in columns W/X; grows using template row borders."""
     from ..core.staff_hours import (
         class_hours_summary_for_staff_export,
         staff_v2_hours_summary_footer,
     )
 
-    _clear_v2_staff_summary(ws)
+    _clear_v2_staff_summary(ws, grid_ref_ws)
     class_rows, _class_total = class_hours_summary_for_staff_export(
         session, staff_id, bookings
     )
     extra_rows, grand_total, variance = staff_v2_hours_summary_footer(
         session, staff_id, bookings
     )
-    _format_v2_summary_columns(ws)
 
     col_l, col_r = _summary_cols()
-    hdr_row = V2_SUMMARY_HEADER_ROW
-
-    hdr_class = ws.cell(row=hdr_row, column=col_l, value="Class")
-    _apply_v2_summary_cell(
-        hdr_class, role="header", table_top=True, is_left=True,
-    )
-    hdr_hours = ws.cell(row=hdr_row, column=col_r, value="Hours")
-    _apply_v2_summary_cell(
-        hdr_hours, role="header", table_top=True, is_right=True,
-    )
-
     row = V2_SUMMARY_FIRST_DATA_ROW
-    for idx, (label, hours) in enumerate(class_rows):
-        row = _v2_summary_hours_row(
-            ws, row, col_l, col_r, label, hours, role="data", data_index=idx
-        )
+    for label, hours in class_rows:
+        _copy_summary_row_style(ws, grid_ref_ws, V2_SUMMARY_DATA_STYLE_ROW, row, clear_values=False)
+        row = _v2_summary_hours_row(ws, row, col_l, col_r, label, hours)
 
     if class_rows:
-        row = _v2_summary_spacer_row(ws, row, col_l, col_r)
+        row = _v2_summary_spacer_row(ws, grid_ref_ws, row, col_l, col_r)
 
-    for idx, (label, hours) in enumerate(extra_rows):
-        row = _v2_summary_hours_row(
-            ws,
-            row,
-            col_l,
-            col_r,
-            label,
-            hours,
-            role="data",
-            data_index=len(class_rows) + idx,
-        )
+    for label, hours in extra_rows:
+        _copy_summary_row_style(ws, grid_ref_ws, V2_SUMMARY_DATA_STYLE_ROW, row, clear_values=False)
+        row = _v2_summary_hours_row(ws, row, col_l, col_r, label, hours)
 
-    row = _v2_summary_spacer_row(ws, row, col_l, col_r)
-    table_top = not class_rows and not extra_rows
-    row = _v2_summary_hours_row(
-        ws,
-        row,
-        col_l,
-        col_r,
-        "Total",
-        grand_total,
-        role="total",
-        table_top=table_top,
-        table_bottom=variance is None,
-    )
+    row = _v2_summary_spacer_row(ws, grid_ref_ws, row, col_l, col_r)
+    _copy_summary_row_style(ws, grid_ref_ws, V2_SUMMARY_TOTAL_STYLE_ROW, row, clear_values=False)
+    row = _v2_summary_hours_row(ws, row, col_l, col_r, "Total", grand_total)
 
     if variance is not None:
-        _v2_summary_hours_row(
-            ws,
-            row,
-            col_l,
-            col_r,
-            "Over / under",
-            variance,
-            role="total",
-            table_bottom=True,
-        )
+        _copy_summary_row_style(ws, grid_ref_ws, V2_SUMMARY_TOTAL_STYLE_ROW, row, clear_values=False)
+        row = _v2_summary_hours_row(ws, row, col_l, col_r, "Over / under", variance)
+
+    _trim_v2_summary_below(ws, row - 1)
+    return row - 1
 
 
 def _draw_v2_placecard(
@@ -444,34 +441,46 @@ def _draw_v2_placecard(
     col_end: int,
     lines: tuple[str, str, str],
     tint_key: str,
+    *,
+    grid_ref_ws,
+    colour_map: dict[str, tuple[str, str]] | None = None,
 ) -> None:
-    """Merged placecard for a booking (styles apply to the card only)."""
+    """Paint a merged placecard: fill, text, coloured edge, template grid borders preserved."""
     top_row, bot_row = min(top_row, bot_row), max(top_row, bot_row)
     col_start, col_end = min(col_start, col_end), max(col_start, col_end)
+    text = "\n".join(x for x in lines if x).strip()
+    if not text:
+        return
     _unmerge_intersecting(ws, top_row, bot_row, col_start, col_end)
-    text = "\n".join(x for x in lines if x)
-    fill = PatternFill(
-        start_color=_course_fill_hex(tint_key),
-        end_color=_course_fill_hex(tint_key),
-        fill_type="solid",
-    )
-    border_side = Side(border_style="medium", color=_course_border_hex(tint_key))
-    border = Border(top=border_side, bottom=border_side, left=border_side, right=border_side)
 
-    anchor = ws.cell(row=top_row, column=col_start, value=text)
-    anchor.fill = fill
-    anchor.font = V2_PLACECARD_FONT
-    anchor.border = border
-    anchor.alignment = V2_PLACECARD_ALIGN
+    template_borders = {
+        (row, col): copy(grid_ref_ws.cell(row=row, column=col).border)
+        for row in range(top_row, bot_row + 1)
+        for col in range(col_start, col_end + 1)
+    }
+    fill_hex = screen_fill_xlsx(tint_key, colour_map)
+    border_hex = screen_border_xlsx(tint_key, colour_map)
+    fill = PatternFill(start_color=fill_hex, end_color=fill_hex, fill_type="solid")
+    edge = Side(style="thin", color=border_hex)
+
     for row in range(top_row, bot_row + 1):
         for col in range(col_start, col_end + 1):
             cell = ws.cell(row=row, column=col)
-            if isinstance(cell, MergedCell):
-                continue
             cell.fill = fill
-            if row == top_row and col == col_start:
-                continue
-            cell.border = border
+            cell.border = template_borders[(row, col)]
+
+    anchor = ws.cell(row=top_row, column=col_start)
+    anchor.value = text
+    anchor.font = V2_PLACECARD_FONT
+    anchor.alignment = V2_PLACECARD_ALIGN
+
+    for col in range(col_start, col_end + 1):
+        _set_cell_border(ws.cell(row=top_row, column=col), top=edge)
+        _set_cell_border(ws.cell(row=bot_row, column=col), bottom=edge)
+    for row in range(top_row, bot_row + 1):
+        _set_cell_border(ws.cell(row=row, column=col_start), left=edge)
+        _set_cell_border(ws.cell(row=row, column=col_end), right=edge)
+
     ws.merge_cells(
         start_row=top_row,
         end_row=bot_row,
@@ -486,42 +495,28 @@ def _set_v2_title(ws, title: str) -> None:
 
 
 def _strip_saturday_from_sheet(ws) -> None:
-    """Clear Saturday column values beyond the Mon–Fri grid (values only)."""
-    sat_start = V2_DAY_FIRST_COL + V2_NUM_DAYS * V2_DAY_STRIDE
-    for merged in list(ws.merged_cells.ranges):
-        if merged.min_col >= sat_start:
-            ws.unmerge_cells(str(merged))
+    """Clear spacer column values between the grid and summary; keep template layout."""
+    clear_start = V2_LAST_COL + 1
+    clear_end = V2_SUMMARY_CLASS_COL - 1
+    if clear_start > clear_end:
+        return
     for row in range(1, ws.max_row + 1):
-        for col in range(sat_start, ws.max_column + 1):
+        for col in range(clear_start, clear_end + 1):
             _clear_v2_cell_value(ws, row, col)
 
 
-def _paint_v2_staff_blocked_slots(ws, session: Session, staff_id: int) -> None:
-    """Very light purple fill for Staff-tab blocked-times grid slots (not non-teaching day)."""
-    staff = session.get(Staff, staff_id)
-    if staff is None:
-        return
-    blocked = blocked_slots_from_availability(staff, session)
-    if not blocked:
-        return
-    for day, slot in blocked:
-        if not (0 <= day < V2_NUM_DAYS and 0 <= slot < NUM_SLOTS):
-            continue
-        row = _v2_slot_row(slot)
-        col_start, col_end = _v2_lane_cols(day, True, True)
-        for col in range(col_start, col_end + 1):
-            cell = ws.cell(row=row, column=col)
-            if isinstance(cell, MergedCell):
-                continue
-            cell.fill = V2_BLOCKED_SLOT_FILL
-
-
 def _render_v2_course_tab(
-    ws, title: str, bookings: list[Booking], *, colour_by_class: bool
+    ws,
+    title: str,
+    bookings: list[Booking],
+    *,
+    grid_ref_ws,
+    colour_by_class: bool,
+    colour_map: dict[str, tuple[str, str]],
 ) -> None:
     _strip_saturday_from_sheet(ws)
+    _clear_v2_hours_summary_panel(ws)
     _set_v2_title(ws, title)
-    _unmerge_v2_body(ws)
     _clear_v2_body(ws)
     _clear_v2_footer(ws)
 
@@ -540,7 +535,19 @@ def _render_v2_course_tab(
             _lecturer_label(b),
         )
         tint = booking_colour_key(b, by_class=colour_by_class)
-        _draw_v2_placecard(ws, top_row, bot_row, col_start, col_end, lines, tint)
+        _draw_v2_placecard(
+            ws,
+            top_row,
+            bot_row,
+            col_start,
+            col_end,
+            lines,
+            tint,
+            grid_ref_ws=grid_ref_ws,
+            colour_map=colour_map,
+        )
+    _reapply_template_grid_borders(ws, grid_ref_ws)
+    _clear_v2_hours_summary_panel(ws)
 
 
 def _render_v2_staff_tab(
@@ -548,17 +555,16 @@ def _render_v2_staff_tab(
     title: str,
     bookings: list[Booking],
     *,
+    grid_ref_ws,
     view_staff_id: int,
     session: Session,
     colour_by_class: bool,
+    colour_map: dict[str, tuple[str, str]],
 ) -> None:
     _strip_saturday_from_sheet(ws)
     _set_v2_title(ws, title)
-    _unmerge_v2_body(ws)
     _clear_v2_body(ws)
     _clear_v2_footer(ws)
-
-    _paint_v2_staff_blocked_slots(ws, session, view_staff_id)
 
     for group in _bookings_by_slot(bookings):
         b0 = group[0]
@@ -576,17 +582,36 @@ def _render_v2_staff_tab(
                 colour_by_class=colour_by_class,
                 term=lane_term,
             )
-            _draw_v2_placecard(ws, top_row, bot_row, col_start, col_end, lines, tint)
+            _draw_v2_placecard(
+                ws,
+                top_row,
+                bot_row,
+                col_start,
+                col_end,
+                lines,
+                tint,
+                grid_ref_ws=grid_ref_ws,
+                colour_map=colour_map,
+            )
 
-    _render_v2_staff_hours_summary(ws, session, view_staff_id, bookings)
+    _reapply_template_grid_borders(ws, grid_ref_ws)
+    _render_v2_staff_hours_summary(
+        ws, session, view_staff_id, bookings, grid_ref_ws=grid_ref_ws
+    )
 
 
 def _render_v2_room_tab(
-    ws, title: str, bookings: list[Booking], *, colour_by_class: bool
+    ws,
+    title: str,
+    bookings: list[Booking],
+    *,
+    grid_ref_ws,
+    colour_by_class: bool,
+    colour_map: dict[str, tuple[str, str]],
 ) -> None:
     _strip_saturday_from_sheet(ws)
+    _clear_v2_hours_summary_panel(ws)
     _set_v2_title(ws, title)
-    _unmerge_v2_body(ws)
     _clear_v2_body(ws)
     _clear_v2_footer(ws)
 
@@ -601,7 +626,19 @@ def _render_v2_room_tab(
             (b.course.code if b.course else "") or "",
         )
         tint = booking_colour_key(b, by_class=colour_by_class)
-        _draw_v2_placecard(ws, top_row, bot_row, col_start, col_end, lines, tint)
+        _draw_v2_placecard(
+            ws,
+            top_row,
+            bot_row,
+            col_start,
+            col_end,
+            lines,
+            tint,
+            grid_ref_ws=grid_ref_ws,
+            colour_map=colour_map,
+        )
+    _reapply_template_grid_borders(ws, grid_ref_ws)
+    _clear_v2_hours_summary_panel(ws)
 
 
 def _generate_v2_entity_tabs(
@@ -616,6 +653,9 @@ def _generate_v2_entity_tabs(
     from ..core.sidebar_order import ordered_courses, ordered_staff
 
     bookings = _week_bookings(session, week_id)
+    session_colour_map = _colour_map_for_bookings(
+        bookings, colour_by_class=colour_by_class
+    )
     used_names = set(wb.sheetnames)
 
     course_t = wb["Course Template v2"] if "Course Template v2" in wb.sheetnames else None
@@ -626,44 +666,47 @@ def _generate_v2_entity_tabs(
         for c in ordered_courses(
             session, include_block_cohorts=True, timetable_session_id=timetable_session_id
         ):
-            ws = wb.copy_worksheet(course_t)
-            ws.title = _safe_sheet_name(c.code, used_names)
+            ws = _clone_v2_template_sheet(wb, course_t, c.code, used_names)
             _render_v2_course_tab(
                 ws,
                 c.code,
                 [b for b in bookings if b.course_id == c.id],
+                grid_ref_ws=course_t,
                 colour_by_class=colour_by_class,
+                colour_map=session_colour_map,
             )
             report.course_tabs += 1
 
     if staff_t is not None:
         for s in ordered_staff(session, timetable_session_id=timetable_session_id):
-            ws = wb.copy_worksheet(staff_t)
-            ws.title = _safe_sheet_name(s.name, used_names)
+            ws = _clone_v2_template_sheet(wb, staff_t, s.name, used_names)
             staff_bookings = _bookings_for_staff_tab(bookings, s.id)
             _render_v2_staff_tab(
                 ws,
                 s.name,
                 staff_bookings,
+                grid_ref_ws=staff_t,
                 view_staff_id=s.id,
                 session=session,
                 colour_by_class=colour_by_class,
+                colour_map=session_colour_map,
             )
             report.staff_tabs += 1
 
     if room_t is not None:
         room_q = session.query(Room).order_by(Room.code)
-        if timetable_session_id is not None:
+        if timetable_session_id is not None and "timetable_session_id" in Room.__table__.columns:
             room_q = room_q.filter(Room.timetable_session_id == timetable_session_id)
         rooms = [r for r in room_q.all() if room_is_physical(r)]
         for r in rooms:
-            ws = wb.copy_worksheet(room_t)
-            ws.title = _safe_sheet_name(r.code, used_names)
+            ws = _clone_v2_template_sheet(wb, room_t, r.code, used_names)
             _render_v2_room_tab(
                 ws,
                 r.code,
                 [b for b in bookings if b.room_id == r.id],
+                grid_ref_ws=room_t,
                 colour_by_class=colour_by_class,
+                colour_map=session_colour_map,
             )
             report.room_tabs += 1
 

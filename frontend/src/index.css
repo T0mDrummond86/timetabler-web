@@ -61,6 +61,17 @@
   --violation-soft-bg: #fffbeb;
   --session-tab-badge-fg: #fff;
 
+  --variance-overtime-bg: #bae6fd;
+  --variance-overtime-fg: #0c4a6e;
+  --variance-shortfall-bg: #fecaca;
+  --variance-shortfall-fg: #7f1d1d;
+  --variance-part-bg: #fed7aa;
+  --variance-part-fg: #92400e;
+  --variance-part-overtime-bg: #e9d5ff;
+  --variance-part-overtime-fg: #581c87;
+  --variance-unknown-bg: #e2e8f0;
+  --variance-unknown-fg: #334155;
+
   --slot-h: 28px;
   --grid-header-h: 40px;
 }
@@ -103,9 +114,10 @@
   --grid-body-bg: #0f172a;
   --grid-slot-line: #334155;
   --grid-slot-line-hour: #475569;
-  --booking-card-text: rgba(241, 245, 249, 0.85);
-  --booking-card-meta: rgba(241, 245, 249, 0.72);
-  --booking-card-notes: rgba(241, 245, 249, 0.6);
+  /* Placecards keep pastel fills in dark mode — ink stays dark for readability. */
+  --booking-card-text: rgba(26, 26, 26, 0.85);
+  --booking-card-meta: rgba(26, 26, 26, 0.72);
+  --booking-card-notes: rgba(26, 26, 26, 0.6);
   --modal-backdrop: rgba(0, 0, 0, 0.65);
   --import-overlay-bg: rgba(0, 0, 0, 0.65);
   --badge-global-color: #c4b5fd;
@@ -114,6 +126,17 @@
   --violation-hard-bg: #450a0a;
   --violation-soft-bg: #422006;
   --session-tab-badge-fg: #0f172a;
+
+  --variance-overtime-bg: #0369a1;
+  --variance-overtime-fg: #f0f9ff;
+  --variance-shortfall-bg: #991b1b;
+  --variance-shortfall-fg: #fef2f2;
+  --variance-part-bg: #b45309;
+  --variance-part-fg: #fffbeb;
+  --variance-part-overtime-bg: #6b21a8;
+  --variance-part-overtime-fg: #faf5ff;
+  --variance-unknown-bg: #475569;
+  --variance-unknown-fg: #f8fafc;
 }
 
 * {
@@ -1128,9 +1151,14 @@ button.danger {
 
 .booking-card-title {
   font-weight: 600;
+  color: var(--booking-card-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+[data-theme="dark"] .booking-card {
+  color: #1a1a1a;
 }
 
 .booking-card-meta {
@@ -2151,15 +2179,28 @@ button.danger {
 
 .usage-cell.status-clash {
   background: #fecaca;
+  color: #1a1a1a;
+  font-weight: 600;
 }
 
 .usage-cell.status-ok {
   background: #bbf7d0;
+  color: #14532d;
+  font-weight: 600;
+}
+
+.usage-cell.status-busy {
+  color: #1a1a1a;
+  font-weight: 600;
 }
 
 .usage-cell.status-empty {
   background: #fafafa;
   color: var(--text-secondary);
+}
+
+[data-theme="dark"] .usage-cell.status-empty {
+  background: var(--bg-subtle);
 }
 
 .entity-list-col {
@@ -2201,8 +2242,19 @@ button.danger {
   border-bottom: 1px solid var(--border);
 }
 
-.entity-mini-table input[type="number"] {
+.entity-mini-table input[type="number"],
+.entity-mini-table .input-numeric-plain {
   width: 4.5rem;
+}
+
+.input-numeric-plain {
+  -moz-appearance: textfield;
+}
+
+.input-numeric-plain::-webkit-outer-spin-button,
+.input-numeric-plain::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .qual-detail-summary p {
@@ -2267,6 +2319,12 @@ button.danger {
   height: 1.25rem;
   text-align: center;
   vertical-align: middle;
+}
+
+.usage-table .usage-cell.status-busy,
+.usage-table .usage-cell.status-clash {
+  color: #1a1a1a;
+  font-weight: 600;
 }
 
 .usage-time-col {
@@ -2402,6 +2460,35 @@ button.danger {
   grid-template-columns: minmax(320px, 1.2fr) minmax(280px, 1fr);
 }
 
+.staff-editor-layout.staff-editor-resizable {
+  grid-template-columns: var(--staff-table-col, 48%) 6px minmax(220px, 1fr);
+  align-items: stretch;
+}
+
+.staff-editor-resize-handle {
+  margin: 0 -2px;
+  border-radius: 3px;
+  background: var(--border);
+  cursor: col-resize;
+  touch-action: none;
+  transition: background 0.15s ease;
+}
+
+.staff-editor-resize-handle:hover,
+.staff-editor-resize-handle.active {
+  background: var(--primary);
+}
+
+.staff-editor-resize-handle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+body.staff-editor-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
 .staff-hours-list-col {
   min-width: 0;
   max-width: 100%;
@@ -2469,7 +2556,8 @@ button.danger {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--surface-elevated, #f3f4f6);
+  background: var(--bg-subtle);
+  color: var(--text);
   font-weight: 600;
   text-align: left;
 }
@@ -2486,8 +2574,11 @@ button.danger {
   background: rgba(59, 130, 246, 0.12);
 }
 
-.staff-hours-wrap {
+.staff-hours-table td.staff-hours-wrap {
   white-space: normal;
+}
+
+.staff-hours-wrap {
   max-width: 14rem;
 }
 
@@ -2501,7 +2592,21 @@ button.danger {
 
 .staff-hours-detail {
   max-width: 18rem;
+}
+
+.staff-hours-table .staff-hours-bulk-online-col {
+  width: 14rem;
+  max-width: 14rem;
+  min-width: 14rem;
+}
+
+.staff-hours-table td.staff-hours-bulk-online {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
   font-size: 0.72rem;
+  vertical-align: top;
 }
 
 .staff-hours-name {
@@ -2516,20 +2621,34 @@ button.danger {
   padding: 1rem;
 }
 
+.variance-cell {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .variance-cell.variance-full-fte-overtime {
-  background: #cbe8f9;
+  background: var(--variance-overtime-bg);
+  color: var(--variance-overtime-fg);
 }
 
 .variance-cell.variance-full-fte-shortfall {
-  background: #f5c2c2;
+  background: var(--variance-shortfall-bg);
+  color: var(--variance-shortfall-fg);
 }
 
 .variance-cell.variance-part-fte-variation {
-  background: #ffd8a8;
+  background: var(--variance-part-bg);
+  color: var(--variance-part-fg);
 }
 
 .variance-cell.variance-part-fte-variation-overtime {
-  background: #dcc8f0;
+  background: var(--variance-part-overtime-bg);
+  color: var(--variance-part-overtime-fg);
+}
+
+.variance-cell.variance-unknown {
+  background: var(--variance-unknown-bg);
+  color: var(--variance-unknown-fg);
 }
 
 .entity-link-btn {

@@ -17,6 +17,7 @@ from openpyxl import load_workbook
 from sqlalchemy.orm import Session
 
 from ..constants import NUM_DAYS, NUM_SLOTS
+from ..core.booking_staff import apply_parsed_lecturers_to_booking, parse_import_lecturer_label
 from ..core.unit_brackets import (
     apply_unit_bracket_fields_from_names,
     normalize_class_label_for_parse,
@@ -226,25 +227,26 @@ def _parse_day_course_column(ws, day: int, base_col: int) -> list[dict]:
         lec_raw = _strip_cell(ws.cell(row=r, column=base_col + 2).value)
         rm_key = rm_raw.strip()
         lec_key = lec_raw.strip()
-        lec_name = _normalize_lecturer_name(lec_key)
+        primary, co_name, co_t1, co_t2 = parse_import_lecturer_label(lec_key)
+        lec_primary = _normalize_lecturer_name(primary or "")
 
         # Row whose only unit text is like "3hrs" — duration tag on the last slot
         # of the block (same room/lecturer). Include this slot, then close.
         if u_raw and _is_duration_only(u_raw):
             if (
                 cur is not None
-                and _lecturers_match(lec_name, cur["staff_name"])
+                and lec_key == cur["lecturer_key"]
                 and rm_key == cur["room"]
             ):
                 cur["end_slot"] = s + 1
             flush()
             continue
 
-        if _lecturer_placeholder(lec_key):
+        if _lecturer_placeholder(lec_key) or _lecturer_placeholder(primary or ""):
             flush()
             continue
 
-        if not _clean_unit_piece(u_raw) and not rm_key and lec_name is None:
+        if not _clean_unit_piece(u_raw) and not rm_key and lec_primary is None:
             flush()
             continue
 
@@ -256,14 +258,18 @@ def _parse_day_course_column(ws, day: int, base_col: int) -> list[dict]:
         _remainder, row_id = _extract_placecard_id(u_raw)
         if row_id:
             if cur is None:
-                if not piece and not rm_key and lec_name is None:
+                if not piece and not rm_key and lec_primary is None:
                     continue
                 cur = {
                     "start_slot": s,
                     "end_slot": s + 1,
                     "unit_parts": [piece] if piece else [],
                     "room": rm_key,
-                    "staff_name": lec_name,
+                    "lecturer_key": lec_key,
+                    "primary_name": lec_primary,
+                    "co_name": _normalize_lecturer_name(co_name or "") if co_name else None,
+                    "co_t1": co_t1,
+                    "co_t2": co_t2,
                     "placecard_id": row_id,
                 }
                 continue
@@ -277,11 +283,15 @@ def _parse_day_course_column(ws, day: int, base_col: int) -> list[dict]:
                 "end_slot": s + 1,
                 "unit_parts": [piece] if piece else [],
                 "room": rm_key,
-                "staff_name": lec_name,
+                "lecturer_key": lec_key,
+                "primary_name": lec_primary,
+                "co_name": _normalize_lecturer_name(co_name or "") if co_name else None,
+                "co_t1": co_t1,
+                "co_t2": co_t2,
             }
             continue
 
-        same = _lecturers_match(lec_name, cur["staff_name"]) and rm_key == cur["room"]
+        same = lec_key == cur["lecturer_key"] and rm_key == cur["room"]
         if same:
             cur["end_slot"] = s + 1
             if piece:
@@ -293,7 +303,11 @@ def _parse_day_course_column(ws, day: int, base_col: int) -> list[dict]:
                 "end_slot": s + 1,
                 "unit_parts": [piece] if piece else [],
                 "room": rm_key,
-                "staff_name": lec_name,
+                "lecturer_key": lec_key,
+                "primary_name": lec_primary,
+                "co_name": _normalize_lecturer_name(co_name or "") if co_name else None,
+                "co_t1": co_t1,
+                "co_t2": co_t2,
             }
             if row_id:
                 cur["placecard_id"] = row_id
@@ -506,25 +520,33 @@ def import_overall_visual(
                 )
                 uid = get_unit(display, span)
                 rid = get_room(seg["room"])
-                sid = resolve_staff_id(seg["staff_name"])
                 ensure_course_unit(course.id, uid)
                 if uid is not None:
                     course_unit_sets[course_code].add(int(uid))
-                session.add(
-                    Booking(
-                        week_id=week.id,
-                        course_id=course.id,
-                        unit_id=uid,
-                        staff_id=sid,
-                        room_id=rid,
-                        day=day,
-                        start_slot=seg["start_slot"],
-                        end_slot=seg["end_slot"],
-                        external_id=ext,
-                        in_term_1=it1,
-                        in_term_2=it2,
-                    )
+                booking = Booking(
+                    week_id=week.id,
+                    course_id=course.id,
+                    unit_id=uid,
+                    room_id=rid,
+                    day=day,
+                    start_slot=seg["start_slot"],
+                    end_slot=seg["end_slot"],
+                    external_id=ext,
+                    in_term_1=it1,
+                    in_term_2=it2,
                 )
+                co_norm = seg.get("co_name")
+                apply_parsed_lecturers_to_booking(
+                    booking,
+                    primary_name=seg.get("primary_name"),
+                    co_teacher_name=(
+                        co_norm if co_norm and not _lecturer_placeholder(co_norm) else None
+                    ),
+                    co_in_term_1=seg.get("co_t1"),
+                    co_in_term_2=seg.get("co_t2"),
+                    resolve_staff_id=resolve_staff_id,
+                )
+                session.add(booking)
                 report.bookings_created += 1
 
     # Dedupe courses into qualifications by identical class sets.

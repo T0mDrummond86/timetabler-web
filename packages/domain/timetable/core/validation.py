@@ -162,7 +162,7 @@ def _check_pairwise_clashes(session: Session, bookings: list[Booking]) -> Iterab
                         f"Room double-booked: {a.room.code} on {DAYS[day]}",
                         (a.id, b.id),
                     )
-                shared_staff = set(timetable_staff_ids(a)) & set(timetable_staff_ids(b))
+                shared_staff = staff_ids_with_term_overlap(a, b)
                 if shared_staff and not permitted_parallel_online_cohort_overlap(a, b):
                     names = [staff_name_on_booking(a, sid) for sid in sorted(shared_staff)]
                     label = names[0] if len(names) == 1 else ", ".join(names)

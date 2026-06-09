@@ -53,6 +53,7 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
           <thead>
             <tr>
               <th>Lecturer</th>
+              <th>Cost centre</th>
               <th>FTE</th>
               <th title="FTE × 21 hours per FTE">Lecturing h</th>
               <th title="Weekly in-class scheduled contact (non-online rooms), session-adjusted">
@@ -62,7 +63,9 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
                 Session avg
               </th>
               <th title="Total workload minus lecturing hours">Variance</th>
-              <th title="Per-class online session detail">Bulk online</th>
+              <th className="staff-hours-bulk-online-col" title="Per-class online session detail">
+                Bulk online
+              </th>
               <th title="Online / collaborate load hours">Bulk online h</th>
               <th>Dev &amp; project</th>
               <th>Dev description</th>
@@ -83,6 +86,7 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
                 onClick={() => onSelect(row.id)}
               >
                 <td className="staff-hours-name">{row.name}</td>
+                <td className="staff-hours-wrap">{row.cost_centre ?? ""}</td>
                 <td>{formatOptionalNum(row.fte)}</td>
                 <td>{formatHours(row.lecturing_hours)}</td>
                 <td>{formatHours(row.in_class_timetabled_hours)}</td>
@@ -95,10 +99,7 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
                 >
                   {formatHours(row.variance)}
                 </td>
-                <td
-                  className="staff-hours-wrap staff-hours-detail staff-hours-truncate"
-                  title={row.bulk_online_detail ?? undefined}
-                >
+                <td className="staff-hours-wrap staff-hours-detail staff-hours-bulk-online staff-hours-bulk-online-col">
                   {row.bulk_online_detail ?? ""}
                 </td>
                 <td>{formatHours(row.bulk_online_hours_avg)}</td>
@@ -119,7 +120,7 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
             ))}
             {!loading && !filtered.length && (
               <tr>
-                <td colSpan={17} className="muted staff-hours-empty">
+                <td colSpan={18} className="muted staff-hours-empty">
                   {rows.length ? "No lecturers match this variance filter." : "No staff in this session."}
                 </td>
               </tr>

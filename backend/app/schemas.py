@@ -325,6 +325,7 @@ class BlockGroupPatch(BaseModel):
 class StaffOut(BaseModel):
     id: int
     name: str
+    cost_centre: str | None = None
     max_hours_per_week: float | None = None
     fte: float | None = None
     non_teaching_day: int | None = None
@@ -341,6 +342,7 @@ class StaffOut(BaseModel):
 
 class StaffPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
+    cost_centre: str | None = Field(default=None, max_length=80)
     max_hours_per_week: float | None = None
     fte: float | None = None
     non_teaching_day: int | None = Field(default=None, ge=0, le=4)
@@ -701,6 +703,7 @@ class ResourceUsageOut(BaseModel):
 class StaffHoursRowOut(BaseModel):
     id: int
     name: str
+    cost_centre: str | None = None
     fte: float | None = None
     lecturing_hours: float | None = None
     in_class_timetabled_hours: float | None = None
@@ -738,6 +741,7 @@ class StaffOnlineStudentsPatch(BaseModel):
 class StaffDetailOut(BaseModel):
     id: int
     name: str
+    cost_centre: str | None = None
     fte: float | None = None
     max_hours_per_week: float | None = None
     non_teaching_day: int | None = None

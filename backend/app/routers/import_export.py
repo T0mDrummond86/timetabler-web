@@ -213,7 +213,7 @@ def export_timetable(
             variant=variant,
             colour_by_class=colour_by_class,
         )
-    except (RuntimeError, FileNotFoundError, ValueError) as exc:
+    except (RuntimeError, FileNotFoundError, ValueError, TypeError) as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     return _file_response(content, filename, media)
 

@@ -243,6 +243,55 @@ def test_admin_export_appends_event_id_to_week_cell(client: TestClient, tmp_path
     wb.close()
 
 
+def test_admin_visual_import_splits_sfs_co_teacher(client: TestClient, tmp_path: Path):
+    token, session_id = _auth(client)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "CO1"
+    ws.cell(_COURSE_TITLE_ROW, _COURSE_TITLE_COL, value="Course: CO1")
+    row = 19
+    ws.cell(row, TERM1_LABEL_COLS[0], value="09:00-12:00")
+    ws.cell(row, TERM1_LABEL_COLS[1], value="Alice Teacher + Bob Co-Teacher")
+    ws.cell(row, TERM1_LABEL_COLS[2], value="A101")
+    label = "Team Teach (ICTPRG435)"
+    ws.merge_cells(
+        start_row=row,
+        end_row=row,
+        start_column=TERM1_WEEK_COLS[0],
+        end_column=TERM1_WEEK_COLS[-1],
+    )
+    ws.cell(row, TERM1_WEEK_COLS[0], value=label)
+    path = tmp_path / "admin_co_teacher.xlsx"
+    wb.save(path)
+
+    with path.open("rb") as fh:
+        res = client.post(
+            f"/sessions/{session_id}/import/admin-visual",
+            headers=_headers(token),
+            files={"file": ("admin.xlsx", fh, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        )
+    assert res.status_code == 200, res.text
+    assert res.json()["bookings_written"] == 1
+
+    staff = client.get(f"/sessions/{session_id}/staff", headers=_headers(token)).json()
+    staff_by_name = {s["name"]: s["id"] for s in staff}
+    assert "Alice Teacher" in staff_by_name
+    assert "Bob Co-Teacher" in staff_by_name
+    assert "Alice Teacher + Bob Co-Teacher" not in staff_by_name
+
+    courses = client.get(f"/sessions/{session_id}/courses", headers=_headers(token)).json()
+    course_id = next(c["id"] for c in courses if c["code"] == "CO1")
+    grid = client.get(
+        f"/sessions/{session_id}/timetable",
+        params={"course_id": course_id},
+        headers=_headers(token),
+    ).json()
+    booking = grid["bookings"][0]
+    assert booking["staff_name"] == "Alice Teacher"
+    assert booking["sfs_co_teacher_staff_id"] == staff_by_name["Bob Co-Teacher"]
+    assert booking["sfs_co_teacher_name"] == "Bob Co-Teacher"
+
+
 def test_admin_visual_import_rejects_non_admin_workbook(client: TestClient, tmp_path: Path):
     token, session_id = _auth(client)
     wb = Workbook()

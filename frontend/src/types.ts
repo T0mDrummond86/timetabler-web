@@ -285,6 +285,7 @@ export type ResourceUsage = {
 export type StaffHoursRow = {
   id: number;
   name: string;
+  cost_centre: string | null;
   fte: number | null;
   lecturing_hours: number | null;
   in_class_timetabled_hours: number | null;
@@ -307,6 +308,7 @@ export type StaffHoursRow = {
 export type StaffDetail = {
   id: number;
   name: string;
+  cost_centre: string | null;
   fte: number | null;
   max_hours_per_week: number | null;
   non_teaching_day: number | null;

@@ -50,19 +50,17 @@ def _write_backup_sheet(
 
 
 def _course_fill_hex(key: str) -> str:
-    """Stable pastel hex for a course (matches the in-app palette)."""
-    h = int(hashlib.md5(key.encode("utf-8")).hexdigest()[:6], 16)
-    hue = (h % 360) / 360.0
-    r, g, b = colorsys.hls_to_rgb(hue, 0.86, 0.55)
-    return f"FF{int(r * 255):02X}{int(g * 255):02X}{int(b * 255):02X}"
+    """Stable fill hex for a course/class key (matches the in-app palette)."""
+    from ..core.screen_colours import screen_fill_xlsx
+
+    return screen_fill_xlsx(key)
 
 
 def _course_border_hex(key: str) -> str:
-    """A stronger, darker hue for the card's outer border."""
-    h = int(hashlib.md5(key.encode("utf-8")).hexdigest()[:6], 16)
-    hue = (h % 360) / 360.0
-    r, g, b = colorsys.hls_to_rgb(hue, 0.40, 0.55)
-    return f"FF{int(r * 255):02X}{int(g * 255):02X}{int(b * 255):02X}"
+    """Border hex for a course/class key (matches the in-app palette)."""
+    from ..core.screen_colours import screen_border_xlsx
+
+    return screen_border_xlsx(key)
 
 
 @dataclass

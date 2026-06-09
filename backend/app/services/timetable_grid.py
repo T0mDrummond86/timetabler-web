@@ -21,7 +21,7 @@ from timetable.core.tenancy_models import TimetableSession
 from timetable.core.unassigned_lecturer import bookings_without_lecturer
 from timetable.core.validation import Severity, _iter_violations
 
-from ..colours import class_colours
+from ..colours import assign_screen_colours, class_colours
 from .violation_dismissals import apply_dismissals_to_map, dismissed_keys
 
 ColumnKind = Literal["day", "room", "staff"]
@@ -186,9 +186,10 @@ def _booking_card(
     hard_ids: set[int],
     soft_ids: set[int],
     colour_by_class: bool = True,
+    screen_colour_map: dict[str, tuple[str, str]] | None = None,
 ) -> dict:
     colour_key = booking_colour_key(b, by_class=colour_by_class)
-    fill, border = class_colours(colour_key)
+    fill, border = class_colours(colour_key, screen_colour_map)
     b_violations = v_by_booking.get(b.id, [])
     staff_name = b.staff.name if b.staff else None
     if view == "co_teach":
@@ -307,6 +308,10 @@ def _build_grid_payload(
             if b.room_id is not None and b.room_id in room_to_col:
                 by_column[room_to_col[b.room_id]].append(b)
 
+    screen_colour_map = assign_screen_colours(
+        {booking_colour_key(b, by_class=colour_by_class) for b in bookings}
+    )
+
     cards: list[dict] = []
     for col_idx in range(len(columns)):
         col_bookings = by_column.get(col_idx, [])
@@ -325,6 +330,7 @@ def _build_grid_payload(
                     hard_ids=hard_ids,
                     soft_ids=soft_ids,
                     colour_by_class=colour_by_class,
+                    screen_colour_map=screen_colour_map,
                 )
             )
 

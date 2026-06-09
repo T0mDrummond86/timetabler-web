@@ -24,7 +24,7 @@ def ordered_courses(
     timetable_session_id: int | None = None,
 ) -> list[Course]:
     q = session.query(Course)
-    if timetable_session_id is not None:
+    if timetable_session_id is not None and "timetable_session_id" in Course.__table__.columns:
         q = q.filter(Course.timetable_session_id == timetable_session_id)
     if not include_block_cohorts:
         q = q.filter(
@@ -37,11 +37,9 @@ def ordered_courses(
     )
 
 
-def ordered_staff(
-    session: Session, *, timetable_session_id: int | None = None
-) -> list[Staff]:
+def ordered_staff(session: Session, *, timetable_session_id: int | None = None) -> list[Staff]:
     q = session.query(Staff)
-    if timetable_session_id is not None:
+    if timetable_session_id is not None and "timetable_session_id" in Staff.__table__.columns:
         q = q.filter(Staff.timetable_session_id == timetable_session_id)
     return q.order_by(Staff.sidebar_order, Staff.name, Staff.id).all()
 

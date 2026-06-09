@@ -1571,6 +1571,7 @@ export function TimetablePage() {
           showAlerts={showAlerts}
           onShowAlertsChange={setShowAlerts}
           onImport={(kind, file) => void onImportFile(kind, file)}
+          onError={setError}
           importing={importing}
           showDisplay={sessionTab === "timetable"}
         />
