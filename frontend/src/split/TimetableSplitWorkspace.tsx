@@ -100,7 +100,7 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
   const [mutating, setMutating] = useState(false);
   const [days, setDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri"]);
   const [globalLink, setGlobalLink] = useState<TimetableGlobalLink | null>(null);
-  const { confirm, dialogs } = useConfirmPrompt();
+  const { dialogs } = useConfirmPrompt();
 
   const linkedSessionIds = useMemo(
     () => (globalLink?.linked && globalLink.member_session_ids?.length ? globalLink.member_session_ids : undefined),

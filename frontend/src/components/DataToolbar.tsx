@@ -22,7 +22,6 @@ export function DataToolbar({
   showAlerts,
   onShowAlertsChange,
   onImport,
-  onError,
   importing,
   showDisplay = true,
 }: Props) {
