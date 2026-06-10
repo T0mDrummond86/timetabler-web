@@ -71,6 +71,58 @@ def import_qualifications_csp_workbook(db: Session, timetable_session_id: int, f
     }
 
 
+def import_qualifications_ep_nb_csp_workbook(db: Session, timetable_session_id: int, file_path: str) -> dict:
+    from timetable.io.ep_nb_csp_import import import_qualifications_from_ep_nb_csp
+
+    try:
+        rep = import_qualifications_from_ep_nb_csp(
+            db, file_path, timetable_session_id=timetable_session_id
+        )
+        clear_all_dismissals(db, timetable_session_id=timetable_session_id)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return {
+        "qualifications_created": rep.qualifications_created,
+        "qualifications_linked": rep.qualifications_linked,
+        "classes_created": rep.classes_created,
+        "classes_updated": rep.classes_updated,
+        "courses_created": rep.courses_created,
+        "class_qual_links_added": rep.class_qual_links_added,
+        "warnings": rep.warnings,
+        "source": "qualifications_ep_nb_csp",
+    }
+
+
+def import_asc_export_workbook(db: Session, timetable_session_id: int, file_path: str) -> dict:
+    from timetable.io.asc_import import import_asc_export
+
+    try:
+        rep = import_asc_export(db, file_path, timetable_session_id=timetable_session_id)
+        clear_all_dismissals(db, timetable_session_id=timetable_session_id)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return {
+        "staff_created": rep.staff_created,
+        "rooms_created": rep.rooms_created,
+        "qualifications_created": rep.qualifications_created,
+        "qualifications_linked": rep.qualifications_linked,
+        "classes_created": rep.classes_created,
+        "classes_updated": rep.classes_updated,
+        "courses_created": rep.courses_created,
+        "class_qual_links_added": rep.class_qual_links_added,
+        "room_links_added": rep.room_links_added,
+        "lecturer_links_added": rep.lecturer_links_added,
+        "bookings_created": rep.bookings_created,
+        "bookings_written": rep.bookings_created,
+        "warnings": rep.warnings,
+        "source": "asc",
+    }
+
+
 def import_lecturer_preferences_workbook(db: Session, timetable_session_id: int, file_path: str) -> dict:
     from timetable.io.lecturer_preferences_import import import_lecturer_preferences
 

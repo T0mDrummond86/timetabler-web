@@ -951,7 +951,7 @@ export const api = {
     triggerAuthDownload(path);
   },
 
-  async importFile(sessionId: number, kind: "session" | "qualifications" | "qualifications-csp" | "lecturer-preferences" | "overall-visual" | "admin-visual", file: File) {
+  async importFile(sessionId: number, kind: "session" | "qualifications" | "qualifications-csp" | "qualifications-ep-nb-csp" | "asc" | "lecturer-preferences" | "overall-visual" | "admin-visual", file: File) {
     const token = getToken();
     const headers: Record<string, string> = {};
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -961,6 +961,8 @@ export const api = {
       session: `/sessions/${sessionId}/import`,
       qualifications: `/sessions/${sessionId}/import/qualifications`,
       "qualifications-csp": `/sessions/${sessionId}/import/qualifications-csp`,
+      "qualifications-ep-nb-csp": `/sessions/${sessionId}/import/qualifications-ep-nb-csp`,
+      asc: `/sessions/${sessionId}/import/asc`,
       "lecturer-preferences": `/sessions/${sessionId}/import/lecturer-preferences`,
       "overall-visual": `/sessions/${sessionId}/import/overall-visual`,
       "admin-visual": `/sessions/${sessionId}/import/admin-visual`,

@@ -9,7 +9,7 @@ type Props = {
   onColourByClassChange: (v: boolean) => void;
   showAlerts: boolean;
   onShowAlertsChange: (v: boolean) => void;
-  onImport: (kind: "session" | "qualifications" | "qualifications-csp" | "lecturer-preferences" | "overall-visual" | "admin-visual", file: File) => void;
+  onImport: (kind: "session" | "qualifications" | "qualifications-csp" | "qualifications-ep-nb-csp" | "asc" | "lecturer-preferences" | "overall-visual" | "admin-visual", file: File) => void;
   onError?: (message: string) => void;
   importing?: boolean;
   showDisplay?: boolean;
@@ -34,7 +34,9 @@ export function DataToolbar({
   const [printOpen, setPrintOpen] = useState(false);
 
   function importAcceptFor(kind: ImportKind) {
-    return kind === "qualifications-csp" ? ".docx" : ".xlsm,.xlsx";
+    if (kind === "qualifications-csp") return ".docx";
+    if (kind === "qualifications-ep-nb-csp") return ".xlsx";
+    return ".xlsm,.xlsx";
   }
 
   const importAccept = importAcceptFor(importKind);
@@ -114,6 +116,14 @@ export function DataToolbar({
             <button type="button" className="ctx-item ctx-item-desc" role="menuitem" onClick={() => pickImport("qualifications-csp")}>
               <span className="ctx-item-title">Qualifications CSP</span>
               <span className="ctx-item-hint">Curriculum Structure Package (.docx)</span>
+            </button>
+            <button type="button" className="ctx-item ctx-item-desc" role="menuitem" onClick={() => pickImport("qualifications-ep-nb-csp")}>
+              <span className="ctx-item-title">EP-NB CSP</span>
+              <span className="ctx-item-hint">East Perth / Northbridge CSP spreadsheet (.xlsx)</span>
+            </button>
+            <button type="button" className="ctx-item ctx-item-desc" role="menuitem" onClick={() => pickImport("asc")}>
+              <span className="ctx-item-title">aSc export</span>
+              <span className="ctx-item-hint">Staff, rooms, classes, quals &amp; bookings from aSc (.xlsx)</span>
             </button>
             <button type="button" className="ctx-item ctx-item-desc" role="menuitem" onClick={() => pickImport("lecturer-preferences")}>
               <span className="ctx-item-title">Lecturer preferences</span>

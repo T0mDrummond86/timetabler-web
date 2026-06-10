@@ -980,7 +980,7 @@ export function TimetablePage() {
   }
 
   async function onImportFile(
-    kind: "session" | "qualifications" | "qualifications-csp" | "lecturer-preferences" | "overall-visual" | "admin-visual",
+    kind: "session" | "qualifications" | "qualifications-csp" | "qualifications-ep-nb-csp" | "asc" | "lecturer-preferences" | "overall-visual" | "admin-visual",
     file: File,
   ) {
     setImporting(true);
@@ -1010,6 +1010,15 @@ export function TimetablePage() {
         const bookings = report.bookings_written ?? report.bookings;
         const parts: string[] = [];
         if (typeof bookings === "number") parts.push(`${bookings} bookings`);
+        if (typeof report.classes_created === "number" && report.classes_created > 0) {
+          parts.push(`${report.classes_created} new classes`);
+        }
+        if (typeof report.staff_created === "number" && report.staff_created > 0) {
+          parts.push(`${report.staff_created} staff`);
+        }
+        if (typeof report.rooms_created === "number" && report.rooms_created > 0) {
+          parts.push(`${report.rooms_created} rooms`);
+        }
         if (typeof report.units_created === "number" && report.units_created > 0) {
           parts.push(`${report.units_created} new classes`);
         }

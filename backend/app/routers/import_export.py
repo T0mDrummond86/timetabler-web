@@ -15,11 +15,13 @@ from ..services.session_import_export import (
     cleanup_temp,
     export_json,
     import_admin_visual_workbook,
+    import_asc_export_workbook,
     import_json_payload,
     import_lecturer_preferences_workbook,
     import_overall_visual_workbook,
     import_qualifications_workbook,
     import_qualifications_csp_workbook,
+    import_qualifications_ep_nb_csp_workbook,
     import_workbook,
     save_upload_to_temp,
 )
@@ -123,6 +125,33 @@ async def import_qualifications_csp(
         cleanup_temp(tmp)
 
 
+@router.post("/sessions/{session_id}/import/qualifications-ep-nb-csp")
+async def import_qualifications_ep_nb_csp(
+    session_id: int,
+    file: UploadFile = File(...),
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    tmp = await _upload_to_temp(file, ".xlsx")
+    try:
+        from timetable.io.ep_nb_csp_import import is_ep_nb_csp_workbook
+
+        if not is_ep_nb_csp_workbook(tmp):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Workbook does not look like an EP-NB CSP export "
+                    "(expected qualification title, Semester bands, and BB Shell/TPN rows)."
+                ),
+            )
+        return import_qualifications_ep_nb_csp_workbook(db, session_id, tmp)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    finally:
+        cleanup_temp(tmp)
+
+
 @router.post("/sessions/{session_id}/import/lecturer-preferences")
 async def import_lecturer_preferences(
     session_id: int,
@@ -178,6 +207,33 @@ async def import_admin_visual(
                 ),
             )
         return import_admin_visual_workbook(db, session_id, tmp)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    finally:
+        cleanup_temp(tmp)
+
+
+@router.post("/sessions/{session_id}/import/asc")
+async def import_asc_export(
+    session_id: int,
+    file: UploadFile = File(...),
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    tmp = await _upload_to_temp(file, ".xlsx")
+    try:
+        from timetable.io.asc_import import is_asc_export_workbook
+
+        if not is_asc_export_workbook(tmp):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Workbook does not look like an aSc Timetables export "
+                    "(expected Teachers, Classrooms, Classes, and Lessons sheets)."
+                ),
+            )
+        return import_asc_export_workbook(db, session_id, tmp)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     finally:
