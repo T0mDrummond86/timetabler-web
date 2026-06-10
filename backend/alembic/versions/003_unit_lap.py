@@ -2,6 +2,7 @@
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 revision = "003_unit_lap"
 down_revision = "002_staff_cost_centre"
@@ -10,6 +11,9 @@ depends_on = None
 
 
 def upgrade() -> None:
+    inspector = inspect(op.get_bind())
+    if inspector.has_table("unit_lap"):
+        return
     op.create_table(
         "unit_lap",
         sa.Column("unit_id", sa.Integer(), nullable=False),
@@ -25,5 +29,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    inspector = inspect(op.get_bind())
+    if not inspector.has_table("unit_lap"):
+        return
     op.drop_index("ix_unit_lap_timetable_session_id", table_name="unit_lap")
     op.drop_table("unit_lap")

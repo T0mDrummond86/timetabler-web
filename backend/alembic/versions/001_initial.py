@@ -1,7 +1,14 @@
 """Initial schema: auth + domain with timetable_session_id."""
 
 from alembic import op
-import sqlalchemy as sa
+
+from timetable.core.models import Base
+from timetable.core.tenancy_models import (  # noqa: F401 (registers tables)
+    Membership,
+    Organization,
+    TimetableSession,
+    User,
+)
 
 revision = "001_initial"
 down_revision = None
@@ -10,9 +17,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Dev bootstrap uses create_all(); revision documents Phase 1 schema.
-    pass
+    Base.metadata.create_all(op.get_bind())
 
 
 def downgrade() -> None:
-    pass
+    Base.metadata.drop_all(op.get_bind())
