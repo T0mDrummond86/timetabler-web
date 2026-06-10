@@ -44,6 +44,7 @@ import { EntityEditorsPanel } from "../components/EntityEditorsPanel";
 import { HoldingAreaPanel } from "../components/HoldingAreaPanel";
 import { TimetableSidebar } from "../components/TimetableSidebar";
 import { UsageDashboard } from "../components/UsageDashboard";
+import { LapCreationPanel } from "../components/LapCreationPanel";
 import { WeekGridView } from "../components/WeekGridView";
 import { recordSessionOpen } from "../lib/recentSessions";
 import type { TimetableMode, ViewKind } from "../viewKinds";
@@ -68,7 +69,17 @@ import {
 } from "../lib/gridZoom";
 import { notifySessionChanged, useSessionSync } from "../lib/sessionSync";
 
-type SessionTab = "timetable" | "staff" | "rooms" | "units" | "qualifications" | "changelog" | "warnings" | "custodians" | "usage";
+type SessionTab =
+  | "timetable"
+  | "staff"
+  | "rooms"
+  | "units"
+  | "qualifications"
+  | "changelog"
+  | "warnings"
+  | "custodians"
+  | "usage"
+  | "lap";
 
 type ViewState = {
   viewKind: ViewKind;
@@ -92,6 +103,7 @@ const SESSION_TABS: { id: SessionTab; label: string; secondary?: boolean }[] = [
   { id: "qualifications", label: "Qualifications", secondary: true },
   { id: "custodians", label: "Class custodians", secondary: true },
   { id: "usage", label: "Usage", secondary: true },
+  { id: "lap", label: "LAP creation", secondary: true },
 ];
 
 const DISPLAY_STORAGE_KEY = "timetabler-display";
@@ -1858,6 +1870,9 @@ export function TimetablePage() {
       )}
       {sessionTab === "usage" && courses.length > 0 && (
         <UsageDashboard sessionId={sessionId} refreshKey={changeLogKey} />
+      )}
+      {sessionTab === "lap" && courses.length > 0 && (
+        <LapCreationPanel sessionId={sessionId} refreshKey={changeLogKey} />
       )}
 
       {createDraft && grid && (

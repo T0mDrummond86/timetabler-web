@@ -18,6 +18,7 @@ from .routers import (
     entities,
     global_sessions,
     import_export,
+    laps,
     orgs,
     sessions,
     timetable,
@@ -82,6 +83,7 @@ app.include_router(changelog.router)
 app.include_router(bookings.router)
 app.include_router(timetable.router)
 app.include_router(violations.router)
+app.include_router(laps.router)
 
 
 @app.exception_handler(LookupError)

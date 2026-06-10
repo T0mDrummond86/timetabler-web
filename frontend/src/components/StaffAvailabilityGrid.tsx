@@ -40,9 +40,6 @@ export function StaffAvailabilityGrid({ blocked, onChange, disabled }: Props) {
 
   return (
     <div className="staff-availability-grid-wrap">
-      <p className="muted entity-hint">
-        Checked slots are unavailable. Drag to paint blocked times (matches desktop Staff tab).
-      </p>
       <div className="staff-availability-grid">
         <div className="avail-corner" />
         {DAYS.map((d) => (

@@ -30,6 +30,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     UniqueConstraint,
 )
@@ -183,7 +184,28 @@ class Unit(Base):
     double_session_same_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
     double_session_first_slots: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    lap: Mapped["UnitLap | None"] = relationship(back_populates="unit", uselist=False)
+
     __table_args__ = (UniqueConstraint("timetable_session_id", "name", name="unit_session_name_uk"),)
+
+
+class UnitLap(Base):
+    """Uploaded Learning & Assessment Plan (.docx) for a class (unit)."""
+
+    __tablename__ = "unit_lap"
+    unit_id: Mapped[int] = mapped_column(ForeignKey("unit.id", ondelete="CASCADE"), primary_key=True)
+    timetable_session_id: Mapped[int] = mapped_column(
+        ForeignKey("timetable_session.id", ondelete="CASCADE"),
+        index=True,
+    )
+    original_filename: Mapped[str] = mapped_column(String(255))
+    content: Mapped[bytes] = mapped_column(LargeBinary)
+    uploaded_at: Mapped[_dt.datetime] = mapped_column(
+        DateTime,
+        default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
+    )
+
+    unit: Mapped[Unit] = relationship(back_populates="lap")
 
 
 class Qualification(Base):

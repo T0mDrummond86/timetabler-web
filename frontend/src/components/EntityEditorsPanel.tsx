@@ -507,7 +507,7 @@ export function EntityEditorsPanel({
   }
 
   return (
-    <section className="panel">
+    <section className={`panel${fixedTab ? " entity-editor-panel--fill" : ""}`}>
       {!fixedTab && (
       <div className="panel-header">
         <h2>Entity editors</h2>
@@ -752,9 +752,6 @@ export function EntityEditorsPanel({
               {onlineRows.length > 0 && (
                 <fieldset className="qual-link-fieldset">
                   <legend>Online students per class</legend>
-                  <p className="muted entity-hint">
-                    Totals apply when a booking has no per-session class size. Each row is one class.
-                  </p>
                   <table className="entity-mini-table">
                     <thead>
                       <tr>
@@ -795,11 +792,6 @@ export function EntityEditorsPanel({
                     </tbody>
                   </table>
                 </fieldset>
-              )}
-              {staffDetail && !onlineRows.length && (
-                <p className="muted entity-hint">
-                  No online bookings for this lecturer in the current timetable.
-                </p>
               )}
               <label className="checkbox">
                 <input
@@ -1088,9 +1080,6 @@ export function EntityEditorsPanel({
               {qualDetail && qualDetail.linked_classes.length > 0 && (
                 <fieldset className="qual-link-fieldset">
                   <legend>Linked classes</legend>
-                  <p className="muted entity-hint">
-                    Managed in the Classes tab; listed here for reference.
-                  </p>
                   <ul className="entity-linked-list">
                     {qualDetail.linked_classes.map((u) => (
                       <li key={u.id}>
@@ -1139,10 +1128,6 @@ export function EntityEditorsPanel({
                   Create block
                 </button>
               </div>
-              <p className="muted entity-hint">
-                Use Create block to add an intensive block cohort for this qualification. Schedule it in
-                Block delivery view.
-              </p>
             </form>
           )}
           {error && <p className="error">{error}</p>}

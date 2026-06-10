@@ -203,12 +203,7 @@ export function LinkedSessionImportPanel({
   }
 
   if (!linked.length) {
-    return (
-      <p className="muted entity-hint">
-        Link at least two timetable sessions in this global group to import staff or qualifications
-        between them.
-      </p>
-    );
+    return null;
   }
 
   const targets = targetOptions?.length
@@ -220,11 +215,6 @@ export function LinkedSessionImportPanel({
     <>
       <section className="linked-import-panel card">
         <h3>Import from linked session</h3>
-        <p className="muted entity-hint">
-          Choose a source session, tick staff or qualifications, pick rows in each list, then
-          press <strong>Import selected</strong> below (the popup button only saves your
-          selection). Qualifications are imported with one group and their linked classes.
-        </p>
         {hasTargetPicker && targetLabel && (
           <p className="linked-import-target-hint">
             Importing into: <strong>{targetLabel}</strong>

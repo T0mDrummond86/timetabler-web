@@ -359,6 +359,20 @@ export type UnitConstraints = {
   competent_staff_ids: number[];
 };
 
+export type LapRow = {
+  unit_id: number;
+  unit_name: string;
+  component_codes: string | null;
+  has_lap: boolean;
+  original_filename: string | null;
+  uploaded_at: string | null;
+  timetable_lecturer_name: string;
+};
+
+export type LapList = {
+  rows: LapRow[];
+};
+
 export type CreateBookingDraft = {
   courseId: number;
   day: number;

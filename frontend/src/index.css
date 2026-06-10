@@ -1901,6 +1901,35 @@ button.danger {
   border-radius: var(--radius-sm);
 }
 
+/* Dedicated session tabs (Rooms, Classes, …): grow the list into leftover viewport height. */
+.entity-editor-panel--fill .entity-editor-layout {
+  min-height: calc(100dvh - 15rem);
+  align-items: stretch;
+}
+
+.entity-editor-panel--fill .entity-list-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.entity-editor-panel--fill .entity-list {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+.entity-editor-panel--fill .staff-hours-table-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+.entity-editor-panel--fill .staff-hours-table-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
 .entity-item {
   display: flex;
   align-items: center;
@@ -3198,4 +3227,67 @@ body.staff-editor-resizing {
   justify-content: flex-end;
   gap: 0.5rem;
   margin-top: 0.5rem;
+}
+
+.lap-panel .panel-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.lap-panel-actions {
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.lap-delivery-period-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 14rem;
+}
+
+.lap-delivery-period-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.lap-delivery-period-input {
+  min-width: 14rem;
+}
+
+.lap-panel .panel-hint {
+  margin: 0.35rem 0 0;
+  max-width: 52rem;
+}
+
+.lap-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.lap-filter {
+  min-width: 14rem;
+  max-width: 22rem;
+  flex: 1;
+}
+
+.lap-table .lap-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.lap-table .lap-actions .btn-sm {
+  margin-left: 0.35rem;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.85rem;
 }

@@ -812,3 +812,17 @@ class TimetablePrintRequest(BaseModel):
     colour_by_class: bool = True
     include_index: bool = True
     entities: list[TimetablePrintEntityIn] = Field(min_length=1)
+
+
+class LapRowOut(BaseModel):
+    unit_id: int
+    unit_name: str
+    component_codes: str | None = None
+    has_lap: bool
+    original_filename: str | None = None
+    uploaded_at: str | None = None
+    timetable_lecturer_name: str
+
+
+class LapListOut(BaseModel):
+    rows: list[LapRowOut]
