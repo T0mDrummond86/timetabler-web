@@ -590,7 +590,11 @@ export function TimetablePage() {
         setError(msg);
         if (msg.includes("Session not found")) {
           navigate("/dashboard");
-        } else if (msg.includes("401") || msg.includes("Not authenticated")) {
+        } else if (
+          msg.includes("401") ||
+          msg.includes("Not authenticated") ||
+          msg.includes("Invalid token")
+        ) {
           setToken(null);
           navigate("/login");
         }

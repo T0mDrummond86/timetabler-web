@@ -202,6 +202,16 @@ async function apiFetch<T>(
     } catch {
       /* ignore */
     }
+    if (
+      auth &&
+      res.status === 401 &&
+      typeof window !== "undefined" &&
+      !window.location.pathname.startsWith("/login") &&
+      !window.location.pathname.startsWith("/register")
+    ) {
+      setToken(null);
+      window.location.replace("/login");
+    }
     throw new Error(detail);
   }
   if (res.status === 204) return undefined as T;
