@@ -172,27 +172,36 @@ def _extract_assessments(doc: Document) -> list[dict[str, str]]:
     return assessments
 
 
+def _is_session_column_header(row) -> bool:
+    """Old LAPs label the first column ``No``; current template uses ``Session``."""
+    if len(row.cells) < 2:
+        return False
+    first = norm(cell_text(row.cells[0]))
+    second = norm(cell_text(row.cells[1]))
+    return (first, second) in (("session", "hrs"), ("no", "hrs"))
+
+
+def _find_session_table(doc: Document):
+    return find_table(doc, lambda t: any(_is_session_column_header(r) for r in t.rows))
+
+
+def _session_subheader_index(rows) -> int | None:
+    for i, row in enumerate(rows):
+        if _is_session_column_header(row):
+            return i
+    return None
+
+
 def _extract_sessions(doc: Document) -> list[dict[str, str]]:
-    table = find_table(
-        doc,
-        lambda t: any(
-            norm(cell_text(r.cells[0])) == "session" and norm(cell_text(r.cells[1])) == "hrs"
-            for r in t.rows
-            if len(r.cells) >= 2
-        ),
-    )
+    table = _find_session_table(doc)
     sessions: list[dict[str, str]] = []
     if table is None:
         return sessions
 
     rows = table.rows
-    subheader = next(
-        i
-        for i, r in enumerate(rows)
-        if len(r.cells) >= 2
-        and norm(cell_text(r.cells[0])) == "session"
-        and norm(cell_text(r.cells[1])) == "hrs"
-    )
+    subheader = _session_subheader_index(rows)
+    if subheader is None:
+        return sessions
     for row in rows[subheader + 1 :]:
         c = row.cells
         first = norm(cell_text(c[0]))
@@ -389,24 +398,13 @@ def _fill_assessments(doc: Document, data: dict) -> None:
 
 
 def _fill_sessions(doc: Document, data: dict) -> None:
-    table = find_table(
-        doc,
-        lambda t: any(
-            norm(cell_text(r.cells[0])) == "session" and norm(cell_text(r.cells[1])) == "hrs"
-            for r in t.rows
-            if len(r.cells) >= 2
-        ),
-    )
+    table = _find_session_table(doc)
     if table is None or not data["sessions"]:
         return
     rows = list(table.rows)
-    subheader = next(
-        i
-        for i, r in enumerate(rows)
-        if len(r.cells) >= 2
-        and norm(cell_text(r.cells[0])) == "session"
-        and norm(cell_text(r.cells[1])) == "hrs"
-    )
+    subheader = _session_subheader_index(rows)
+    if subheader is None:
+        return
 
     by_number: dict[str, object] = {}
     for r in rows[subheader + 1 :]:
@@ -462,28 +460,12 @@ def _format_hours_sum(total: float) -> str:
 
 def update_session_hour_totals(doc: Document) -> None:
     """Sum in-class and out-of-class session hours into the table footer rows."""
-    table = find_table(
-        doc,
-        lambda t: any(
-            norm(cell_text(r.cells[0])) == "session" and norm(cell_text(r.cells[1])) == "hrs"
-            for r in t.rows
-            if len(r.cells) >= 2
-        ),
-    )
+    table = _find_session_table(doc)
     if table is None:
         return
 
     rows = list(table.rows)
-    subheader = next(
-        (
-            i
-            for i, r in enumerate(rows)
-            if len(r.cells) >= 2
-            and norm(cell_text(r.cells[0])) == "session"
-            and norm(cell_text(r.cells[1])) == "hrs"
-        ),
-        None,
-    )
+    subheader = _session_subheader_index(rows)
     if subheader is None:
         return
 

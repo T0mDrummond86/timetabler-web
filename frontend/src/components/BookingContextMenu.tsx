@@ -14,7 +14,6 @@ type Props = {
   onToggleLock: (field: "lock_time" | "lock_staff") => void;
   onAlternateMove: (option: AlternatePlacementOption) => void;
   onDismissViolation?: (bookingId: number, code: string) => void;
-  onDelete?: () => void;
 };
 
 export function BookingContextMenu({
@@ -28,7 +27,6 @@ export function BookingContextMenu({
   onToggleLock,
   onAlternateMove,
   onDismissViolation,
-  onDelete,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [slots, setSlots] = useState<AlternateSlots | null>(null);
@@ -183,14 +181,6 @@ export function BookingContextMenu({
       <button type="button" className="ctx-item" onClick={() => { onToggleLock("lock_staff"); onClose(); }}>
         {booking.lock_staff ? "Unlock lecturer" : "Lock lecturer"}
       </button>
-      {onDelete && (
-        <>
-          <div className="ctx-divider" />
-          <button type="button" className="ctx-item ctx-danger" onClick={() => { onDelete(); onClose(); }}>
-            Delete booking
-          </button>
-        </>
-      )}
     </div>
   );
 }

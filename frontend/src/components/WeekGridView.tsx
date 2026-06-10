@@ -25,7 +25,6 @@ type Props = {
   onToggleLock?: (booking: BookingCard, field: "lock_time" | "lock_staff") => void;
   onAlternateMove?: (booking: BookingCard, option: AlternatePlacementOption) => void;
   onDismissViolation?: (bookingId: number, code: string) => void;
-  onDelete?: (booking: BookingCard) => void;
 };
 
 function cardTitle(b: BookingCard): string {
@@ -92,7 +91,6 @@ export function WeekGridView({
   onToggleLock,
   onAlternateMove,
   onDismissViolation,
-  onDelete,
 }: Props) {
   const [contextMenu, setContextMenu] = useState<{
     booking: BookingCard;
@@ -356,7 +354,6 @@ export function WeekGridView({
           onToggleLock={(field) => onToggleLock?.(contextMenu.booking, field)}
           onAlternateMove={(opt) => onAlternateMove?.(contextMenu.booking, opt)}
           onDismissViolation={onDismissViolation}
-          onDelete={onDelete ? () => onDelete(contextMenu.booking) : undefined}
         />
       )}
     </section>

@@ -51,3 +51,11 @@ CORS_ORIGINS=https://timetable.example.edu.au
 2. `GET /docs` returns 404
 3. `POST /auth/register` returns 403 if registration disabled
 4. API refuses to start with default `JWT_SECRET` when `ENVIRONMENT=production`
+
+## Render Blueprint (recommended)
+
+The repo includes [`render.yaml`](../render.yaml) for a free-tier stack: Postgres + Docker API + static frontend.
+
+Full walkthrough: [`DEPLOY_RENDER.md`](DEPLOY_RENDER.md).
+
+Production API image: [`backend/Dockerfile.prod`](../backend/Dockerfile.prod) — no `--reload`, runs `alembic upgrade head` then `uvicorn` on `$PORT`.

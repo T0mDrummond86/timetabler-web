@@ -17,6 +17,9 @@ _OLD_LAP = Path(
     "/Users/tomdrummond/Documents/apps/FormFiller-Innerrer/uploads/"
     "20260528-114128_ICTNWK424_ICTTEN434_ICTNWK429_LAP_EP_FT_S12023.docx"
 )
+_SYSTEM_SECURITY_LAP = Path(
+    "/Users/tomdrummond/Downloads/System Security Joon LAP.docx"
+)
 _TEMPLATE = resource_path("templates", "lap_template.docx")
 
 
@@ -189,6 +192,43 @@ def test_build_export_lap_applies_multiple_lecturers():
     assert len(lecturers) == 2
     assert lecturers[0]["name"] == "Jane Smith"
     assert lecturers[1]["name"] == "Bob Jones"
+
+
+def test_extract_sessions_with_no_hrs_header():
+    if not _SYSTEM_SECURITY_LAP.is_file():
+        pytest.skip("System Security LAP sample not available")
+    data = extract_lap(_SYSTEM_SECURITY_LAP.read_bytes())
+    assert len(data["sessions"]) == 20
+    assert "Course introduction" in data["sessions"][0]["topic"]
+    assert data["sessions"][0]["hrs"] == "2"
+
+
+def test_build_export_lap_clears_extra_old_lecturers():
+    if not _SYSTEM_SECURITY_LAP.is_file():
+        pytest.skip("System Security LAP sample not available")
+    exported = build_export_lap(
+        _SYSTEM_SECURITY_LAP.read_bytes(),
+        [
+            {
+                "name": "Darran Price",
+                "phone": "N/A",
+                "email": "darran.price@nmtafe.wa.edu.au",
+                "contact_times": "regular business hours",
+                "campus": "A139 if not in A137",
+            }
+        ],
+        delivery_period="2026 semester 2",
+    )
+    from timetable.io.lap_docx import _extract_lecturers
+
+    doc = Document(BytesIO(exported))
+    lecturers = _extract_lecturers(doc)
+    names = [l["name"] for l in lecturers if (l.get("name") or "").strip()]
+    assert names == ["Darran Price"]
+
+    roundtrip = extract_lap(BytesIO(exported))
+    topics = [s["topic"] for s in roundtrip["sessions"] if (s.get("topic") or "").strip()]
+    assert len(topics) == 20
 
 
 def test_update_lap_lecturer_still_accepts_single_dict():

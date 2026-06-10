@@ -24,9 +24,15 @@ def import_workbook(db: Session, timetable_session_id: int, file_path: str) -> d
 def import_qualifications_workbook(db: Session, timetable_session_id: int, file_path: str) -> dict:
     from timetable.io.qualification_import import import_qualifications_from_template
 
-    rep = import_qualifications_from_template(db, file_path)
-    clear_all_dismissals(db, timetable_session_id=timetable_session_id)
-    db.commit()
+    try:
+        rep = import_qualifications_from_template(
+            db, file_path, timetable_session_id=timetable_session_id
+        )
+        clear_all_dismissals(db, timetable_session_id=timetable_session_id)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     return {
         "qualifications_created": rep.qualifications_created,
         "qualifications_linked": rep.qualifications_linked,
@@ -38,6 +44,30 @@ def import_qualifications_workbook(db: Session, timetable_session_id: int, file_
         "lecturer_links_added": rep.lecturer_links_added,
         "warnings": rep.warnings,
         "source": "qualifications",
+    }
+
+
+def import_qualifications_csp_workbook(db: Session, timetable_session_id: int, file_path: str) -> dict:
+    from timetable.io.csp_qualification_import import import_qualifications_from_csp
+
+    try:
+        rep = import_qualifications_from_csp(
+            db, file_path, timetable_session_id=timetable_session_id
+        )
+        clear_all_dismissals(db, timetable_session_id=timetable_session_id)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return {
+        "qualifications_created": rep.qualifications_created,
+        "qualifications_linked": rep.qualifications_linked,
+        "classes_created": rep.classes_created,
+        "classes_updated": rep.classes_updated,
+        "courses_created": rep.courses_created,
+        "class_qual_links_added": rep.class_qual_links_added,
+        "warnings": rep.warnings,
+        "source": "qualifications_csp",
     }
 
 

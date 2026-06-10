@@ -975,36 +975,8 @@ export function TimetablePage() {
     }
   }
 
-  async function onDeleteBooking(booking?: BookingCard) {
-    const target = booking ?? editBooking;
-    const cid = mutationCourseId(target);
-    if (!cid || !target) return;
-    if (
-      booking &&
-      !(await confirm({
-        title: "Delete booking",
-        message: "Remove this booking from the timetable?",
-        confirmLabel: "Delete",
-        danger: true,
-      }))
-    )
-      return;
-    setMutating(true);
-    setError(null);
-    try {
-      const result = await api.deleteBooking(sessionId, target.id, cid);
-      await applyMutation(result.change);
-      setEditBooking(null);
-      await refreshHolding();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed");
-    } finally {
-      setMutating(false);
-    }
-  }
-
   async function onImportFile(
-    kind: "session" | "qualifications" | "lecturer-preferences" | "overall-visual" | "admin-visual",
+    kind: "session" | "qualifications" | "qualifications-csp" | "lecturer-preferences" | "overall-visual" | "admin-visual",
     file: File,
   ) {
     setImporting(true);
@@ -1755,7 +1727,6 @@ export function TimetablePage() {
                   onToggleLock={editable ? onToggleLock : undefined}
                   onAlternateMove={editable ? onAlternateMove : undefined}
                   onDismissViolation={showAlerts ? onDismissViolation : undefined}
-                  onDelete={editable ? onDeleteBooking : undefined}
                 />
               )
             )}
@@ -1899,11 +1870,6 @@ export function TimetablePage() {
           saving={mutating}
           onClose={() => setEditBooking(null)}
           onSave={onSaveEdit}
-          onDelete={
-            isCourseViewKind(viewKind) || viewKind === "block_delivery"
-              ? onDeleteBooking
-              : undefined
-          }
         />
       )}
       {dialogs}

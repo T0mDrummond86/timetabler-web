@@ -67,9 +67,13 @@ def _extract_lecturer(doc: Document) -> dict[str, str]:
     return {key: "" for key in _LECTURER_KEYS}
 
 
+def _clear_lecturer_data_rows(table, header_idx: int) -> None:
+    for row in table.rows[header_idx + 1 :]:
+        for cell in row.cells:
+            set_cell_text(cell, "")
+
+
 def _fill_lecturer_rows(doc: Document, lecturers: list[dict[str, str]]) -> bool:
-    if not lecturers:
-        return False
     table = _lecturer_table(doc)
     if table is None:
         return False
@@ -79,13 +83,15 @@ def _fill_lecturer_rows(doc: Document, lecturers: list[dict[str, str]]) -> bool:
         for i, row in enumerate(rows)
         if "lecturer name" in norm(cell_text(distinct_cells(row)[0]))
     )
+    _clear_lecturer_data_rows(table, header_idx)
+    if not lecturers:
+        return True
 
     def fill_row(row, lec: dict[str, str]) -> None:
         value_cells = row.cells
         for idx, key in enumerate(_LECTURER_KEYS):
-            value = (lec.get(key) or "").strip()
-            if value and idx < len(value_cells):
-                set_cell_text(value_cells[idx], value)
+            if idx < len(value_cells):
+                set_cell_text(value_cells[idx], (lec.get(key) or "").strip())
 
     first_data_row = rows[header_idx + 1]
     fill_row(first_data_row, lecturers[0])
@@ -97,14 +103,9 @@ def _fill_lecturer_rows(doc: Document, lecturers: list[dict[str, str]]) -> bool:
 
 
 def _session_table(doc: Document):
-    return find_table(
-        doc,
-        lambda t: any(
-            norm(cell_text(r.cells[0])) == "session" and norm(cell_text(r.cells[1])) == "hrs"
-            for r in t.rows
-            if len(r.cells) >= 2
-        ),
-    )
+    from .lap_migrate import _find_session_table
+
+    return _find_session_table(doc)
 
 
 def overlay_session_hours(doc: Document, hours_by_session: dict[int | str, str]) -> None:
@@ -115,14 +116,12 @@ def overlay_session_hours(doc: Document, hours_by_session: dict[int | str, str])
     table = _session_table(doc)
     if table is None:
         return
+    from .lap_migrate import _session_subheader_index
+
     rows = list(table.rows)
-    subheader = next(
-        i
-        for i, r in enumerate(rows)
-        if len(r.cells) >= 2
-        and norm(cell_text(r.cells[0])) == "session"
-        and norm(cell_text(r.cells[1])) == "hrs"
-    )
+    subheader = _session_subheader_index(rows)
+    if subheader is None:
+        return
     for row in rows[subheader + 1 :]:
         num = norm(cell_text(row.cells[0]))
         if num.startswith("total"):

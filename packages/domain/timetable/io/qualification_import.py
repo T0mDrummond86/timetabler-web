@@ -101,7 +101,33 @@ def _parse_csv(v) -> list[str]:
     return [p for p in parts if p]
 
 
-def import_qualifications_from_template(session: Session, path: str | Path) -> QualImportReport:
+def _model_has_session_id(model) -> bool:
+    return "timetable_session_id" in model.__table__.columns
+
+
+def _scoped_query(session: Session, model, timetable_session_id: int | None):
+    q = session.query(model)
+    if timetable_session_id is not None and _model_has_session_id(model):
+        q = q.filter(model.timetable_session_id == timetable_session_id)
+    return q
+
+
+def _scoped_filter_by(session: Session, model, timetable_session_id: int | None, **filters):
+    q = session.query(model).filter_by(**filters)
+    if timetable_session_id is not None and _model_has_session_id(model):
+        q = q.filter(model.timetable_session_id == timetable_session_id)
+    return q
+
+
+def _create_kwargs(model, timetable_session_id: int | None, **fields):
+    if timetable_session_id is not None and _model_has_session_id(model):
+        fields["timetable_session_id"] = timetable_session_id
+    return fields
+
+
+def import_qualifications_from_template(
+    session: Session, path: str | Path, *, timetable_session_id: int | None = None
+) -> QualImportReport:
     rep = QualImportReport()
     wb = load_workbook(path, data_only=True)
 
@@ -111,10 +137,18 @@ def import_qualifications_from_template(session: Session, path: str | Path) -> Q
         if qual_name is None or qual_name.lower() == PLACEHOLDER_QNAME.lower():
             continue
 
-        qual = session.query(Qualification).filter_by(name=qual_name).first()
+        qual = _scoped_filter_by(
+            session, Qualification, timetable_session_id, name=qual_name
+        ).first()
         if qual is None:
             qual = Qualification(
-                name=qual_name, num_groups=1, schedule_period=SCHEDULE_PERIOD_DAY
+                **_create_kwargs(
+                    Qualification,
+                    timetable_session_id,
+                    name=qual_name,
+                    num_groups=1,
+                    schedule_period=SCHEDULE_PERIOD_DAY,
+                )
             )
             session.add(qual)
             session.flush()
@@ -123,9 +157,20 @@ def import_qualifications_from_template(session: Session, path: str | Path) -> Q
             # Spawn the default group-Course (Group A) so the qualification
             # appears on the timetable straight away.
             default_course_code = f"{qual.name} GrpA"
-            existing_course = session.query(Course).filter_by(code=default_course_code).first()
+            existing_course = _scoped_filter_by(
+                session, Course, timetable_session_id, code=default_course_code
+            ).first()
             if existing_course is None:
-                session.add(Course(code=default_course_code, qualification_id=qual.id))
+                session.add(
+                    Course(
+                        **_create_kwargs(
+                            Course,
+                            timetable_session_id,
+                            code=default_course_code,
+                            qualification_id=qual.id,
+                        )
+                    )
+                )
                 rep.courses_created += 1
             elif existing_course.qualification_id != qual.id:
                 existing_course.qualification_id = qual.id
@@ -143,9 +188,13 @@ def import_qualifications_from_template(session: Session, path: str | Path) -> Q
             title, bracket_codes = split_class_title_and_unit_codes(raw_cn)
             storage_name = title if bracket_codes is not None else raw_cn
 
-            existing_unit = session.query(Unit).filter_by(name=storage_name).first()
+            existing_unit = _scoped_filter_by(
+                session, Unit, timetable_session_id, name=storage_name
+            ).first()
             if existing_unit is None and bracket_codes is not None:
-                legacy = session.query(Unit).filter_by(name=raw_cn).first()
+                legacy = _scoped_filter_by(
+                    session, Unit, timetable_session_id, name=raw_cn
+                ).first()
                 if legacy is not None:
                     legacy.name = storage_name
                     if bracket_codes and not (legacy.component_codes or "").strip():
@@ -153,7 +202,14 @@ def import_qualifications_from_template(session: Session, path: str | Path) -> Q
                     existing_unit = legacy
 
             if existing_unit is None:
-                unit = Unit(name=storage_name, component_codes=bracket_codes)
+                unit = Unit(
+                    **_create_kwargs(
+                        Unit,
+                        timetable_session_id,
+                        name=storage_name,
+                        component_codes=bracket_codes,
+                    )
+                )
                 session.add(unit)
                 session.flush()
                 rep.classes_created += 1
@@ -182,7 +238,7 @@ def import_qualifications_from_template(session: Session, path: str | Path) -> Q
             # Allowed rooms.
             for code in _parse_csv(ws.cell(row=base + 4, column=2).value):
                 room = (
-                    session.query(Room)
+                    _scoped_query(session, Room, timetable_session_id)
                     .filter(Room.code.ilike(code))
                     .first()
                 )
@@ -202,7 +258,7 @@ def import_qualifications_from_template(session: Session, path: str | Path) -> Q
             # Allowed lecturers.
             for name in _parse_csv(ws.cell(row=base + 5, column=2).value):
                 staff = (
-                    session.query(Staff)
+                    _scoped_query(session, Staff, timetable_session_id)
                     .filter(Staff.name.ilike(name))
                     .first()
                 )
@@ -219,6 +275,6 @@ def import_qualifications_from_template(session: Session, path: str | Path) -> Q
                     session.add(StaffCompetency(staff_id=staff.id, unit_id=unit.id))
                     rep.lecturer_links_added += 1
 
-    apply_unit_bracket_fields_from_names(session)
+    apply_unit_bracket_fields_from_names(session, timetable_session_id=timetable_session_id)
     session.commit()
     return rep

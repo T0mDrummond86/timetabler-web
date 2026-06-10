@@ -19,6 +19,7 @@ from ..services.session_import_export import (
     import_lecturer_preferences_workbook,
     import_overall_visual_workbook,
     import_qualifications_workbook,
+    import_qualifications_csp_workbook,
     import_workbook,
     save_upload_to_temp,
 )
@@ -99,6 +100,23 @@ async def import_qualifications(
     tmp = await _upload_to_temp(file, ".xlsx")
     try:
         return import_qualifications_workbook(db, session_id, tmp)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    finally:
+        cleanup_temp(tmp)
+
+
+@router.post("/sessions/{session_id}/import/qualifications-csp")
+async def import_qualifications_csp(
+    session_id: int,
+    file: UploadFile = File(...),
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    tmp = await _upload_to_temp(file, ".docx")
+    try:
+        return import_qualifications_csp_workbook(db, session_id, tmp)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     finally:

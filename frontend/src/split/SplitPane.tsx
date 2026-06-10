@@ -23,7 +23,6 @@ type Props = {
   onMove?: (bookingId: number, column: number, startSlot: number) => void;
   onEdit?: (booking: BookingCard) => void;
   onDismissViolation?: (bookingId: number, code: string) => void;
-  onDelete?: (booking: BookingCard) => void;
   onGroupRenamed?: (course: Course) => void;
   onRenameError?: (message: string) => void;
 };
@@ -42,7 +41,6 @@ export function SplitPane({
   onMove,
   onEdit,
   onDismissViolation,
-  onDelete,
   onGroupRenamed,
   onRenameError,
 }: Props) {
@@ -210,7 +208,6 @@ export function SplitPane({
             onMove={editable ? onMove : undefined}
             onEdit={editable ? onEdit : undefined}
             onDismissViolation={editable && showAlerts ? onDismissViolation : undefined}
-            onDelete={editable ? onDelete : undefined}
           />
         )}
         {!grid && slot.viewKind !== "block_overview" && loading && (

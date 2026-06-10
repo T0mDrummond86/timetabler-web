@@ -9,7 +9,7 @@ type Props = {
   onColourByClassChange: (v: boolean) => void;
   showAlerts: boolean;
   onShowAlertsChange: (v: boolean) => void;
-  onImport: (kind: "session" | "qualifications" | "lecturer-preferences" | "overall-visual" | "admin-visual", file: File) => void;
+  onImport: (kind: "session" | "qualifications" | "qualifications-csp" | "lecturer-preferences" | "overall-visual" | "admin-visual", file: File) => void;
   onError?: (message: string) => void;
   importing?: boolean;
   showDisplay?: boolean;
@@ -32,6 +32,11 @@ export function DataToolbar({
   const [importKind, setImportKind] = useState<Props["onImport"] extends (k: infer K, f: File) => void ? K : never>("session");
   const [printOpen, setPrintOpen] = useState(false);
 
+  const importAccept =
+    importKind === "qualifications-csp"
+      ? ".docx"
+      : ".xlsm,.xlsx";
+
   function exportPath(path: string, filename: string) {
     exportMenu.close();
     api.downloadExport(path, filename);
@@ -48,7 +53,7 @@ export function DataToolbar({
       <input
         ref={importRef}
         type="file"
-        accept=".xlsm,.xlsx"
+        accept={importAccept}
         hidden
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -99,6 +104,10 @@ export function DataToolbar({
             <button type="button" className="ctx-item ctx-item-desc" role="menuitem" onClick={() => pickImport("qualifications")}>
               <span className="ctx-item-title">Qualifications template</span>
               <span className="ctx-item-hint">QInputTemplate classes &amp; quals</span>
+            </button>
+            <button type="button" className="ctx-item ctx-item-desc" role="menuitem" onClick={() => pickImport("qualifications-csp")}>
+              <span className="ctx-item-title">Qualifications CSP</span>
+              <span className="ctx-item-hint">Curriculum Structure Package (.docx)</span>
             </button>
             <button type="button" className="ctx-item ctx-item-desc" role="menuitem" onClick={() => pickImport("lecturer-preferences")}>
               <span className="ctx-item-title">Lecturer preferences</span>

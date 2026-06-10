@@ -25,7 +25,6 @@ type Props = {
     sfs_co_teacher_in_term_2?: number;
     online_student_count?: number | null;
   }) => void;
-  onDelete?: () => void;
 };
 
 export function BookingEditDialog({
@@ -36,7 +35,6 @@ export function BookingEditDialog({
   saving,
   onClose,
   onSave,
-  onDelete,
 }: Props) {
   const [day, setDay] = useState(booking.day);
   const [startSlot, setStartSlot] = useState(booking.start_slot);
@@ -278,11 +276,6 @@ export function BookingEditDialog({
           </label>
 
           <footer className="modal-footer">
-            {onDelete && (
-              <button type="button" className="btn-danger" onClick={onDelete} disabled={saving}>
-                Delete
-              </button>
-            )}
             <span className="modal-footer-spacer" />
             <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
               Cancel

@@ -32,6 +32,14 @@ class Settings(BaseSettings):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        if self.database_url.startswith("postgresql://"):
+            self.database_url = self.database_url.replace(
+                "postgresql://", "postgresql+psycopg://", 1
+            )
+        elif self.database_url.startswith("postgres://"):
+            self.database_url = self.database_url.replace(
+                "postgres://", "postgresql+psycopg://", 1
+            )
         auto = os.environ.get("AUTO_CREATE_TABLES")
         if auto is not None and "auto_create_tables" not in kwargs:
             self.auto_create_tables = auto.lower() in ("1", "true", "yes")

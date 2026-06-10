@@ -414,27 +414,6 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
     }
   }
 
-  async function onDeleteBooking(booking: BookingCard) {
-    const cid = mutationCourseId(booking);
-    if (
-      !cid ||
-      !(await confirm({
-        title: "Delete booking",
-        message: "Delete this booking? This cannot be undone.",
-        confirmLabel: "Delete",
-        danger: true,
-      }))
-    )
-      return;
-    try {
-      await api.deleteBooking(sessionId, booking.id, cid);
-      await afterMutation();
-      setEditBooking(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed");
-    }
-  }
-
   const gridClass =
     layout === "4"
       ? "split-grid split-grid-4"
@@ -567,7 +546,6 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
                 onMove={onMove}
                 onEdit={setEditBooking}
                 onDismissViolation={onDismissViolation}
-                onDelete={onDeleteBooking}
                 onGroupRenamed={onGroupRenamed}
                 onRenameError={setError}
               />
@@ -598,11 +576,6 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
               setMutating(false);
             }
           }}
-          onDelete={
-            COURSE_VIEWS.includes(activeSlot.viewKind) || activeSlot.viewKind === "block_delivery"
-              ? () => void onDeleteBooking(editBooking)
-              : undefined
-          }
         />
       )}
       {dialogs}
