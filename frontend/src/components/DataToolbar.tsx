@@ -28,23 +28,30 @@ export function DataToolbar({
   const exportMenu = useDropdown();
   const importMenu = useDropdown();
   const importRef = useRef<HTMLInputElement>(null);
-  const [importKind, setImportKind] = useState<Props["onImport"] extends (k: infer K, f: File) => void ? K : never>("session");
+  type ImportKind = Props["onImport"] extends (k: infer K, f: File) => void ? K : never;
+  const importKindRef = useRef<ImportKind>("session");
+  const [importKind, setImportKind] = useState<ImportKind>("session");
   const [printOpen, setPrintOpen] = useState(false);
 
-  const importAccept =
-    importKind === "qualifications-csp"
-      ? ".docx"
-      : ".xlsm,.xlsx";
+  function importAcceptFor(kind: ImportKind) {
+    return kind === "qualifications-csp" ? ".docx" : ".xlsm,.xlsx";
+  }
+
+  const importAccept = importAcceptFor(importKind);
 
   function exportPath(path: string, filename: string) {
     exportMenu.close();
     api.downloadExport(path, filename);
   }
 
-  function pickImport(kind: typeof importKind) {
+  function pickImport(kind: ImportKind) {
+    importKindRef.current = kind;
     setImportKind(kind);
     importMenu.close();
-    importRef.current?.click();
+    const input = importRef.current;
+    if (!input) return;
+    input.accept = importAcceptFor(kind);
+    input.click();
   }
 
   return (
@@ -56,7 +63,7 @@ export function DataToolbar({
         hidden
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) onImport(importKind, file);
+          if (file) onImport(importKindRef.current, file);
           e.target.value = "";
         }}
       />

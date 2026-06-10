@@ -1621,7 +1621,10 @@ export function TimetablePage() {
       {!loading && courses.length === 0 && sessionTab === "timetable" && (
         <section className="card">
           <h2>No timetable data</h2>
-          <p className="muted">Import a desktop Timetable Export (.xlsm) or load demo data to begin.</p>
+          <p className="muted">
+            Add staff, rooms, classes, and qualifications from their tabs, or import a desktop Timetable
+            Export (.xlsm) / load demo data to begin.
+          </p>
           <div className="row gap">
             <input
               ref={importRef}
@@ -1764,7 +1767,7 @@ export function TimetablePage() {
         </div>
       )}
 
-      {sessionTab === "staff" && courses.length > 0 && (
+      {sessionTab === "staff" && (
         <EntityEditorsPanel
           sessionId={sessionId}
           staff={staff}
@@ -1778,7 +1781,7 @@ export function TimetablePage() {
           syncToken={entitySyncToken}
         />
       )}
-      {sessionTab === "rooms" && courses.length > 0 && (
+      {sessionTab === "rooms" && (
         <EntityEditorsPanel
           sessionId={sessionId}
           staff={staff}
@@ -1790,7 +1793,7 @@ export function TimetablePage() {
           fixedTab="rooms"
         />
       )}
-      {sessionTab === "units" && courses.length > 0 && (
+      {sessionTab === "units" && (
         <EntityEditorsPanel
           sessionId={sessionId}
           staff={staff}
@@ -1804,7 +1807,7 @@ export function TimetablePage() {
           onFocusConsumed={() => setFocusUnitId(null)}
         />
       )}
-      {sessionTab === "qualifications" && courses.length > 0 && (
+      {sessionTab === "qualifications" && (
         <EntityEditorsPanel
           sessionId={sessionId}
           staff={staff}
