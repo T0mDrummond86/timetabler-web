@@ -9,6 +9,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from ..core.storage import app_data_dir
 from ..constants import NUM_DAYS, NUM_SLOTS
 from ..core.auto_timetable_constraints import AutoTimetableConstraintSettings
 from ..core.constraint_registry import placement_lex_order, staff_lex_order
@@ -29,10 +30,7 @@ from ..core.scheduling_constraints import (
 )
 from .solver import Assignment, PinnedPlacement, SolveReport, solve, validate_proposed_assignments
 
-_LOG_PATH = (
-    Path.home()
-    / "Library/Application Support/JoondalupTimetable/auto_solve_diag.log"
-)
+_LOG_PATH = app_data_dir() / "auto_solve_diag.log"
 
 
 def _log(phase: str) -> None:

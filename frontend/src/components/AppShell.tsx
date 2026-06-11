@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
+import { APP_NAME } from "../branding";
 import { ThemeToggle } from "./ThemeToggle";
 
 type Props = {
@@ -27,7 +28,7 @@ export function AppShell({
         <header className="app-topbar">
           <div className="app-topbar-start">
             <Link to="/dashboard" className="app-brand">
-              Timetabler
+              {APP_NAME}
             </Link>
           </div>
           <div className="app-topbar-end">

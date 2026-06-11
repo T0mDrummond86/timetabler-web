@@ -1,6 +1,6 @@
-# Timetabler Web
+# TAFEtabler Web
 
-Multi-tenant web reimplementation of [Joondalup Timetable](https://github.com/T0mDrummond86/timetabler) (desktop). The desktop app remains the reference UI; this repo reuses its **Python domain layer** behind a FastAPI API and React frontend.
+Multi-tenant web version of [TAFEtabler](https://github.com/T0mDrummond86/timetabler) (desktop). The desktop app remains the reference UI; this repo reuses its **Python domain layer** behind a FastAPI API and React frontend.
 
 ## Stack
 

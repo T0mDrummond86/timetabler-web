@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "timetabler-domain"
 version = "0.1.0"
-description = "Joondalup Timetable domain logic (core, solver, import/export)"
+description = "TAFEtabler domain logic (core, solver, import/export)"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

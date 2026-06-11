@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Live end-to-end smoke test against a running Timetabler stack.
+"""Live end-to-end smoke test against a running TAFEtabler stack.
 
 Usage:
   API_URL=http://localhost:8000 FRONTEND_URL=http://localhost:5173 python3 scripts/e2e_smoke.py

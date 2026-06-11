@@ -10,21 +10,33 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
+from ..branding import APP_DATA_DIR_NAME, LEGACY_APP_DATA_DIR_NAME
 from .models import Base, Semester, Week
 
 
 DEFAULT_SESSION_NAME = "Default"
 
 
+def _app_data_root() -> Path:
+    if os.name == "nt":
+        return Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+    if os.uname().sysname == "Darwin":
+        return Path.home() / "Library" / "Application Support"
+    return Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+
+
+def _migrate_legacy_app_data_dir(root: Path) -> None:
+    legacy = root / LEGACY_APP_DATA_DIR_NAME
+    new = root / APP_DATA_DIR_NAME
+    if legacy.exists() and not new.exists():
+        legacy.rename(new)
+
+
 def app_data_dir() -> Path:
     """Mac/Linux/Windows app data dir for this app."""
-    if os.name == "nt":
-        root = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
-    elif os.uname().sysname == "Darwin":
-        root = Path.home() / "Library" / "Application Support"
-    else:
-        root = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
-    d = root / "JoondalupTimetable"
+    root = _app_data_root()
+    _migrate_legacy_app_data_dir(root)
+    d = root / APP_DATA_DIR_NAME
     d.mkdir(parents=True, exist_ok=True)
     return d
 

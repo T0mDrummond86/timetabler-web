@@ -1,4 +1,4 @@
-"""Timetabler web API."""
+"""TAFEtabler web API."""
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from timetable.branding import APP_NAME
 from timetable.constants import NUM_DAYS, NUM_SLOTS
 
 from .config import settings
@@ -38,9 +39,9 @@ _redoc_url = "/redoc" if settings.expose_api_docs else None
 _openapi_url = "/openapi.json" if settings.expose_api_docs else None
 
 app = FastAPI(
-    title="Timetabler API",
+    title=f"{APP_NAME} API",
     version="0.7.0",
-    description="Multi-tenant web API for Joondalup Timetable",
+    description=f"Multi-tenant web API for {APP_NAME}",
     lifespan=lifespan,
     docs_url=_docs_url,
     redoc_url=_redoc_url,
@@ -105,7 +106,7 @@ def health():
 @app.get("/")
 def root():
     payload: dict = {
-        "name": "Timetabler API",
+        "name": f"{APP_NAME} API",
         "health": "/health",
     }
     if settings.expose_api_docs:
