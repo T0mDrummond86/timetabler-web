@@ -32,7 +32,7 @@ from ..services.booking_mutations import (
 )
 from ..services.holding_area import list_holding_area
 from ..services.alternate_placements import alternate_slots_for_booking
-from ..services.entity_crud import unit_to_out
+from ..services.entity_crud import units_to_out_batch
 from ..services.timetable_grid import assert_session_in_org
 
 router = APIRouter(tags=["bookings"])
@@ -81,7 +81,7 @@ def session_units(
         .order_by(Unit.name)
         .all()
     )
-    return [unit_to_out(db, u) for u in rows]
+    return units_to_out_batch(db, rows)
 
 
 @router.get("/sessions/{session_id}/qualifications", response_model=list[QualificationOut])

@@ -172,6 +172,26 @@ def unit_qualification_ids(db: Session, unit_id: int) -> list[int]:
 
 
 def unit_to_out(db: Session, unit: Unit) -> dict:
+    return _unit_payload(unit, unit_qualification_ids(db, unit.id))
+
+
+def units_to_out_batch(db: Session, units: list[Unit]) -> list[dict]:
+    if not units:
+        return []
+    unit_ids = [u.id for u in units]
+    pairs = (
+        db.query(UnitQualification.unit_id, UnitQualification.qualification_id)
+        .filter(UnitQualification.unit_id.in_(unit_ids))
+        .order_by(UnitQualification.unit_id, UnitQualification.qualification_id)
+        .all()
+    )
+    qual_by_unit: dict[int, list[int]] = {uid: [] for uid in unit_ids}
+    for uid, qid in pairs:
+        qual_by_unit[uid].append(int(qid))
+    return [_unit_payload(u, qual_by_unit.get(u.id, [])) for u in units]
+
+
+def _unit_payload(unit: Unit, qualification_ids: list[int]) -> dict:
     return {
         "id": unit.id,
         "name": unit.name,
@@ -181,5 +201,5 @@ def unit_to_out(db: Session, unit: Unit) -> dict:
         "double_session_same_day": getattr(unit, "double_session_same_day", None),
         "double_session_first_slots": getattr(unit, "double_session_first_slots", None),
         "screen_fill_colour": getattr(unit, "screen_fill_colour", None),
-        "qualification_ids": unit_qualification_ids(db, unit.id),
+        "qualification_ids": qualification_ids,
     }

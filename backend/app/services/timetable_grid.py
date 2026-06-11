@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Literal
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from timetable.constants import DAYS, FIRST_SLOT_TIME, NUM_DAYS, NUM_SLOTS, SLOT_MINUTES
@@ -136,17 +137,16 @@ def scheduled_hours_on_day(db: Session, timetable_session_id: int, day: int) -> 
     week = get_repeating_week(db, timetable_session_id)
     if week is None or not (0 <= day < NUM_DAYS):
         return 0.0
-    bookings = (
-        db.query(Booking)
+    total_slots = (
+        db.query(func.coalesce(func.sum(Booking.end_slot - Booking.start_slot), 0))
         .filter(
             Booking.week_id == week.id,
             Booking.day == day,
             Booking.block_week_index.is_(None),
         )
-        .all()
+        .scalar()
     )
-    total_slots = sum(b.end_slot - b.start_slot for b in bookings)
-    return total_slots * SLOT_MINUTES / 60.0
+    return int(total_slots) * SLOT_MINUTES / 60.0
 
 
 def _booking_query(db: Session, week_id: int):
