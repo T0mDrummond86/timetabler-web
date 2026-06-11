@@ -180,5 +180,6 @@ def unit_to_out(db: Session, unit: Unit) -> dict:
         "double_session": getattr(unit, "double_session", 0) or 0,
         "double_session_same_day": getattr(unit, "double_session_same_day", None),
         "double_session_first_slots": getattr(unit, "double_session_first_slots", None),
+        "screen_fill_colour": getattr(unit, "screen_fill_colour", None),
         "qualification_ids": unit_qualification_ids(db, unit.id),
     }

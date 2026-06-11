@@ -28,7 +28,7 @@ from ..core.class_colour import booking_colour_key
 from ..core.models import Booking, Course, Room, Staff
 from ..core.room_types import room_is_physical
 from .backup_payload import write_backup_sheet
-from ..core.screen_colours import assign_screen_colours, screen_border_xlsx, screen_fill_xlsx
+from ..core.screen_colours import screen_border_xlsx, screen_fill_xlsx
 from .xlsm_export import (
     ExportReport,
     _bookings_by_slot,
@@ -357,9 +357,23 @@ def _colour_map_for_bookings(
     bookings: list[Booking],
     *,
     colour_by_class: bool,
+    session: Session | None = None,
+    timetable_session_id: int | None = None,
 ) -> dict[str, tuple[str, str]]:
-    keys = {booking_colour_key(b, by_class=colour_by_class) for b in bookings}
-    return assign_screen_colours(keys)
+    from ..core.class_colour_overrides import build_screen_colour_map
+    from ..core.models import Unit
+
+    units = None
+    if session is not None and colour_by_class:
+        q = session.query(Unit)
+        if timetable_session_id is not None and hasattr(Unit, "timetable_session_id"):
+            q = q.filter(Unit.timetable_session_id == timetable_session_id)
+        units = q.all()
+    return build_screen_colour_map(
+        bookings,
+        colour_by_class=colour_by_class,
+        units=units,
+    )
 
 
 def _v2_summary_spacer_row(
@@ -654,7 +668,10 @@ def _generate_v2_entity_tabs(
 
     bookings = _week_bookings(session, week_id)
     session_colour_map = _colour_map_for_bookings(
-        bookings, colour_by_class=colour_by_class
+        bookings,
+        colour_by_class=colour_by_class,
+        session=session,
+        timetable_session_id=timetable_session_id,
     )
     used_names = set(wb.sheetnames)
 

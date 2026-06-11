@@ -713,16 +713,29 @@ def _import_bookings(
         rep.bookings_created += 1
 
 
+def is_asc_export_file(path: str | Path) -> bool:
+    """Return True when the file looks like an aSc export (.xlsx or 2012 XML)."""
+    from .asc_xml_import import is_asc_export_xml
+
+    return is_asc_export_xml(path) or is_asc_export_workbook(path)
+
+
 def import_asc_export(
     session: Session,
     path: str | Path,
     *,
     timetable_session_id: int | None = None,
 ) -> AscImportReport:
+    from .asc_xml_import import import_asc_xml_export, is_asc_export_xml
+
+    if is_asc_export_xml(path):
+        return import_asc_xml_export(session, path, timetable_session_id=timetable_session_id)
+
     if not is_asc_export_workbook(path):
         raise ValueError(
-            "Workbook does not look like an aSc Timetables export "
-            "(expected Teachers, Classrooms, Classes, and Lessons sheets)."
+            "File does not look like an aSc Timetables export "
+            "(expected .xlsx with Teachers/Classrooms/Classes/Lessons sheets, "
+            "or aSc 2012 XML with teachers, lessons, and cards)."
         )
 
     rep = AscImportReport()

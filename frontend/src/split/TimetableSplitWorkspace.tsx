@@ -404,6 +404,19 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
     }
   }
 
+  async function onSetClassColour(unitId: number, fill: string | null) {
+    setMutating(true);
+    setError(null);
+    try {
+      await api.patchUnit(sessionId, unitId, { screen_fill_colour: fill });
+      await afterMutation();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Class colour update failed");
+    } finally {
+      setMutating(false);
+    }
+  }
+
   async function onDismissViolation(bookingId: number, code: string) {
     try {
       await api.dismissViolation(sessionId, bookingId, code);
@@ -546,6 +559,7 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
                 onMove={onMove}
                 onEdit={setEditBooking}
                 onDismissViolation={onDismissViolation}
+                onSetClassColour={onSetClassColour}
                 onGroupRenamed={onGroupRenamed}
                 onRenameError={setError}
               />

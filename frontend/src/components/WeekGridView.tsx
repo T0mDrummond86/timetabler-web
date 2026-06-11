@@ -4,6 +4,7 @@ import { BookingCard, HoldingClass, TimetableGrid } from "../types";
 import type { AlternatePlacementOption } from "../types";
 import type { ViewKind } from "../viewKinds";
 import { BookingContextMenu } from "./BookingContextMenu";
+import { ClassColourDialog } from "./ClassColourDialog";
 import { MIME_BOOKING, MIME_PENDING } from "./HoldingAreaPanel";
 import { DEFAULT_GRID_ZOOM } from "../lib/gridZoom";
 
@@ -25,6 +26,8 @@ type Props = {
   onToggleLock?: (booking: BookingCard, field: "lock_time" | "lock_staff") => void;
   onAlternateMove?: (booking: BookingCard, option: AlternatePlacementOption) => void;
   onDismissViolation?: (bookingId: number, code: string) => void;
+  onSetClassColour?: (unitId: number, fill: string | null) => void;
+  colourByClass?: boolean;
 };
 
 function cardTitle(b: BookingCard): string {
@@ -91,11 +94,18 @@ export function WeekGridView({
   onToggleLock,
   onAlternateMove,
   onDismissViolation,
+  onSetClassColour,
+  colourByClass = true,
 }: Props) {
   const [contextMenu, setContextMenu] = useState<{
     booking: BookingCard;
     x: number;
     y: number;
+  } | null>(null);
+  const [classColourTarget, setClassColourTarget] = useState<{
+    unitId: number;
+    className: string | null;
+    currentFill: string | null;
   } | null>(null);
   const slotHeight = Math.round(BASE_SLOT_HEIGHT * zoom);
   const gridHeight = grid.num_slots * slotHeight;
@@ -312,6 +322,7 @@ export function WeekGridView({
                     onContextMenu={(e) => {
                       if (!editable) return;
                       e.preventDefault();
+                      e.stopPropagation();
                       setContextMenu({ booking: b, x: e.clientX, y: e.clientY });
                     }}
                     onKeyDown={(e) => {
@@ -354,6 +365,36 @@ export function WeekGridView({
           onToggleLock={(field) => onToggleLock?.(contextMenu.booking, field)}
           onAlternateMove={(opt) => onAlternateMove?.(contextMenu.booking, opt)}
           onDismissViolation={onDismissViolation}
+          onPickClassColour={
+            onSetClassColour && contextMenu.booking.unit_id != null
+              ? () =>
+                  setClassColourTarget({
+                    unitId: contextMenu.booking.unit_id!,
+                    className: contextMenu.booking.unit_name,
+                    currentFill: contextMenu.booking.unit_screen_fill_colour ?? null,
+                  })
+              : undefined
+          }
+          colourByClass={colourByClass}
+        />
+      )}
+      {classColourTarget && onSetClassColour && (
+        <ClassColourDialog
+          className={classColourTarget.className}
+          currentFill={classColourTarget.currentFill}
+          onApply={(fill) => {
+            onSetClassColour(classColourTarget.unitId, fill);
+            setClassColourTarget(null);
+          }}
+          onReset={
+            classColourTarget.currentFill
+              ? () => {
+                  onSetClassColour(classColourTarget.unitId, null);
+                  setClassColourTarget(null);
+                }
+              : undefined
+          }
+          onClose={() => setClassColourTarget(null)}
         />
       )}
     </section>

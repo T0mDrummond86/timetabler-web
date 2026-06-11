@@ -44,9 +44,13 @@ services:
         condition: service_healthy
     volumes:
       - ./backend/app:/app/app
+      - ./backend/alembic:/app/backend/alembic
+      - ./backend/alembic.ini:/app/backend/alembic.ini
+      - ./backend/scripts/start-dev.sh:/app/backend/scripts/start-dev.sh
       - ./packages/domain/timetable:/app/packages/domain/timetable
       - ./packages/domain/templates:/app/packages/domain/templates
       - ./packages/domain/adminExportStyleGuide.xlsx:/app/packages/domain/adminExportStyleGuide.xlsx
+    command: sh /app/backend/scripts/start-dev.sh
 
   frontend:
     image: node:22-alpine

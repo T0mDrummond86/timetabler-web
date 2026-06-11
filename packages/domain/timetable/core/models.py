@@ -183,6 +183,8 @@ class Unit(Base):
     double_session: Mapped[int] = mapped_column(Integer, default=0)
     double_session_same_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
     double_session_first_slots: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Optional manual placecard fill (#RRGGBB). Border is derived automatically.
+    screen_fill_colour: Mapped[str | None] = mapped_column(String(7), nullable=True)
 
     lap: Mapped["UnitLap | None"] = relationship(back_populates="unit", uselist=False)
 

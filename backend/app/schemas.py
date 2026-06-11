@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class RegisterRequest(BaseModel):
@@ -488,6 +488,7 @@ class UnitOut(BaseModel):
     double_session: int = 0
     double_session_same_day: int | None = None
     double_session_first_slots: int | None = None
+    screen_fill_colour: str | None = None
     qualification_ids: list[int] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
@@ -500,6 +501,21 @@ class UnitPatch(BaseModel):
     double_session: int | None = Field(default=None, ge=0, le=1)
     double_session_same_day: int | None = Field(default=None, ge=0, le=1)
     double_session_first_slots: int | None = Field(default=None, ge=1, le=27)
+    screen_fill_colour: str | None = None
+
+    @field_validator("screen_fill_colour", mode="before")
+    @classmethod
+    def _validate_screen_fill_colour(cls, value):
+        from timetable.core.class_colour_overrides import normalize_screen_fill_colour
+
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip():
+            return None
+        try:
+            return normalize_screen_fill_colour(str(value))
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
 
 
 class UnitQualificationsPatch(BaseModel):

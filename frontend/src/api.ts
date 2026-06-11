@@ -101,6 +101,7 @@ export type Unit = {
   double_session?: number;
   double_session_same_day?: number | null;
   double_session_first_slots?: number | null;
+  screen_fill_colour?: string | null;
   qualification_ids?: number[];
 };
 export type Qualification = {

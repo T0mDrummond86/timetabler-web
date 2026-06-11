@@ -13,8 +13,11 @@ RUN pip install --no-cache-dir /app/packages/domain \
     && pip install --no-cache-dir -r /app/backend/requirements.txt
 
 COPY backend/app /app/app
+COPY backend/alembic /app/backend/alembic
+COPY backend/alembic.ini /app/backend/alembic.ini
+COPY backend/scripts/start-dev.sh /app/backend/scripts/start-dev.sh
 
 ENV PYTHONPATH=/app/packages/domain:/app
 
 WORKDIR /app
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["sh", "/app/backend/scripts/start-dev.sh"]

@@ -223,14 +223,15 @@ async def import_asc_export(
     assert_session_in_org(db, session_id, ctx.organization.id)
     tmp = await _upload_to_temp(file, ".xlsx")
     try:
-        from timetable.io.asc_import import is_asc_export_workbook
+        from timetable.io.asc_import import is_asc_export_file
 
-        if not is_asc_export_workbook(tmp):
+        if not is_asc_export_file(tmp):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=(
-                    "Workbook does not look like an aSc Timetables export "
-                    "(expected Teachers, Classrooms, Classes, and Lessons sheets)."
+                    "File does not look like an aSc Timetables export "
+                    "(expected .xlsx with Teachers/Classrooms/Classes/Lessons sheets, "
+                    "or aSc 2012 XML with teachers, lessons, and cards)."
                 ),
             )
         return import_asc_export_workbook(db, session_id, tmp)

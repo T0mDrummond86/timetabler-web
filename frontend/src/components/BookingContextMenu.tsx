@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { api } from "../api";
 import type { AlternatePlacementOption, AlternateSlots, BookingCard } from "../types";
 import type { ViewKind } from "../viewKinds";
@@ -14,6 +15,8 @@ type Props = {
   onToggleLock: (field: "lock_time" | "lock_staff") => void;
   onAlternateMove: (option: AlternatePlacementOption) => void;
   onDismissViolation?: (bookingId: number, code: string) => void;
+  onPickClassColour?: () => void;
+  colourByClass?: boolean;
 };
 
 export function BookingContextMenu({
@@ -27,11 +30,10 @@ export function BookingContextMenu({
   onToggleLock,
   onAlternateMove,
   onDismissViolation,
+  onPickClassColour,
+  colourByClass = true,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
-  const [slots, setSlots] = useState<AlternateSlots | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [expandedDay, setExpandedDay] = useState<number | null>(null);
 
   const showAlternate =
     viewKind === "course" ||
@@ -41,26 +43,35 @@ export function BookingContextMenu({
     viewKind === "block_delivery";
   const timesOnly = viewKind === "staff";
 
+  const [slots, setSlots] = useState<AlternateSlots | null>(null);
+  const [loading, setLoading] = useState(showAlternate);
+  const [alternateOpen, setAlternateOpen] = useState(false);
+  const [expandedDay, setExpandedDay] = useState<number | null>(null);
+
   useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    }
+    let removeListener: (() => void) | undefined;
+    const timer = window.setTimeout(() => {
+      function onPointerDown(e: PointerEvent) {
+        if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      }
+      document.addEventListener("pointerdown", onPointerDown, true);
+      removeListener = () => document.removeEventListener("pointerdown", onPointerDown, true);
+    }, 0);
+
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
-    document.addEventListener("mousedown", onDocClick);
     document.addEventListener("keydown", onKey);
+
     return () => {
-      document.removeEventListener("mousedown", onDocClick);
+      clearTimeout(timer);
+      removeListener?.();
       document.removeEventListener("keydown", onKey);
     };
   }, [onClose]);
 
   useEffect(() => {
-    if (!showAlternate) {
-      setLoading(false);
-      return;
-    }
+    if (!showAlternate) return;
     let cancelled = false;
     (async () => {
       try {
@@ -75,16 +86,43 @@ export function BookingContextMenu({
     };
   }, [sessionId, booking.id, showAlternate, timesOnly]);
 
-  return (
+  const menu = (
     <div
       ref={ref}
       className="booking-context-menu"
       style={{ top: y, left: x }}
       role="menu"
+      onPointerDown={(e) => e.stopPropagation()}
     >
       <button type="button" className="ctx-item" onClick={() => { onEdit(); onClose(); }}>
         Edit booking…
       </button>
+      {booking.unit_id != null && onPickClassColour && (
+        <>
+          <div className="ctx-divider" />
+          <button
+            type="button"
+            className="ctx-item ctx-colour-picker"
+            onClick={() => {
+              onPickClassColour();
+              onClose();
+            }}
+          >
+            <span
+              className="ctx-colour-swatch"
+              style={{
+                backgroundColor:
+                  booking.unit_screen_fill_colour ?? booking.fill_colour,
+              }}
+              aria-hidden
+            />
+            Choose class colour…
+          </button>
+          {!colourByClass && (
+            <span className="ctx-muted ctx-colour-hint">Enable “Class colours” to see this tint.</span>
+          )}
+        </>
+      )}
       {booking.violations.length > 0 && onDismissViolation && (
         <>
           <div className="ctx-divider" />
@@ -137,41 +175,52 @@ export function BookingContextMenu({
       {showAlternate && (
         <>
           <div className="ctx-divider" />
-          <span className="ctx-label">Move to alternate slot</span>
-          {loading && <span className="ctx-muted">Loading…</span>}
-          {!loading && slots && !slots.days.length && (
-            <span className="ctx-muted">No open slots</span>
+          <button
+            type="button"
+            className="ctx-item ctx-expand"
+            onClick={() => setAlternateOpen((open) => !open)}
+          >
+            Move to alternate slot
+            {alternateOpen ? " ▾" : " ▸"}
+          </button>
+          {alternateOpen && (
+            <>
+              {loading && <span className="ctx-muted">Loading…</span>}
+              {!loading && slots && !slots.days.length && (
+                <span className="ctx-muted">No open slots</span>
+              )}
+              {slots?.days.map((day) => (
+                <div key={day.day} className="ctx-submenu">
+                  <button
+                    type="button"
+                    className="ctx-item ctx-expand"
+                    onClick={() => setExpandedDay(expandedDay === day.day ? null : day.day)}
+                  >
+                    {day.day_label}
+                    {day.is_current_day ? " ◆" : ""}
+                  </button>
+                  {expandedDay === day.day &&
+                    day.slots.map((slot) =>
+                      slot.options.map((opt) => (
+                        <button
+                          key={`${opt.day}-${opt.start_slot}-${opt.room_id}`}
+                          type="button"
+                          className="ctx-item ctx-nested"
+                          disabled={opt.is_current}
+                          onClick={() => {
+                            onAlternateMove(opt);
+                            onClose();
+                          }}
+                        >
+                          {slot.time_label} — {opt.room_code}
+                          {opt.is_current ? " ◆" : ""}
+                        </button>
+                      )),
+                    )}
+                </div>
+              ))}
+            </>
           )}
-          {slots?.days.map((day) => (
-            <div key={day.day} className="ctx-submenu">
-              <button
-                type="button"
-                className="ctx-item ctx-expand"
-                onClick={() => setExpandedDay(expandedDay === day.day ? null : day.day)}
-              >
-                {day.day_label}
-                {day.is_current_day ? " ◆" : ""}
-              </button>
-              {expandedDay === day.day &&
-                day.slots.map((slot) =>
-                  slot.options.map((opt) => (
-                    <button
-                      key={`${opt.day}-${opt.start_slot}-${opt.room_id}`}
-                      type="button"
-                      className="ctx-item ctx-nested"
-                      disabled={opt.is_current}
-                      onClick={() => {
-                        onAlternateMove(opt);
-                        onClose();
-                      }}
-                    >
-                      {slot.time_label} — {opt.room_code}
-                      {opt.is_current ? " ◆" : ""}
-                    </button>
-                  )),
-                )}
-            </div>
-          ))}
         </>
       )}
       <div className="ctx-divider" />
@@ -183,4 +232,6 @@ export function BookingContextMenu({
       </button>
     </div>
   );
+
+  return createPortal(menu, document.body);
 }

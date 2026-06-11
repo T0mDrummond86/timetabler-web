@@ -38,6 +38,7 @@ export type BookingCard = {
   in_term_1?: boolean;
   in_term_2?: boolean;
   unit_id?: number | null;
+  unit_screen_fill_colour?: string | null;
   session_part?: number;
   sfs_co_teacher_staff_id?: number | null;
   sfs_co_teacher_name?: string | null;

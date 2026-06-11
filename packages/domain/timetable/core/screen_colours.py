@@ -176,6 +176,11 @@ def assign_screen_colours(keys: set[str]) -> dict[str, tuple[str, str]]:
     return result
 
 
+def screen_border_from_fill(fill: str) -> str:
+    """Derive a placecard border colour from its fill."""
+    return _darken_hex(fill)
+
+
 def screen_colours_for_key(
     key: str,
     colour_map: dict[str, tuple[str, str]] | None = None,

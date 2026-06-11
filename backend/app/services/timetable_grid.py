@@ -15,13 +15,14 @@ from timetable.core.booking_staff import (
 )
 from timetable.core.staff_hours import room_is_online
 from timetable.core.class_colour import booking_colour_key
-from timetable.core.models import Booking, Course, Room, Semester, Staff, StaffAvailability, Week
+from timetable.core.class_colour_overrides import build_screen_colour_map
+from timetable.core.models import Booking, Course, Room, Semester, Staff, StaffAvailability, Unit, Week
 from timetable.core.schedule_variants import apply_schedule_display_filter, variant_week_buttons
 from timetable.core.tenancy_models import TimetableSession
 from timetable.core.unassigned_lecturer import bookings_without_lecturer
 from timetable.core.validation import Severity, _iter_violations
 
-from ..colours import assign_screen_colours, class_colours
+from ..colours import class_colours
 from .violation_dismissals import apply_dismissals_to_map, dismissed_keys
 
 ColumnKind = Literal["day", "room", "staff"]
@@ -220,6 +221,9 @@ def _booking_card(
         "in_term_1": bool(getattr(b, "in_term_1", 0)),
         "in_term_2": bool(getattr(b, "in_term_2", 0)),
         "unit_id": b.unit_id,
+        "unit_screen_fill_colour": (
+            b.unit.screen_fill_colour if b.unit and b.unit.screen_fill_colour else None
+        ),
         "session_part": getattr(b, "session_part", 1) or 1,
         "sfs_co_teacher_staff_id": getattr(b, "sfs_co_teacher_staff_id", None),
         "sfs_co_teacher_name": (
@@ -308,8 +312,15 @@ def _build_grid_payload(
             if b.room_id is not None and b.room_id in room_to_col:
                 by_column[room_to_col[b.room_id]].append(b)
 
-    screen_colour_map = assign_screen_colours(
-        {booking_colour_key(b, by_class=colour_by_class) for b in bookings}
+    units = (
+        db.query(Unit)
+        .filter(Unit.timetable_session_id == timetable_session_id)
+        .all()
+    )
+    screen_colour_map = build_screen_colour_map(
+        bookings,
+        colour_by_class=colour_by_class,
+        units=units,
     )
 
     cards: list[dict] = []

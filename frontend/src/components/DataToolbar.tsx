@@ -36,6 +36,7 @@ export function DataToolbar({
   function importAcceptFor(kind: ImportKind) {
     if (kind === "qualifications-csp") return ".docx";
     if (kind === "qualifications-ep-nb-csp") return ".xlsx";
+    if (kind === "asc") return ".xlsm,.xlsx,.xml";
     return ".xlsm,.xlsx";
   }
 
@@ -123,7 +124,7 @@ export function DataToolbar({
             </button>
             <button type="button" className="ctx-item ctx-item-desc" role="menuitem" onClick={() => pickImport("asc")}>
               <span className="ctx-item-title">aSc export</span>
-              <span className="ctx-item-hint">Staff, rooms, classes, quals &amp; bookings from aSc (.xlsx)</span>
+              <span className="ctx-item-hint">Staff, rooms, classes, quals &amp; bookings from aSc (.xlsx / .xml)</span>
             </button>
             <button type="button" className="ctx-item ctx-item-desc" role="menuitem" onClick={() => pickImport("lecturer-preferences")}>
               <span className="ctx-item-title">Lecturer preferences</span>

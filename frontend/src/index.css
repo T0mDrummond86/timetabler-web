@@ -1357,7 +1357,7 @@ button.danger {
 
 .booking-context-menu {
   position: fixed;
-  z-index: 1000;
+  z-index: 10000;
   min-width: 220px;
   max-width: 320px;
   max-height: 70vh;
@@ -1388,6 +1388,127 @@ button.danger {
 .ctx-item:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+.ctx-colour-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ctx-colour-swatch {
+  display: inline-block;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.ctx-colour-palette {
+  display: grid;
+  grid-template-columns: repeat(8, 1.5rem);
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem 0.5rem;
+}
+
+.ctx-colour-preset {
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.ctx-colour-preset:hover {
+  transform: scale(1.08);
+  box-shadow: var(--shadow-sm);
+}
+
+.ctx-colour-custom {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+
+.ctx-colour-custom-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.ctx-colour-custom-error {
+  grid-column: 1 / -1;
+  padding: 0 0 0.15rem;
+}
+
+.ctx-colour-hint {
+  display: block;
+  padding: 0 0.75rem 0.35rem;
+}
+
+.class-colour-dialog {
+  width: min(22rem, calc(100vw - 2rem));
+  padding: 1rem 1.1rem 1.1rem;
+}
+
+.class-colour-dialog-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.35rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.class-colour-dialog-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  flex: 1 1 auto;
+}
+
+.class-colour-dialog-header .muted {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.class-colour-dialog-palette {
+  padding: 0;
+  margin-bottom: 0.75rem;
+}
+
+.class-colour-dialog-custom {
+  margin-bottom: 0.5rem;
+}
+
+.ctx-colour-custom-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.class-colour-dialog-error {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+}
+
+.class-colour-dialog-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 0.75rem;
 }
 
 .ctx-item.ctx-nested {
@@ -2528,32 +2649,89 @@ body.staff-editor-resizing {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  padding: 0 0.35rem 0.35rem;
+  padding: 0 0.25rem 0.35rem;
+  gap: 0.65rem;
+}
+
+.staff-hours-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.staff-hours-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.staff-hours-summary-card__label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.staff-hours-summary-card__value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.staff-hours-summary-card--positive .staff-hours-summary-card__value {
+  color: #0369a1;
+}
+
+.staff-hours-summary-card--negative .staff-hours-summary-card__value {
+  color: #b91c1c;
+}
+
+.staff-hours-summary-card--neutral .staff-hours-summary-card__value {
+  color: #64748b;
 }
 
 .staff-hours-table-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem 1rem;
-  padding: 0.35rem 0.15rem;
+  padding: 0 0.1rem;
 }
 
 .staff-variance-filter {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.85rem;
-  font-weight: 600;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 500;
   color: var(--text-secondary);
 }
 
 .staff-variance-filter select {
   font-weight: 400;
   min-width: 12rem;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
 }
 
 .staff-hours-table-count {
+  font-size: 0.78rem;
+}
+
+.staff-hours-loading {
+  margin: 0;
   font-size: 0.8rem;
 }
 
@@ -2562,94 +2740,336 @@ body.staff-editor-resizing {
   flex: 1;
   max-height: min(52vh, 520px);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-sm);
 }
 
 .staff-hours-table {
   width: max-content;
   min-width: 100%;
-  border-collapse: collapse;
-  font-size: 0.78rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8125rem;
 }
 
-.staff-hours-table th,
-.staff-hours-table td {
-  padding: 0.3rem 0.45rem;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-  vertical-align: top;
-}
-
-.staff-hours-table th {
+.staff-hours-table thead th {
   position: sticky;
   top: 0;
-  z-index: 1;
-  background: var(--bg-subtle);
-  color: var(--text);
+  z-index: 3;
+  padding: 0.65rem 0.75rem;
+  background: color-mix(in srgb, var(--bg-subtle) 92%, transparent);
+  backdrop-filter: blur(8px);
+  color: var(--text-secondary);
+  font-size: 0.68rem;
   font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.staff-hours-table tbody td {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
 .staff-hours-table tbody tr.staff-hours-row {
   cursor: pointer;
+  transition: background 0.12s ease, box-shadow 0.12s ease;
 }
 
 .staff-hours-table tbody tr.staff-hours-row:hover {
-  background: rgba(0, 0, 0, 0.03);
+  background: color-mix(in srgb, var(--primary-soft) 55%, var(--bg-elevated));
 }
 
-.staff-hours-table tbody tr.staff-hours-row.selected {
-  background: rgba(59, 130, 246, 0.12);
+.staff-hours-table tbody tr.staff-hours-row--selected {
+  background: color-mix(in srgb, var(--primary-soft) 85%, var(--bg-elevated));
+  box-shadow: inset 3px 0 0 var(--primary);
 }
 
-.staff-hours-table td.staff-hours-wrap {
-  white-space: normal;
+.staff-hours-table tbody tr.staff-hours-row--selected:hover {
+  background: color-mix(in srgb, var(--primary-soft) 95%, var(--bg-elevated));
 }
 
-.staff-hours-wrap {
+.staff-col-sticky {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: inherit;
+  box-shadow: 1px 0 0 color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.staff-hours-table thead .staff-col-sticky {
+  z-index: 4;
+  background: color-mix(in srgb, var(--bg-subtle) 96%, transparent);
+}
+
+.staff-col-primary {
+  min-width: 11rem;
   max-width: 14rem;
 }
 
-.staff-hours-truncate {
-  max-width: 11rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: middle;
+.staff-lecturer-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
 }
 
-.staff-hours-detail {
-  max-width: 18rem;
-}
-
-.staff-hours-table .staff-hours-bulk-online-col {
-  width: 14rem;
-  max-width: 14rem;
-  min-width: 14rem;
-}
-
-.staff-hours-table td.staff-hours-bulk-online {
-  white-space: normal;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  line-height: 1.35;
-  font-size: 0.72rem;
-  vertical-align: top;
+.staff-avatar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #dbeafe, #eff6ff);
+  color: #1e40af;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .staff-hours-name {
   font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-col-metric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  color: var(--text);
+}
+
+.staff-col-metric-highlight {
+  font-weight: 600;
+}
+
+.staff-col-variance {
+  min-width: 5.5rem;
+}
+
+.staff-col-meta {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  max-width: 11rem;
+}
+
+.staff-col-detail {
+  max-width: 13rem;
+  min-width: 10rem;
+  white-space: normal;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.staff-col-metric-group,
+.staff-hours-table thead .staff-col-metric-group {
+  padding-left: 1rem;
+}
+
+.staff-col-meta-group,
+.staff-hours-table thead .staff-col-meta-group {
+  padding-left: 1rem;
+}
+
+.staff-hours-table td.staff-hours-wrap {
+  white-space: normal;
+  max-width: 14rem;
+}
+
+.staff-hours-truncate {
   max-width: 10rem;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-hours-table .staff-hours-bulk-online-col {
+  width: 13rem;
+  max-width: 13rem;
+  min-width: 10rem;
+}
+
+.staff-bulk-online {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  max-width: 12rem;
+}
+
+.staff-bulk-online__summary {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.35;
+}
+
+.staff-bulk-online__full {
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 12rem;
+  line-height: 1.35;
+}
+
+.staff-bulk-online__toggle {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.staff-bulk-online__toggle:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+
+.staff-bulk-online-empty {
+  color: var(--text-muted);
 }
 
 .staff-hours-empty {
   text-align: center;
-  padding: 1rem;
+  padding: 2rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  white-space: normal;
 }
 
+.variance-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.45rem 0.15rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  border: 1px solid transparent;
+}
+
+.variance-badge__dot {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.variance-badge--positive {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.variance-badge__dot--positive {
+  background: #10b981;
+}
+
+.variance-badge--negative {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.variance-badge__dot--negative {
+  background: #ef4444;
+}
+
+.variance-badge--neutral {
+  background: #f8fafc;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+
+.variance-badge__dot--neutral {
+  background: #94a3b8;
+}
+
+.variance-badge--unknown {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #e2e8f0;
+}
+
+.variance-badge__dot--unknown {
+  background: #cbd5e1;
+}
+
+[data-theme="dark"] .staff-hours-table-scroll {
+  background: var(--surface);
+}
+
+[data-theme="dark"] .staff-hours-summary-card {
+  background: var(--surface);
+}
+
+[data-theme="dark"] .staff-avatar {
+  background: linear-gradient(145deg, #1e3a5f, #1e293b);
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .staff-hours-table tbody tr.staff-hours-row:hover {
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+}
+
+[data-theme="dark"] .staff-hours-table tbody tr.staff-hours-row--selected {
+  background: color-mix(in srgb, var(--primary) 18%, var(--surface));
+}
+
+[data-theme="dark"] .variance-badge--positive {
+  background: rgba(16, 185, 129, 0.15);
+  color: #6ee7b7;
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+[data-theme="dark"] .variance-badge--negative {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+[data-theme="dark"] .variance-badge--neutral {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+[data-theme="dark"] .variance-badge--unknown {
+  background: rgba(100, 116, 139, 0.18);
+  color: #cbd5e1;
+  border-color: rgba(100, 116, 139, 0.35);
+}
+
+@media (max-width: 900px) {
+  .staff-hours-summary-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Legacy variance cell classes kept for any other consumers */
 .variance-cell {
   font-weight: 600;
   font-variant-numeric: tabular-nums;

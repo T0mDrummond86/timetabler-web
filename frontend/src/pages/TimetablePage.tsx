@@ -843,6 +843,20 @@ export function TimetablePage() {
     }
   }
 
+  async function onSetClassColour(unitId: number, fill: string | null) {
+    setMutating(true);
+    setError(null);
+    try {
+      await api.patchUnit(sessionId, unitId, { screen_fill_colour: fill });
+      await reloadView();
+      notifyPeers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Class colour update failed");
+    } finally {
+      setMutating(false);
+    }
+  }
+
   async function onToggleLock(booking: BookingCard, field: "lock_time" | "lock_staff") {
     const cid = mutationCourseId(booking);
     if (!cid) return;
@@ -1743,6 +1757,8 @@ export function TimetablePage() {
                   onToggleLock={editable ? onToggleLock : undefined}
                   onAlternateMove={editable ? onAlternateMove : undefined}
                   onDismissViolation={showAlerts ? onDismissViolation : undefined}
+                  onSetClassColour={editable ? onSetClassColour : undefined}
+                  colourByClass={colourByClass}
                 />
               )
             )}
