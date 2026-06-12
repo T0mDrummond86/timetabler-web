@@ -11,6 +11,33 @@ from .booking_sessions import (
 from .models import Booking
 
 
+def _term_flags(b: Booking) -> tuple[bool, bool]:
+    return bool(getattr(b, "in_term_1", 1)), bool(getattr(b, "in_term_2", 1))
+
+
+def _placement_key(b: Booking) -> tuple[int, int, int, int, int]:
+    t1, t2 = _term_flags(b)
+    return (int(b.day), int(b.start_slot), int(b.end_slot), int(t1), int(t2))
+
+
+def are_semester_week_variants(group: list[Booking]) -> bool:
+    """True when rows are alternate semester-week schedules, not concurrent placements."""
+    if len(group) <= 1:
+        return False
+    for i, a in enumerate(group):
+        weeks_a = set(active_session_weeks(a))
+        terms_a = _term_flags(a)
+        for b in group[i + 1 :]:
+            weeks_b = set(active_session_weeks(b))
+            terms_b = _term_flags(b)
+            if weeks_a & weeks_b:
+                if _placement_key(a) != _placement_key(b):
+                    return False
+            elif terms_a != terms_b:
+                return False
+    return True
+
+
 def schedule_group_key(b: Booking) -> tuple[int, int]:
     """(unit_id, session_part) — bookings sharing this are one class on a course."""
     return (int(b.unit_id or 0), int(getattr(b, "session_part", 1) or 1))
@@ -45,7 +72,10 @@ def booking_owning_week(bookings: list[Booking], week: int) -> Booking:
 
 
 def has_schedule_variants(bookings: Iterable[Booking]) -> bool:
-    return any(len(g) > 1 for g in group_schedule_bookings(bookings).values())
+    return any(
+        len(g) > 1 and are_semester_week_variants(g)
+        for g in group_schedule_bookings(bookings).values()
+    )
 
 
 def variant_week_buttons(bookings: Iterable[Booking]) -> list[tuple[str, int]]:
@@ -54,6 +84,8 @@ def variant_week_buttons(bookings: Iterable[Booking]) -> list[tuple[str, int]]:
     out: list[tuple[str, int]] = []
     for group in group_schedule_bookings(bookings).values():
         if len(group) <= 1:
+            continue
+        if not are_semester_week_variants(group):
             continue
         primary = primary_booking(group)
         for b in group:
@@ -77,12 +109,19 @@ def apply_schedule_display_filter(
     semester_week: int | None = None,
     standard_only: bool = False,
 ) -> list[Booking]:
-    """One placecard per class: primary schedule, or the row active in ``semester_week``."""
+    """One placecard per class variant group, or every concurrent placement."""
     groups = group_schedule_bookings(bookings)
-    if standard_only or semester_week is None:
-        return [primary_booking(g) for g in groups.values()]
     result: list[Booking] = []
     for group in groups.values():
+        if len(group) == 1:
+            result.append(group[0])
+            continue
+        if not are_semester_week_variants(group):
+            result.extend(group)
+            continue
+        if standard_only or semester_week is None:
+            result.append(primary_booking(group))
+            continue
         b = booking_for_semester_week(group, semester_week)
         if b is not None:
             result.append(b)

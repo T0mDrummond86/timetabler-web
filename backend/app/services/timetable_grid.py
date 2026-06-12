@@ -18,12 +18,18 @@ from timetable.core.staff_hours import room_is_online
 from timetable.core.class_colour import booking_colour_key
 from timetable.core.class_colour_overrides import build_screen_colour_map
 from timetable.core.models import Booking, Course, Room, Semester, Staff, StaffAvailability, Unit, Week
+from timetable.core.placecard_layout import PlacecardRect, layout_column_bookings
 from timetable.core.schedule_variants import apply_schedule_display_filter, variant_week_buttons
 from timetable.core.tenancy_models import TimetableSession
 from timetable.core.unassigned_lecturer import bookings_without_lecturer
-from timetable.core.validation import Severity, _iter_violations
+from timetable.core.validation import Severity
 
 from ..colours import class_colours
+from .violation_cache import (
+    ClashDetectMode,
+    filter_violations_for_bookings,
+    resolve_week_violations,
+)
 from .violation_dismissals import apply_dismissals_to_map, dismissed_keys
 
 ColumnKind = Literal["day", "room", "staff"]
@@ -51,6 +57,7 @@ def _violations_by_booking_id(violations) -> dict[int, list]:
 
 
 def _assign_lanes(bookings: list[Booking]) -> tuple[dict[int, int], int]:
+    """Legacy lane assignment kept for tests; prefer layout_column_bookings."""
     from timetable.core.validation import bookings_need_separate_lanes
 
     sorted_b = sorted(bookings, key=lambda b: (b.start_slot, b.end_slot))
@@ -78,6 +85,22 @@ def _lane_depth_for_booking(booking: Booking, all_col: list[Booking]) -> int:
         _, n_at = _assign_lanes(active)
         depth = max(depth, n_at)
     return depth
+
+
+def _legacy_lane_geometry(
+    b: Booking,
+    col_bookings: list[Booking],
+    layouts: dict[int, PlacecardRect],
+) -> tuple[int, int, float, float]:
+    rect = layouts.get(b.id)
+    if rect is not None:
+        return 0, 1, rect.left_pct, rect.width_pct
+    lane_index, _ = _assign_lanes(col_bookings)
+    depth = _lane_depth_for_booking(b, col_bookings)
+    lane = lane_index.get(b.id, 0)
+    width_pct = 100.0 / depth
+    left_pct = lane * width_pct
+    return lane, depth, left_pct, width_pct
 
 
 def get_repeating_week(db: Session, timetable_session_id: int) -> Week | None:
@@ -183,6 +206,8 @@ def _booking_card(
     column: int,
     lane: int,
     lane_depth: int,
+    layout_left_pct: float,
+    layout_width_pct: float,
     v_by_booking: dict,
     hard_ids: set[int],
     soft_ids: set[int],
@@ -204,6 +229,8 @@ def _booking_card(
         "end_slot": b.end_slot,
         "lane": lane,
         "lane_depth": lane_depth,
+        "layout_left_pct": layout_left_pct,
+        "layout_width_pct": layout_width_pct,
         "unit_name": b.unit.name if b.unit else None,
         "course_code": b.course.code if b.course else None,
         "staff_name": staff_name,
@@ -270,8 +297,14 @@ def _build_grid_payload(
     staff_hours: float | None = None,
     colour_by_class: bool = True,
     hide_dismissed: bool = True,
+    clash_detect: ClashDetectMode = "auto",
 ) -> dict:
-    violations = list(_iter_violations(db, bookings))
+    violations = filter_violations_for_bookings(
+        resolve_week_violations(
+            db, week.id, clash_detect, timetable_session_id=timetable_session_id
+        ),
+        bookings,
+    )
     dismissed = dismissed_keys(db, timetable_session_id=timetable_session_id) if hide_dismissed else set()
     v_by_booking_raw = _violations_by_booking_id(violations)
     v_by_booking = apply_dismissals_to_map(dismissed, v_by_booking_raw) if dismissed else v_by_booking_raw
@@ -328,15 +361,18 @@ def _build_grid_payload(
         col_bookings = by_column.get(col_idx, [])
         if not col_bookings:
             continue
-        lane_index, _ = _assign_lanes(col_bookings)
+        layouts = layout_column_bookings(col_bookings)
         for b in col_bookings:
+            lane, depth, left_pct, width_pct = _legacy_lane_geometry(b, col_bookings, layouts)
             cards.append(
                 _booking_card(
                     b,
                     view=view,
                     column=col_idx,
-                    lane=lane_index.get(b.id, 0),
-                    lane_depth=_lane_depth_for_booking(b, col_bookings),
+                    lane=lane,
+                    lane_depth=depth,
+                    layout_left_pct=left_pct,
+                    layout_width_pct=width_pct,
                     v_by_booking=v_by_booking,
                     hard_ids=hard_ids,
                     soft_ids=soft_ids,
@@ -475,6 +511,7 @@ def build_course_timetable(
     view: str = "course",
     colour_by_class: bool = True,
     hide_dismissed: bool = True,
+    clash_detect: ClashDetectMode = "auto",
 ) -> dict:
     course = (
         db.query(Course)
@@ -512,6 +549,7 @@ def build_course_timetable(
         preview_semester_week=preview,
         colour_by_class=colour_by_class,
         hide_dismissed=hide_dismissed,
+        clash_detect=clash_detect,
     )
 
 
@@ -522,6 +560,7 @@ def build_staff_timetable(
     staff_id: int,
     colour_by_class: bool = True,
     hide_dismissed: bool = True,
+    clash_detect: ClashDetectMode = "auto",
 ) -> dict:
     staff = (
         db.query(Staff)
@@ -560,6 +599,7 @@ def build_staff_timetable(
         staff_hours=hours,
         colour_by_class=colour_by_class,
         hide_dismissed=hide_dismissed,
+        clash_detect=clash_detect,
     )
 
 
@@ -570,6 +610,7 @@ def build_room_timetable(
     day: int,
     colour_by_class: bool = True,
     hide_dismissed: bool = True,
+    clash_detect: ClashDetectMode = "auto",
 ) -> dict:
     if day < 0 or day >= NUM_DAYS:
         raise ValueError(f"day must be 0–{NUM_DAYS - 1}")
@@ -599,6 +640,7 @@ def build_room_timetable(
         focus_day=day,
         colour_by_class=colour_by_class,
         hide_dismissed=hide_dismissed,
+        clash_detect=clash_detect,
     )
 
 
@@ -609,6 +651,7 @@ def build_day_timetable(
     day: int,
     colour_by_class: bool = True,
     hide_dismissed: bool = True,
+    clash_detect: ClashDetectMode = "auto",
 ) -> dict:
     if day < 0 or day >= NUM_DAYS:
         raise ValueError(f"day must be 0–{NUM_DAYS - 1}")
@@ -643,6 +686,7 @@ def build_day_timetable(
         readonly=True,
         colour_by_class=colour_by_class,
         hide_dismissed=hide_dismissed,
+        clash_detect=clash_detect,
     )
 
 
@@ -652,6 +696,7 @@ def build_unassigned_timetable(
     timetable_session_id: int,
     colour_by_class: bool = True,
     hide_dismissed: bool = True,
+    clash_detect: ClashDetectMode = "auto",
 ) -> dict:
     week = get_repeating_week(db, timetable_session_id)
     if week is None:
@@ -669,6 +714,7 @@ def build_unassigned_timetable(
         column_kind="day",
         colour_by_class=colour_by_class,
         hide_dismissed=hide_dismissed,
+        clash_detect=clash_detect,
     )
 
 
@@ -679,6 +725,7 @@ def build_co_teach_timetable(
     course_id: int,
     colour_by_class: bool = True,
     hide_dismissed: bool = True,
+    clash_detect: ClashDetectMode = "auto",
 ) -> dict:
     return build_course_timetable(
         db,
@@ -687,6 +734,7 @@ def build_co_teach_timetable(
         view="co_teach",
         colour_by_class=colour_by_class,
         hide_dismissed=hide_dismissed,
+        clash_detect=clash_detect,
     )
 
 
@@ -698,6 +746,7 @@ def build_block_delivery_timetable(
     block_week_index: int,
     colour_by_class: bool = True,
     hide_dismissed: bool = True,
+    clash_detect: ClashDetectMode = "auto",
 ) -> dict:
     course = (
         db.query(Course)
@@ -733,6 +782,7 @@ def build_block_delivery_timetable(
         block_week_index=block_week_index,
         colour_by_class=colour_by_class,
         hide_dismissed=hide_dismissed,
+        clash_detect=clash_detect,
     )
 
 
@@ -748,6 +798,7 @@ def build_timetable(
     block_week_index: int | None = None,
     colour_by_class: bool = True,
     hide_dismissed: bool = True,
+    clash_detect: ClashDetectMode = "auto",
 ) -> dict:
     if view not in VALID_VIEWS:
         raise ValueError(f"Unknown view: {view}")
@@ -765,6 +816,7 @@ def build_timetable(
                 course_id=course_id,
                 colour_by_class=colour_by_class,
                 hide_dismissed=hide_dismissed,
+                clash_detect=clash_detect,
             )
         return build_course_timetable(
             db,
@@ -774,6 +826,7 @@ def build_timetable(
             view=view,
             colour_by_class=colour_by_class,
             hide_dismissed=hide_dismissed,
+            clash_detect=clash_detect,
         )
     if view == "staff":
         if staff_id is None:
@@ -784,6 +837,7 @@ def build_timetable(
             staff_id=staff_id,
             colour_by_class=colour_by_class,
             hide_dismissed=hide_dismissed,
+            clash_detect=clash_detect,
         )
     if view == "room":
         d = 0 if day is None else day
@@ -793,6 +847,7 @@ def build_timetable(
             day=d,
             colour_by_class=colour_by_class,
             hide_dismissed=hide_dismissed,
+            clash_detect=clash_detect,
         )
     if view == "day":
         if day is None:
@@ -803,6 +858,7 @@ def build_timetable(
             day=day,
             colour_by_class=colour_by_class,
             hide_dismissed=hide_dismissed,
+            clash_detect=clash_detect,
         )
     if view == "unassigned_lecturer":
         return build_unassigned_timetable(
@@ -810,6 +866,7 @@ def build_timetable(
             timetable_session_id=timetable_session_id,
             colour_by_class=colour_by_class,
             hide_dismissed=hide_dismissed,
+            clash_detect=clash_detect,
         )
     if view == "block_delivery":
         if course_id is None:
@@ -823,5 +880,6 @@ def build_timetable(
             block_week_index=block_week_index,
             colour_by_class=colour_by_class,
             hide_dismissed=hide_dismissed,
+            clash_detect=clash_detect,
         )
     raise ValueError(f"Unhandled view: {view}")

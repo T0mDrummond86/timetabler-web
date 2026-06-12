@@ -27,6 +27,8 @@ from timetable.core.models import (
 )
 from timetable.core.tenancy_models import TimetableSession
 from timetable.core.unit_brackets import apply_unit_bracket_fields_from_names
+
+from .violation_cache import invalidate_session_violations
 from timetable.io.backup_payload import PAYLOAD_VERSION, _prepare_units_for_restore
 
 from .session_seed import seed_timetable_session_data
@@ -651,5 +653,6 @@ def duplicate_timetable_session(
     seed_timetable_session_data(db, row)
     restore_session(db, row.id, payload)
     db.commit()
+    invalidate_session_violations(db, row.id)
     db.refresh(row)
     return row

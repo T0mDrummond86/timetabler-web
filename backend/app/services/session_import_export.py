@@ -10,14 +10,20 @@ from sqlalchemy.orm import Session
 from timetable.io.backup_payload import read_backup_payload
 
 from .session_data import restore_session, serialize_session
+from .violation_cache import invalidate_session_violations
 from .violation_dismissals import clear_all_dismissals
+
+
+def _commit_booking_changes(db: Session, timetable_session_id: int) -> None:
+    db.commit()
+    invalidate_session_violations(db, timetable_session_id)
 
 
 def import_workbook(db: Session, timetable_session_id: int, file_path: str) -> dict[str, int | str]:
     payload = read_backup_payload(file_path)
     counts = restore_session(db, timetable_session_id, payload)
     clear_all_dismissals(db, timetable_session_id=timetable_session_id)
-    db.commit()
+    _commit_booking_changes(db, timetable_session_id)
     return {**counts, "source": "xlsm"}
 
 
@@ -101,7 +107,7 @@ def import_asc_export_workbook(db: Session, timetable_session_id: int, file_path
     try:
         rep = import_asc_export(db, file_path, timetable_session_id=timetable_session_id)
         clear_all_dismissals(db, timetable_session_id=timetable_session_id)
-        db.commit()
+        _commit_booking_changes(db, timetable_session_id)
     except Exception:
         db.rollback()
         raise
@@ -143,7 +149,7 @@ def import_overall_visual_workbook(db: Session, timetable_session_id: int, file_
 
     rep = import_overall_visual(db, file_path, timetable_session_id=timetable_session_id)
     clear_all_dismissals(db, timetable_session_id=timetable_session_id)
-    db.commit()
+    _commit_booking_changes(db, timetable_session_id)
     return {
         "bookings_written": rep.bookings_created,
         "courses_created": rep.courses_touched,
@@ -162,7 +168,7 @@ def import_admin_visual_workbook(db: Session, timetable_session_id: int, file_pa
     try:
         rep = import_admin_visual(db, file_path, timetable_session_id=timetable_session_id)
         clear_all_dismissals(db, timetable_session_id=timetable_session_id)
-        db.commit()
+        _commit_booking_changes(db, timetable_session_id)
     except Exception:
         db.rollback()
         raise
@@ -182,7 +188,7 @@ def import_json_payload(
     db: Session, timetable_session_id: int, payload: dict
 ) -> dict[str, int | str]:
     counts = restore_session(db, timetable_session_id, payload)
-    db.commit()
+    _commit_booking_changes(db, timetable_session_id)
     return {**counts, "source": "json"}
 
 

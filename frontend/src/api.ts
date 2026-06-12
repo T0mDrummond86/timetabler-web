@@ -11,6 +11,7 @@ import {
   TimetableGrid,
   TimetableView,
   ViolationsReport,
+  ClashCheckSetting,
 } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
@@ -230,6 +231,7 @@ function timetablePath(
     blockWeekIndex?: number | null;
     colourByClass?: boolean;
     hideDismissed?: boolean;
+    clashDetect?: "auto" | "off" | "once";
   },
 ): string {
   const params = new URLSearchParams();
@@ -238,6 +240,9 @@ function timetablePath(
 
   if (opts.colourByClass === false) params.set("colour_by_class", "false");
   if (opts.hideDismissed === false) params.set("hide_dismissed", "false");
+  if (opts.clashDetect && opts.clashDetect !== "auto") {
+    params.set("clash_detect", opts.clashDetect);
+  }
 
   const courseViews: TimetableView[] = ["course", "course_semester", "block_delivery"];
   if (courseViews.includes(view) && opts.courseId != null) {
@@ -392,6 +397,7 @@ export const api = {
       blockWeekIndex?: number | null;
       colourByClass?: boolean;
       hideDismissed?: boolean;
+      clashDetect?: "auto" | "off" | "once";
     },
   ) => apiFetch<TimetableGrid>(timetablePath(sessionId, opts)),
 
@@ -693,6 +699,20 @@ export const api = {
       `/sessions/${sessionId}/violations-report${q ? `?${q}` : ""}`,
     );
   },
+
+  clashSettings: (sessionId: number) =>
+    apiFetch<ClashCheckSetting[]>(`/sessions/${sessionId}/clash-settings`),
+
+  patchClashSettings: (sessionId: number, settings: Record<string, boolean>) =>
+    apiFetch<ClashCheckSetting[]>(`/sessions/${sessionId}/clash-settings`, {
+      method: "PATCH",
+      body: JSON.stringify({ settings }),
+    }),
+
+  resetClashSettings: (sessionId: number) =>
+    apiFetch<ClashCheckSetting[]>(`/sessions/${sessionId}/clash-settings/reset`, {
+      method: "POST",
+    }),
 
   sidebarOrder: (sessionId: number, body: { view: "course" | "staff"; entity_ids: number[] }) =>
     apiFetch<{ ok: boolean }>(`/sessions/${sessionId}/sidebar-order`, {

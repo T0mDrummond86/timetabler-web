@@ -1,6 +1,8 @@
 """Staff hours across linked global sessions (same lecturer name)."""
 from __future__ import annotations
 
+from collections import defaultdict
+
 from sqlalchemy.orm import Session, joinedload
 
 from timetable.core.models import (
@@ -284,6 +286,15 @@ def staff_hours_snapshot_for_staff_linked(db: Session, staff: Staff) -> StaffHou
     """Hours snapshot including timetabled load from every linked session copy of this lecturer."""
     bookings = bookings_for_linked_staff(db, staff)
     peers = linked_peer_staff(db, staff)
+    return _hours_snapshot_for_staff_with_bookings(db, staff, peers, bookings)
+
+
+def _hours_snapshot_for_staff_with_bookings(
+    db: Session,
+    staff: Staff,
+    peers: list[Staff],
+    bookings: list[Booking],
+) -> StaffHoursSnapshot:
     unit_qual_ids = load_unit_qualification_ids(db)
     qual_student_totals, unit_student_totals = _merged_online_student_totals(
         db,
@@ -291,7 +302,6 @@ def staff_hours_snapshot_for_staff_linked(db: Session, staff: Staff) -> StaffHou
         bookings=bookings,
     )
     legacy_default = resolve_default_online_students_per_class(staff)
-    # Bookings are already scoped to linked peers; do not filter again by this row's id.
     return staff_hours_snapshot_for_bookings(
         bookings,
         staff_id=None,
@@ -302,12 +312,106 @@ def staff_hours_snapshot_for_staff_linked(db: Session, staff: Staff) -> StaffHou
     )
 
 
+def staff_tab_total_hours_map_for_session(
+    db: Session,
+    timetable_session_id: int,
+    *,
+    staff_rows: list[Staff] | None = None,
+) -> dict[int, float]:
+    """Batch Staff-tab totals for one session (sidebar labels).
+
+    Computes hours in one pass instead of reloading all bookings per lecturer.
+    """
+    from timetable.core.staff_hours import (
+        staff_tab_total_hours,
+        staff_tab_total_hours_by_staff_id,
+    )
+    from timetable.core.sidebar_order import ordered_staff
+
+    if staff_rows is None:
+        staff_rows = [s for s in ordered_staff(db) if s.timetable_session_id == timetable_session_id]
+    if not staff_rows:
+        return {}
+
+    if _global_session_for_timetable(db, timetable_session_id) is None:
+        try:
+            all_totals = staff_tab_total_hours_by_staff_id(db)
+        except Exception:
+            return {s.id: 0.0 for s in staff_rows}
+        return {s.id: all_totals.get(s.id, 0.0) for s in staff_rows}
+
+    gs = _global_session_for_timetable(db, timetable_session_id)
+    if gs is None:
+        return {s.id: 0.0 for s in staff_rows}
+    session_ids = _member_session_ids(db, gs.id)
+    if not session_ids:
+        return {s.id: 0.0 for s in staff_rows}
+
+    week_ids = [
+        int(wid)
+        for (wid,) in db.query(Week.id)
+        .join(Semester, Week.semester_id == Semester.id)
+        .filter(Semester.timetable_session_id.in_(session_ids))
+        .all()
+    ]
+    all_bookings: list[Booking] = []
+    if week_ids:
+        all_bookings = (
+            db.query(Booking)
+            .options(
+                joinedload(Booking.room),
+                joinedload(Booking.unit),
+                joinedload(Booking.course),
+            )
+            .filter(Booking.week_id.in_(week_ids))
+            .all()
+        )
+
+    from timetable.core.booking_staff import timetable_staff_ids
+
+    bookings_by_staff: dict[int, list[Booking]] = defaultdict(list)
+    seen_for_staff: dict[int, set[int]] = defaultdict(set)
+    for booking in all_bookings:
+        bid = booking.id
+        for sid in timetable_staff_ids(booking):
+            if bid in seen_for_staff[sid]:
+                continue
+            seen_for_staff[sid].add(bid)
+            bookings_by_staff[sid].append(booking)
+
+    all_peers = db.query(Staff).filter(Staff.timetable_session_id.in_(session_ids)).all()
+    peers_by_name: dict[str, list[Staff]] = defaultdict(list)
+    for peer in all_peers:
+        key = _normalize_staff_name(peer.name)
+        if key:
+            peers_by_name[key].append(peer)
+
+    out: dict[int, float] = {}
+    for staff in staff_rows:
+        key = _normalize_staff_name(staff.name)
+        peers = peers_by_name.get(key, [staff])
+        peer_ids = {p.id for p in peers}
+        merged: list[Booking] = []
+        seen_booking: set[int] = set()
+        for peer_id in peer_ids:
+            for booking in bookings_by_staff.get(peer_id, []):
+                if booking.id in seen_booking:
+                    continue
+                seen_booking.add(booking.id)
+                merged.append(booking)
+        snap = _hours_snapshot_for_staff_with_bookings(db, staff, peers, merged)
+        out[staff.id] = staff_tab_total_hours(staff, snap)
+    return out
+
+
 def staff_tab_total_hours_for_staff(db: Session, staff: Staff) -> float:
     """Staff-tab total hours, including bookings from all linked sessions when applicable."""
-    from timetable.core.staff_hours import staff_tab_total_hours
-
-    snap = staff_hours_snapshot_for_staff(db, staff)
-    return staff_tab_total_hours(staff, snap)
+    totals = staff_tab_total_hours_map_for_session(
+        db,
+        staff.timetable_session_id,
+        staff_rows=[staff],
+    )
+    return totals.get(staff.id, 0.0)
 
 
 def staff_hours_snapshot_for_staff(db: Session, staff: Staff) -> StaffHoursSnapshot:

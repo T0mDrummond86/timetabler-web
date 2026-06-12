@@ -5,9 +5,12 @@ from sqlalchemy.orm import Session, joinedload
 
 from timetable.constants import DAYS, NUM_SLOTS, slot_to_time
 from timetable.core.models import Booking, Week
-from timetable.core.validation import Severity, validate_bookings
+from timetable.core.clash_check_settings import filter_violations_by_clash_settings, load_clash_check_settings
+from timetable.core.tenancy_models import TimetableSession
+from timetable.core.validation import Severity
 
 from .timetable_grid import get_repeating_week
+from .violation_cache import get_week_violations
 
 HEADERS = (
     "severity",
@@ -69,7 +72,12 @@ def violations_report(
     if week is None:
         return {"summary": "No repeating week", "rows": [], "headers": list(HEADERS)}
 
-    violations = validate_bookings(db, week.id)
+    violations = get_week_violations(db, week.id)
+    session_row = db.get(TimetableSession, timetable_session_id)
+    if session_row is not None:
+        violations = filter_violations_by_clash_settings(
+            violations, load_clash_check_settings(session_row)
+        )
     if severity == "hard":
         violations = [v for v in violations if v.severity == Severity.HARD]
     elif severity == "soft":

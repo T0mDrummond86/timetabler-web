@@ -92,6 +92,7 @@ def session_timetable(
     block_week_index: int | None = Query(default=None, ge=1, le=3),
     colour_by_class: bool = Query(default=True),
     hide_dismissed: bool = Query(default=True),
+    clash_detect: str = Query(default="auto", pattern="^(auto|off|once)$"),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
     try:
@@ -106,6 +107,7 @@ def session_timetable(
             block_week_index=block_week_index,
             colour_by_class=colour_by_class,
             hide_dismissed=hide_dismissed,
+            clash_detect=clash_detect,  # type: ignore[arg-type]
         )
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

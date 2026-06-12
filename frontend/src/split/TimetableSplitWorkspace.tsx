@@ -31,23 +31,10 @@ import {
 import { notifySessionChanged, useSessionSync } from "../lib/sessionSync";
 import { useConfirmPrompt } from "../hooks/useConfirmPrompt";
 
-const DISPLAY_STORAGE_KEY = "timetabler-display";
+import { clashDetectForPrefs, readDisplayPrefs } from "../lib/displayPrefs";
+
 const COURSE_VIEWS = COURSE_VIEW_KINDS;
 const SEMESTER_WEEKS = 52;
-
-function readDisplayPrefs(): { colourByClass: boolean; showAlerts: boolean } {
-  try {
-    const raw = localStorage.getItem(DISPLAY_STORAGE_KEY);
-    if (!raw) return { colourByClass: true, showAlerts: true };
-    const parsed = JSON.parse(raw) as { colourByClass?: boolean; showAlerts?: boolean };
-    return {
-      colourByClass: parsed.colourByClass !== false,
-      showAlerts: parsed.showAlerts !== false,
-    };
-  } catch {
-    return { colourByClass: true, showAlerts: true };
-  }
-}
 
 async function defaultIdsForView(
   sessionId: number,
@@ -86,7 +73,7 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
   const [sidebarEntities, setSidebarEntities] = useState<TimetableEntity[]>([]);
   const [sidebarFilter, setSidebarFilter] = useState("");
   const [gridZoom, setGridZoom] = useState(DEFAULT_GRID_ZOOM);
-  const [{ colourByClass, showAlerts }] = useState(readDisplayPrefs);
+  const [{ colourByClass, showAlerts, autoClashDetect }] = useState(readDisplayPrefs);
   const [blockPanel, setBlockPanel] = useState<Awaited<ReturnType<typeof api.blockDeliveryPanel>> | null>(
     null,
   );
@@ -552,6 +539,7 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
                 isActive={slotIdx === activeIndex}
                 colourByClass={colourByClass}
                 showAlerts={showAlerts}
+                autoClashDetect={autoClashDetect}
                 gridZoom={gridZoom}
                 onActivate={() => activateSlot(slotIdx)}
                 refreshToken={refreshTokens[slotIdx] ?? 0}

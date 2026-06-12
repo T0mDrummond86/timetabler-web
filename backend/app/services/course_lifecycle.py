@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 from timetable.core.models import Booking, Course
 from timetable.core.sidebar_order import next_course_sidebar_order
 
+from .violation_cache import invalidate_session_violations
+
 
 class CourseDuplicateError(ValueError):
     pass
@@ -106,6 +108,7 @@ def duplicate_course(
         db.add(nb)
         db.flush()
         cloned_ids.append(nb.id)
+    invalidate_session_violations(db, timetable_session_id)
     return new_course, cloned_ids
 
 
@@ -121,4 +124,5 @@ def delete_course(db: Session, *, timetable_session_id: int, course_id: int) -> 
     db.query(Booking).filter(Booking.course_id == course_id).delete(synchronize_session=False)
     db.delete(course)
     db.flush()
+    invalidate_session_violations(db, timetable_session_id)
     return code

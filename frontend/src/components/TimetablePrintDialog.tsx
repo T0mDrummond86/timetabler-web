@@ -104,8 +104,8 @@ export function TimetablePrintDialog({ sessionId, colourByClass: _colourByClass,
         <p className="muted timetable-print-hint">
           All timetables are selected by default. Class colours are always used in PDF print so
           each class appears in a distinct fill (matching the &quot;Class colours&quot; display
-          setting). Violations show as coloured borders, not grey/pink fills. Use the index page
-          or PDF bookmarks to jump between timetables.
+          setting). Placecards use thin black borders. Use the index page or PDF bookmarks to jump
+          between timetables.
         </p>
 
         <fieldset className="timetable-print-kinds">

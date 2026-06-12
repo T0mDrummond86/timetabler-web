@@ -36,13 +36,14 @@ Behaviour
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import time
 from pathlib import Path
 import re
 
 from openpyxl import load_workbook
 from sqlalchemy.orm import Session
 
-from ..constants import DAYS, NUM_SLOTS
+from ..constants import DAYS, NUM_SLOTS, time_to_slot
 from ..core.models import (
     Booking,
     Course,
@@ -581,9 +582,30 @@ def _extract_all_schedule_blocks(
     return blocks
 
 
-def _asc_periods_to_slots(start_period: int, end_period: int) -> tuple[int, int] | None:
-    start_slot = start_period - 1
-    end_slot = end_period
+def _parse_asc_time(raw: str) -> time:
+    text = str(raw).strip()
+    hour, minute = text.split(":", 1)
+    return time(int(hour), int(minute))
+
+
+def _asc_periods_to_slots(
+    start_period: int,
+    end_period: int,
+    *,
+    period_map: dict[int, tuple[int, int]] | None = None,
+) -> tuple[int, int] | None:
+    """Map aSc period numbers to app slot indices.
+
+    aSc period 1 is normally the first teaching period (often 8:30, slot 1 in our
+    08:00-based grid). When ``period_map`` is supplied (from XML ``<periods>``),
+    start/end times from the export are used directly.
+    """
+    if period_map and start_period in period_map and end_period in period_map:
+        start_slot = period_map[start_period][0]
+        end_slot = period_map[end_period][1]
+    else:
+        start_slot = start_period
+        end_slot = end_period + 1
     if start_slot < 0 or start_slot >= NUM_SLOTS:
         return None
     end_slot = min(end_slot, NUM_SLOTS)

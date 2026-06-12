@@ -243,15 +243,8 @@ def _draw_page(c: canvas.Canvas, page: TimetablePrintPage) -> None:
             continue
         c.setFillColor(_hex(card.fill_hex))
         c.rect(x, y, cw, ch, fill=1, stroke=0)
-        if card.violation == "hard":
-            c.setStrokeColor(_hex("#DC2626"))
-            c.setLineWidth(2.0)
-        elif card.violation == "soft":
-            c.setStrokeColor(_hex("#D97706"))
-            c.setLineWidth(1.5)
-        else:
-            c.setStrokeColor(black)
-            c.setLineWidth(0.75)
+        c.setStrokeColor(black)
+        c.setLineWidth(0.75)
         c.rect(x, y, cw, ch, fill=0, stroke=1)
         if card.lane in ("left", "right"):
             full_x, full_y, full_w, full_h = _card_rect(

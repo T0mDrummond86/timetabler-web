@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useGridFitMetrics } from "../hooks/useGridFitMetrics";
 import { slotRangeLabel, slotToTimeLabel } from "../lib/timeUtils";
 import { BookingCard, HoldingClass, TimetableGrid } from "../types";
 import type { AlternatePlacementOption } from "../types";
@@ -9,7 +10,8 @@ import { MIME_BOOKING, MIME_PENDING } from "./HoldingAreaPanel";
 import { DEFAULT_GRID_ZOOM } from "../lib/gridZoom";
 
 export const BASE_SLOT_HEIGHT = 28;
-const HEADER_HEIGHT = 40;
+export const GRID_HEADER_HEIGHT = 40;
+const HEADER_HEIGHT = GRID_HEADER_HEIGHT;
 const TIME_GUTTER_WIDTH = 56;
 
 type Props = {
@@ -28,6 +30,8 @@ type Props = {
   onDismissViolation?: (bookingId: number, code: string) => void;
   onSetClassColour?: (unitId: number, fill: string | null) => void;
   colourByClass?: boolean;
+  /** Stretch rows to fill the grid area (full day visible, no dead space). */
+  fitToViewport?: boolean;
 };
 
 function cardTitle(b: BookingCard): string {
@@ -50,8 +54,8 @@ function cardMeta(b: BookingCard, grid: TimetableGrid): string {
 }
 
 function termBadges(b: BookingCard): string {
-  const t1 = b.in_term_1 !== false;
-  const t2 = b.in_term_2 !== false;
+  const t1 = Boolean(b.in_term_1);
+  const t2 = Boolean(b.in_term_2);
   if (t1 && t2) return "";
   if (t1) return "T1";
   if (t2) return "T2";
@@ -96,7 +100,10 @@ export function WeekGridView({
   onDismissViolation,
   onSetClassColour,
   colourByClass = true,
+  fitToViewport = false,
 }: Props) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const fit = useGridFitMetrics(scrollRef, grid.num_slots, HEADER_HEIGHT, fitToViewport);
   const [contextMenu, setContextMenu] = useState<{
     booking: BookingCard;
     x: number;
@@ -107,8 +114,16 @@ export function WeekGridView({
     className: string | null;
     currentFill: string | null;
   } | null>(null);
-  const slotHeight = Math.round(BASE_SLOT_HEIGHT * zoom);
+  const zoomScale = zoom / DEFAULT_GRID_ZOOM;
+  const slotHeight =
+    fit != null
+      ? Math.max(6, Math.round(fit.fitSlotHeight * zoomScale))
+      : Math.round(BASE_SLOT_HEIGHT * zoom);
   const gridHeight = grid.num_slots * slotHeight;
+  const needsScroll =
+    fit != null
+      ? HEADER_HEIGHT + gridHeight > fit.containerHeight + 1
+      : zoom > DEFAULT_GRID_ZOOM;
   const columnLabels = grid.columns.length ? grid.columns : grid.days;
   const numColumns = columnLabels.length;
   const minColWidth = grid.column_kind === "room" || grid.column_kind === "staff" ? 108 : 128;
@@ -192,13 +207,23 @@ export function WeekGridView({
   }
 
   return (
-    <section className="timetable-grid-panel">
-      <div className="timetable-grid-scroll">
+    <section className={`timetable-grid-panel${fitToViewport ? " timetable-grid-panel--fit" : ""}`}>
+      <div
+        ref={scrollRef}
+        className={[
+          "timetable-grid-scroll",
+          fitToViewport ? "timetable-grid-scroll--fit" : "",
+          needsScroll ? "timetable-grid-scroll--overflow" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
         <div
           className="timetable-grid"
           style={{
             gridTemplateColumns: colTemplate,
             gridTemplateRows: `${HEADER_HEIGHT}px ${gridHeight}px`,
+            ["--slot-h" as string]: `${slotHeight}px`,
           }}
         >
           <div className="grid-corner" style={{ gridRow: 1, gridColumn: 1 }} aria-hidden />
@@ -267,11 +292,15 @@ export function WeekGridView({
                 />
               ))}
 
+              {byColumn[colIdx].some(
+                (b) => Boolean(b.in_term_1) !== Boolean(b.in_term_2),
+              ) && <div className="grid-term-divider" aria-hidden />}
+
               {byColumn[colIdx].map((b) => {
                 const top = b.start_slot * slotHeight + 1;
                 const height = (b.end_slot - b.start_slot) * slotHeight - 2;
-                const widthPct = 100 / b.lane_depth;
-                const leftPct = b.lane * widthPct;
+                const widthPct = b.layout_width_pct ?? 100 / b.lane_depth;
+                const leftPct = b.layout_left_pct ?? b.lane * (100 / b.lane_depth);
                 const meta = cardMeta(b, grid);
                 const terms = termBadges(b);
                 const locked = b.lock_time || b.lock_staff;

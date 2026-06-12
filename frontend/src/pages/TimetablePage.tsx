@@ -26,6 +26,8 @@ import type {
 } from "../types";
 import { ScheduleVariantBar } from "../components/ScheduleVariantBar";
 import { ViolationsReportPanel } from "../components/ViolationsReportPanel";
+import { ClashSettingsPanel } from "../components/ClashSettingsPanel";
+import { TimetableViolationsPanel } from "../components/TimetableViolationsPanel";
 import { BlockDeliveryPanel } from "../components/BlockDeliveryPanel";
 import { BlockOverviewView } from "../components/BlockOverviewView";
 import { AppShell } from "../components/AppShell";
@@ -68,6 +70,12 @@ import {
   zoomOut,
 } from "../lib/gridZoom";
 import { notifySessionChanged, useSessionSync } from "../lib/sessionSync";
+import {
+  clashDetectForPrefs,
+  readDisplayPrefs,
+  writeDisplayPrefs,
+  type ClashDetectMode,
+} from "../lib/displayPrefs";
 
 type SessionTab =
   | "timetable"
@@ -77,6 +85,7 @@ type SessionTab =
   | "qualifications"
   | "changelog"
   | "warnings"
+  | "clash_settings"
   | "custodians"
   | "usage"
   | "lap";
@@ -96,6 +105,7 @@ type ViewState = {
 const SESSION_TABS: { id: SessionTab; label: string; secondary?: boolean }[] = [
   { id: "timetable", label: "Timetable" },
   { id: "warnings", label: "Warnings" },
+  { id: "clash_settings", label: "Clash settings" },
   { id: "changelog", label: "Change log" },
   { id: "staff", label: "Staff", secondary: true },
   { id: "rooms", label: "Rooms", secondary: true },
@@ -105,26 +115,6 @@ const SESSION_TABS: { id: SessionTab; label: string; secondary?: boolean }[] = [
   { id: "usage", label: "Usage", secondary: true },
   { id: "lap", label: "LAP creation", secondary: true },
 ];
-
-const DISPLAY_STORAGE_KEY = "timetabler-display";
-
-function readDisplayPrefs(): { colourByClass: boolean; showAlerts: boolean } {
-  try {
-    const raw = localStorage.getItem(DISPLAY_STORAGE_KEY);
-    if (!raw) return { colourByClass: true, showAlerts: true };
-    const parsed = JSON.parse(raw) as { colourByClass?: boolean; showAlerts?: boolean };
-    return {
-      colourByClass: parsed.colourByClass !== false,
-      showAlerts: parsed.showAlerts !== false,
-    };
-  } catch {
-    return { colourByClass: true, showAlerts: true };
-  }
-}
-
-function writeDisplayPrefs(prefs: { colourByClass: boolean; showAlerts: boolean }) {
-  localStorage.setItem(DISPLAY_STORAGE_KEY, JSON.stringify(prefs));
-}
 
 const SESSION_TAB_IDS = new Set<SessionTab>(SESSION_TABS.map((t) => t.id));
 const VIEW_KIND_IDS = new Set<ViewKind>([
@@ -205,6 +195,8 @@ export function TimetablePage() {
   const [auxLoading, setAuxLoading] = useState(false);
   const [colourByClass, setColourByClass] = useState(() => readDisplayPrefs().colourByClass);
   const [showAlerts, setShowAlerts] = useState(() => readDisplayPrefs().showAlerts);
+  const [autoClashDetect, setAutoClashDetect] = useState(() => readDisplayPrefs().autoClashDetect);
+  const [checkingClashes, setCheckingClashes] = useState(false);
   const [createDraft, setCreateDraft] = useState<CreateBookingDraft | null>(null);
   const externalViewsMenu = useDropdown();
   const { confirm, prompt, dialogs } = useConfirmPrompt();
@@ -214,6 +206,8 @@ export function TimetablePage() {
   const importRef = useRef<HTMLInputElement>(null);
   const colourByClassRef = useRef(colourByClass);
   colourByClassRef.current = colourByClass;
+  const autoClashDetectRef = useRef(autoClashDetect);
+  autoClashDetectRef.current = autoClashDetect;
   const urlReadyRef = useRef(false);
   const applyingUrlRef = useRef(false);
   const sessionInitIdRef = useRef<number | null>(null);
@@ -289,10 +283,18 @@ export function TimetablePage() {
     async (
       sid: number,
       state: ViewState,
-      opts?: { colourByClass?: boolean },
+      opts?: {
+        colourByClass?: boolean;
+        clashDetect?: ClashDetectMode;
+        refreshSidebar?: boolean;
+      },
     ) => {
-      await loadSidebarEntities(sid, state.viewKind);
+      const refreshSidebar = opts?.refreshSidebar !== false;
+      const sidebarTask = refreshSidebar
+        ? loadSidebarEntities(sid, state.viewKind)
+        : Promise.resolve();
 
+      const loadMain = async () => {
       if (state.viewKind === "block_overview") {
         setGrid(null);
         setSemesterSchedule(null);
@@ -381,10 +383,17 @@ export function TimetablePage() {
         timetableOpts.courseId = state.courseId;
       }
       timetableOpts.colourByClass = opts?.colourByClass ?? colourByClassRef.current;
+      timetableOpts.clashDetect = clashDetectForPrefs(
+        { autoClashDetect: autoClashDetectRef.current },
+        opts?.clashDetect,
+      );
 
       const data = await api.timetable(sid, timetableOpts);
       setGrid(data);
       await loadHoldingForView(sid, state);
+      };
+
+      await Promise.all([sidebarTask, loadMain()]);
     },
     [loadHoldingForView, loadSidebarEntities],
   );
@@ -424,8 +433,8 @@ export function TimetablePage() {
   }, [sessionId, linkedSessionIds]);
 
   useEffect(() => {
-    writeDisplayPrefs({ colourByClass, showAlerts });
-  }, [colourByClass, showAlerts]);
+    writeDisplayPrefs({ colourByClass, showAlerts, autoClashDetect });
+  }, [colourByClass, showAlerts, autoClashDetect]);
 
   const colourPrefLoaded = useRef(false);
   useEffect(() => {
@@ -654,9 +663,25 @@ export function TimetablePage() {
     gridZoom,
   ]);
 
+  function shouldRefreshSidebar(partial: Partial<ViewState>): boolean {
+    if (partial.viewKind != null) return true;
+    if (partial.qualificationId !== undefined && viewKind === "block_delivery") return true;
+    return false;
+  }
+
   async function applyViewChange(partial: Partial<ViewState>) {
     const next = { ...viewState(), ...partial };
-    setLoading(true);
+    const entityOnly =
+      partial.viewKind == null &&
+      partial.qualificationId === undefined &&
+      (partial.staffId !== undefined ||
+        partial.courseId !== undefined ||
+        partial.roomDay !== undefined ||
+        partial.blockCourseId !== undefined ||
+        partial.semesterWeek !== undefined ||
+        partial.previewSemesterWeek !== undefined ||
+        partial.blockWeekIndex !== undefined);
+    if (!entityOnly || !grid) setLoading(true);
     setUndoStack([]);
     setRedoStack([]);
     setError(null);
@@ -672,6 +697,7 @@ export function TimetablePage() {
     try {
       await loadCurrentViewRef.current(sessionId, next, {
         colourByClass: colourByClassRef.current,
+        refreshSidebar: shouldRefreshSidebar(partial),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Load failed");
@@ -1110,6 +1136,22 @@ export function TimetablePage() {
     }
   }
 
+  async function onCheckClashes() {
+    if (!sessionId) return;
+    setCheckingClashes(true);
+    setError(null);
+    try {
+      await loadCurrentViewRef.current(sessionId, viewState(), {
+        colourByClass: colourByClassRef.current,
+        clashDetect: "once",
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Clash check failed");
+    } finally {
+      setCheckingClashes(false);
+    }
+  }
+
   async function onMove(bookingId: number, column: number, startSlot: number) {
     const booking = grid?.bookings.find((b) => b.id === bookingId);
     const cid = mutationCourseId(booking);
@@ -1410,6 +1452,7 @@ export function TimetablePage() {
     <AppShell
       wide
       minimal={isEmbedded}
+      fillViewport={sessionTab === "timetable" && courses.length > 0}
       breadcrumb={
         <>
           <Link to="/dashboard">Dashboard</Link>
@@ -1581,6 +1624,18 @@ export function TimetablePage() {
           onColourByClassChange={setColourByClass}
           showAlerts={showAlerts}
           onShowAlertsChange={setShowAlerts}
+          autoClashDetect={autoClashDetect}
+          onAutoClashDetectChange={(v) => {
+            autoClashDetectRef.current = v;
+            setAutoClashDetect(v);
+            if (sessionId && sessionTab === "timetable") {
+              void loadCurrentViewRef.current(sessionId, viewState(), {
+                colourByClass: colourByClassRef.current,
+              });
+            }
+          }}
+          onCheckClashes={() => void onCheckClashes()}
+          checkingClashes={checkingClashes}
           onImport={(kind, file) => void onImportFile(kind, file)}
           onError={setError}
           importing={importing}
@@ -1592,7 +1647,7 @@ export function TimetablePage() {
       <nav className="session-tabs" aria-label="Session views">
         {SESSION_TABS.map((tab, index) => (
           <span key={tab.id} style={{ display: "contents" }}>
-            {index === 3 && <span className="session-tab-divider" aria-hidden />}
+            {index === 4 && <span className="session-tab-divider" aria-hidden />}
             <button
               type="button"
               className={`session-tab${sessionTab === tab.id ? " active" : ""}${
@@ -1635,42 +1690,44 @@ export function TimetablePage() {
           </div>
         </div>
       )}
-      {loading && sessionTab === "timetable" && !grid && viewKind !== "block_overview" && (
-        <div className="loading-state">
-          <span className="loading-dot" />
-          Loading timetable…
-        </div>
-      )}
-      {!loading && courses.length === 0 && sessionTab === "timetable" && (
-        <section className="card">
-          <h2>No timetable data</h2>
-          <p className="muted">
-            Add staff, rooms, classes, and qualifications from their tabs, or import a desktop Timetable
-            Export (.xlsm) / load demo data to begin.
-          </p>
-          <div className="row gap">
-            <input
-              ref={importRef}
-              type="file"
-              accept=".xlsm,.xlsx"
-              hidden
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void onImportFile("session", file);
-                e.target.value = "";
-              }}
-            />
-            <button type="button" className="btn-primary" onClick={() => importRef.current?.click()} disabled={importing}>
-              Import from desktop
-            </button>
-            <button type="button" className="btn-secondary" onClick={() => void onSeedDemo()} disabled={seeding}>
-              Load demo data
-            </button>
-          </div>
-        </section>
-      )}
+      {sessionTab === "timetable" && (
+        <div className="tt-page tt-page--timetable">
+          {loading && !grid && viewKind !== "block_overview" && (
+            <div className="loading-state">
+              <span className="loading-dot" />
+              Loading timetable…
+            </div>
+          )}
+          {!loading && courses.length === 0 && (
+            <section className="card">
+              <h2>No timetable data</h2>
+              <p className="muted">
+                Add staff, rooms, classes, and qualifications from their tabs, or import a desktop Timetable
+                Export (.xlsm) / load demo data to begin.
+              </p>
+              <div className="row gap">
+                <input
+                  ref={importRef}
+                  type="file"
+                  accept=".xlsm,.xlsx"
+                  hidden
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void onImportFile("session", file);
+                    e.target.value = "";
+                  }}
+                />
+                <button type="button" className="btn-primary" onClick={() => importRef.current?.click()} disabled={importing}>
+                  Import from desktop
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => void onSeedDemo()} disabled={seeding}>
+                  Load demo data
+                </button>
+              </div>
+            </section>
+          )}
 
-      {sessionTab === "timetable" && courses.length > 0 && (
+          {courses.length > 0 && (
         <div className="tt-workspace">
           <TimetableSidebar
             mode={timetableMode}
@@ -1699,6 +1756,7 @@ export function TimetablePage() {
             staffLocked={!!activeStaff?.timetable_locked}
           />
           <div className="tt-main">
+            <div className="tt-main-primary">
             {viewKind === "course" && grid?.schedule_variants && grid.schedule_variants.length > 0 && (
               <ScheduleVariantBar
                 variants={grid.schedule_variants}
@@ -1741,6 +1799,7 @@ export function TimetablePage() {
                   viewKind={viewKind}
                   editable={editable}
                   zoom={gridZoom}
+                  fitToViewport
                   showAlerts={showAlerts}
                   onMove={editable ? onMove : undefined}
                   onEdit={editable ? setEditBooking : undefined}
@@ -1762,6 +1821,7 @@ export function TimetablePage() {
                 />
               )
             )}
+            </div>
             {showsHoldingArea(viewKind) && (
               <HoldingAreaPanel
                 items={holding}
@@ -1772,23 +1832,14 @@ export function TimetablePage() {
               />
             )}
             {grid && showAlerts && grid.violations.length > 0 && (
-              <section className="panel violations-panel violations-panel--compact">
-                <div className="panel-body violations-summary">
-                  <p>
-                    <strong>{grid.violations.length}</strong> scheduling warning
-                    {grid.violations.length !== 1 ? "s" : ""} on this view.
-                  </p>
-                  <button
-                    type="button"
-                    className="btn-secondary btn-xs"
-                    onClick={() => setSessionTab("warnings")}
-                  >
-                    View all warnings
-                  </button>
-                </div>
-              </section>
+              <TimetableViolationsPanel
+                violations={grid.violations}
+                onViewAll={() => setSessionTab("warnings")}
+              />
             )}
           </div>
+        </div>
+          )}
         </div>
       )}
 
@@ -1866,6 +1917,15 @@ export function TimetablePage() {
           sessionId={sessionId}
           refreshKey={changeLogKey}
           onGoToBooking={goToWarningBooking}
+        />
+      )}
+      {sessionTab === "clash_settings" && courses.length > 0 && (
+        <ClashSettingsPanel
+          sessionId={sessionId}
+          onUpdated={() => {
+            void reloadView();
+            setChangeLogKey((k) => k + 1);
+          }}
         />
       )}
       {sessionTab === "custodians" && courses.length > 0 && (

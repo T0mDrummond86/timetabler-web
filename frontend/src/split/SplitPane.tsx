@@ -15,6 +15,7 @@ type Props = {
   isActive: boolean;
   colourByClass: boolean;
   showAlerts: boolean;
+  autoClashDetect: boolean;
   gridZoom: number;
   onActivate: () => void;
   refreshToken: number;
@@ -34,6 +35,7 @@ export function SplitPane({
   isActive,
   colourByClass,
   showAlerts,
+  autoClashDetect,
   gridZoom,
   onActivate,
   refreshToken,
@@ -108,6 +110,7 @@ export function SplitPane({
       const opts: Parameters<typeof api.timetable>[1] = {
         view: current.viewKind,
         colourByClass,
+        clashDetect: clashDetectForPrefs({ autoClashDetect }),
       };
       if (COURSE_VIEWS.includes(current.viewKind) && current.courseId) {
         opts.courseId = current.courseId;
@@ -145,6 +148,7 @@ export function SplitPane({
   }, [
     sessionId,
     colourByClass,
+    autoClashDetect,
     slot.viewKind,
     slot.courseId,
     slot.staffId,

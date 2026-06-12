@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 50 * 1024 * 1024  # 50 MB
     auth_rate_limit_requests: int = 10
     auth_rate_limit_window_seconds: int = 60
+    violations_cache_ttl_seconds: int = 3600
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

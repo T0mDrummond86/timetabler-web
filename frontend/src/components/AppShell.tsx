@@ -11,6 +11,8 @@ type Props = {
   actions?: ReactNode;
   wide?: boolean;
   minimal?: boolean;
+  /** Lock shell to viewport height (timetable grid + scrollable sidebar). */
+  fillViewport?: boolean;
 };
 
 export function AppShell({
@@ -21,9 +23,10 @@ export function AppShell({
   actions,
   wide = false,
   minimal = false,
+  fillViewport = false,
 }: Props) {
   return (
-    <div className="app-shell">
+    <div className={`app-shell${fillViewport ? " app-shell--fill" : ""}`}>
       {!minimal && (
         <header className="app-topbar">
           <div className="app-topbar-start">
@@ -38,7 +41,9 @@ export function AppShell({
         </header>
       )}
 
-      <main className={`app-main${wide ? " app-main-wide" : ""}`}>
+      <main
+        className={`app-main${wide ? " app-main-wide" : ""}${fillViewport ? " app-main--fill" : ""}`}
+      >
         {!minimal && (breadcrumb || title) && (
           <div className="page-head">
             {breadcrumb && <div className="page-breadcrumb">{breadcrumb}</div>}

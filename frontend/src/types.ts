@@ -21,6 +21,8 @@ export type BookingCard = {
   end_slot: number;
   lane: number;
   lane_depth: number;
+  layout_left_pct?: number;
+  layout_width_pct?: number;
   unit_name: string | null;
   course_code: string | null;
   staff_name: string | null;
@@ -210,6 +212,15 @@ export type ChangeLogRow = {
 export type ChangeLogList = {
   mode: "full" | "resolved";
   rows: ChangeLogRow[];
+};
+
+export type ClashCheckSetting = {
+  code: string;
+  label: string;
+  description: string;
+  category: string;
+  severity: "hard" | "soft";
+  enabled: boolean;
 };
 
 export type ViolationRow = Record<string, string> & {

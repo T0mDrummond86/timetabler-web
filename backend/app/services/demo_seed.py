@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
+from .violation_cache import invalidate_session_violations
+
 from timetable.core.models import (
     Booking,
     Course,
@@ -103,6 +105,7 @@ def seed_demo_timetable(db: Session, timetable_session_id: int) -> dict[str, int
         )
     )
     db.flush()
+    invalidate_session_violations(db, timetable_session_id)
     return {
         "course_id": course.id,
         "booking_count": 2,

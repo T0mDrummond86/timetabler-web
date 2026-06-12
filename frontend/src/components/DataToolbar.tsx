@@ -9,6 +9,10 @@ type Props = {
   onColourByClassChange: (v: boolean) => void;
   showAlerts: boolean;
   onShowAlertsChange: (v: boolean) => void;
+  autoClashDetect: boolean;
+  onAutoClashDetectChange: (v: boolean) => void;
+  onCheckClashes?: () => void;
+  checkingClashes?: boolean;
   onImport: (kind: "session" | "qualifications" | "qualifications-csp" | "qualifications-ep-nb-csp" | "asc" | "lecturer-preferences" | "overall-visual" | "admin-visual", file: File) => void;
   onError?: (message: string) => void;
   importing?: boolean;
@@ -21,6 +25,10 @@ export function DataToolbar({
   onColourByClassChange,
   showAlerts,
   onShowAlertsChange,
+  autoClashDetect,
+  onAutoClashDetectChange,
+  onCheckClashes,
+  checkingClashes = false,
   onImport,
   importing,
   showDisplay = true,
@@ -89,6 +97,25 @@ export function DataToolbar({
             />
             Alerts
           </label>
+          <label className="checkbox tt-toolbar-check" title="When off, clashes are not checked after each move — use Check clashes to run once">
+            <input
+              type="checkbox"
+              checked={autoClashDetect}
+              onChange={(e) => onAutoClashDetectChange(e.target.checked)}
+            />
+            Auto-detect clashes
+          </label>
+          {!autoClashDetect && onCheckClashes && (
+            <button
+              type="button"
+              className="btn-secondary btn-xs"
+              onClick={onCheckClashes}
+              disabled={checkingClashes}
+              title="Run one full clash check on the current week"
+            >
+              {checkingClashes ? "Checking…" : "Check clashes"}
+            </button>
+          )}
         </div>
       )}
       <div className="tt-toolbar-group">

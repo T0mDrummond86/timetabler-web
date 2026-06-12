@@ -19,6 +19,7 @@ from timetable.core.double_session import (
 from timetable.core.models import Booking, ChangeLogEntry, Course, Semester, Unit, Week
 
 from .timetable_grid import build_course_timetable, get_repeating_week
+from .violation_cache import invalidate_session_violations
 
 
 class BookingNotFoundError(LookupError):
@@ -113,6 +114,7 @@ def _mutation_result(
         after=after,
     )
     db.commit()
+    invalidate_session_violations(db, timetable_session_id)
     grid = build_course_timetable(
         db,
         timetable_session_id=timetable_session_id,

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import datetime as _dt
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .models import Base
@@ -151,6 +151,7 @@ class TimetableSession(Base):
         default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
         onupdate=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
     )
+    clash_check_settings_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     organization: Mapped[Organization] = relationship(back_populates="timetable_sessions")
     global_membership: Mapped[GlobalSessionMember | None] = relationship(

@@ -166,6 +166,8 @@ class BookingCardOut(BaseModel):
     end_slot: int
     lane: int
     lane_depth: int
+    layout_left_pct: float
+    layout_width_pct: float
     unit_name: str | None
     course_code: str | None
     staff_name: str | None
@@ -801,6 +803,19 @@ class StaffCompetenciesPatch(BaseModel):
 class ViolationDismissRequest(BaseModel):
     booking_id: int
     code: str = Field(min_length=1, max_length=80)
+
+
+class ClashCheckSettingOut(BaseModel):
+    code: str
+    label: str
+    description: str
+    category: str
+    severity: str
+    enabled: bool
+
+
+class ClashCheckSettingsPatch(BaseModel):
+    settings: dict[str, bool] = Field(default_factory=dict)
 
 
 class RoomTypeChoicesOut(BaseModel):
