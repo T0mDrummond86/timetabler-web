@@ -27,6 +27,7 @@ from .xlsm_export import (
 )
 
 PrintKind = Literal["course", "staff", "room"]
+PrintJobKind = Literal["course", "staff", "room", "course_staff"]
 PrintLane = Literal["full", "left", "right"]
 PrintTerm = Literal["t1", "t2"]
 TermLayout = Literal["full", "t1_only", "t2_only", "term_pair", "merged_online"]
@@ -60,6 +61,15 @@ class TimetablePrintPage:
     kind: PrintKind
     cards: tuple[PrintCardDraw, ...]
     unavailable_by_day: dict[int, set[int]] | None
+
+
+@dataclass(frozen=True)
+class PrintEntitySpec:
+    """One printable timetable (course, staff, or room row)."""
+
+    kind: PrintKind
+    entity_id: int
+    label: str
 
 
 def headline_for(kind: PrintKind, name: str) -> str:
@@ -399,13 +409,34 @@ def collect_print_colour_map(
     violations_cache: list | None = None,
 ) -> dict[str, str]:
     """One class→colour map for an entire print job (stable across all pages)."""
+    specs = [PrintEntitySpec(kind=kind, entity_id=eid, label="") for eid in entity_ids]
+    return collect_print_colour_map_for_entities(
+        session,
+        week_id=week_id,
+        entities=specs,
+        term_filter=term_filter,
+        colour_by_class=colour_by_class,
+        violations_cache=violations_cache,
+    )
+
+
+def collect_print_colour_map_for_entities(
+    session: Session,
+    *,
+    week_id: int,
+    entities: list[PrintEntitySpec],
+    term_filter: str,
+    colour_by_class: bool,
+    violations_cache: list | None = None,
+) -> dict[str, str]:
+    """Stable class→colour map across mixed course/staff/room pages."""
     keys: set[str] = set()
-    for entity_id in entity_ids:
+    for spec in entities:
         bookings, _, _, _ = load_entity_bookings(
             session,
             week_id=week_id,
-            kind=kind,
-            entity_id=entity_id,
+            kind=spec.kind,
+            entity_id=spec.entity_id,
             term_filter=term_filter,
             violations_cache=violations_cache,
         )
@@ -417,20 +448,24 @@ def list_print_entities(
     session: Session,
     *,
     timetable_session_id: int,
-    kind: PrintKind,
-) -> list[tuple[int, str]]:
+    kind: PrintJobKind,
+) -> list[PrintEntitySpec]:
     from ..core.sidebar_order import ordered_courses, ordered_staff
 
     if kind == "course":
         rows = ordered_courses(session, include_block_cohorts=True, timetable_session_id=timetable_session_id)
-        return [(c.id, c.code) for c in rows]
+        return [PrintEntitySpec(kind="course", entity_id=c.id, label=c.code) for c in rows]
     if kind == "staff":
         rows = ordered_staff(session, timetable_session_id=timetable_session_id)
-        return [(s.id, s.name or "(unnamed)") for s in rows]
+        return [PrintEntitySpec(kind="staff", entity_id=s.id, label=s.name or "(unnamed)") for s in rows]
+    if kind == "course_staff":
+        return list_print_entities(
+            session, timetable_session_id=timetable_session_id, kind="course"
+        ) + list_print_entities(session, timetable_session_id=timetable_session_id, kind="staff")
     rows = (
         session.query(Room)
         .filter(Room.timetable_session_id == timetable_session_id)
         .order_by(Room.code)
         .all()
     )
-    return [(r.id, r.code) for r in rows]
+    return [PrintEntitySpec(kind="room", entity_id=r.id, label=r.code) for r in rows]

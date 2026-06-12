@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type TimetablePrintEntity, type TimetablePrintKind } from "../api";
 
 type Props = {
@@ -10,14 +10,22 @@ type Props = {
 const KIND_OPTIONS: { id: TimetablePrintKind; label: string }[] = [
   { id: "course", label: "Courses (class group timetables)" },
   { id: "staff", label: "Staff timetables" },
+  { id: "course_staff", label: "Courses and staff" },
   { id: "room", label: "Room timetables" },
 ];
+
+function entityKey(entity: TimetablePrintEntity, kind: TimetablePrintKind): string {
+  if (kind === "course_staff" && entity.entity_kind) {
+    return `${entity.entity_kind}:${entity.id}`;
+  }
+  return String(entity.id);
+}
 
 export function TimetablePrintDialog({ sessionId, colourByClass: _colourByClass, onClose }: Props) {
   const [kind, setKind] = useState<TimetablePrintKind>("course");
   const [weekLabel, setWeekLabel] = useState<string | null>(null);
   const [entities, setEntities] = useState<TimetablePrintEntity[]>([]);
-  const [checked, setChecked] = useState<Set<number>>(new Set());
+  const [checked, setChecked] = useState<Set<string>>(new Set());
   const [termFilter, setTermFilter] = useState<"all" | "t1" | "t2">("all");
   const [includeIndex, setIncludeIndex] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -31,7 +39,7 @@ export function TimetablePrintDialog({ sessionId, colourByClass: _colourByClass,
       const info = await api.timetablePrintInfo(sessionId, kind);
       setWeekLabel(info.week_label);
       setEntities(info.entities);
-      setChecked(new Set(info.entities.map((e) => e.id)));
+      setChecked(new Set(info.entities.map((e) => entityKey(e, kind))));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
       setEntities([]);
@@ -45,17 +53,30 @@ export function TimetablePrintDialog({ sessionId, colourByClass: _colourByClass,
     void loadInfo();
   }, [loadInfo]);
 
-  function toggle(id: number) {
+  const groupedEntities = useMemo(() => {
+    if (kind !== "course_staff") {
+      return [{ title: null as string | null, items: entities }];
+    }
+    const courses = entities.filter((e) => e.entity_kind === "course");
+    const staff = entities.filter((e) => e.entity_kind === "staff");
+    return [
+      { title: "Courses", items: courses },
+      { title: "Staff", items: staff },
+    ].filter((section) => section.items.length > 0);
+  }, [entities, kind]);
+
+  function toggle(entity: TimetablePrintEntity) {
+    const key = entityKey(entity, kind);
     setChecked((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
 
   function selectAll() {
-    setChecked(new Set(entities.map((e) => e.id)));
+    setChecked(new Set(entities.map((e) => entityKey(e, kind))));
   }
 
   function selectNone() {
@@ -63,7 +84,7 @@ export function TimetablePrintDialog({ sessionId, colourByClass: _colourByClass,
   }
 
   async function onGenerate() {
-    const selected = entities.filter((e) => checked.has(e.id));
+    const selected = entities.filter((e) => checked.has(entityKey(e, kind)));
     if (!selected.length) {
       setError("Tick at least one timetable to print.");
       return;
@@ -76,7 +97,11 @@ export function TimetablePrintDialog({ sessionId, colourByClass: _colourByClass,
         term_filter: termFilter,
         colour_by_class: true,
         include_index: includeIndex,
-        entities: selected,
+        entities: selected.map((e) =>
+          kind === "course_staff" && e.entity_kind
+            ? { id: e.id, label: e.label, entity_kind: e.entity_kind }
+            : { id: e.id, label: e.label },
+        ),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Print failed");
@@ -157,20 +182,27 @@ export function TimetablePrintDialog({ sessionId, colourByClass: _colourByClass,
         {loading ? (
           <p className="muted">Loading…</p>
         ) : (
-          <ul className="timetable-print-list">
-            {entities.map((e) => (
-              <li key={e.id}>
-                <label className="checkbox">
-                  <input
-                    type="checkbox"
-                    checked={checked.has(e.id)}
-                    onChange={() => toggle(e.id)}
-                  />
-                  {e.label}
-                </label>
-              </li>
+          <div className="timetable-print-list">
+            {groupedEntities.map((section) => (
+              <div key={section.title ?? "all"}>
+                {section.title && <h3 className="timetable-print-section-title">{section.title}</h3>}
+                <ul>
+                  {section.items.map((e) => (
+                    <li key={entityKey(e, kind)}>
+                      <label className="checkbox">
+                        <input
+                          type="checkbox"
+                          checked={checked.has(entityKey(e, kind))}
+                          onChange={() => toggle(e)}
+                        />
+                        {e.label}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
 
         {error && <p className="error">{error}</p>}

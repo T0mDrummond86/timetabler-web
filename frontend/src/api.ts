@@ -56,9 +56,13 @@ export type TimetableGlobalLink = {
   member_session_ids?: number[];
 };
 
-export type TimetablePrintKind = "course" | "staff" | "room";
+export type TimetablePrintKind = "course" | "staff" | "room" | "course_staff";
 
-export type TimetablePrintEntity = { id: number; label: string };
+export type TimetablePrintEntity = {
+  id: number;
+  label: string;
+  entity_kind?: "course" | "staff";
+};
 
 export type TimetablePrintInfo = {
   week_label: string | null;
@@ -930,7 +934,7 @@ export const api = {
       term_filter: "all" | "t1" | "t2";
       colour_by_class: boolean;
       include_index?: boolean;
-      entities: TimetablePrintEntity[];
+      entities: Array<TimetablePrintEntity & { entity_kind?: "course" | "staff" }>;
     },
   ): Promise<void> {
     const token = getToken();

@@ -180,6 +180,7 @@ export function TimetablePage() {
   const [focusUnitId, setFocusUnitId] = useState<number | null>(null);
   const [sidebarFilter, setSidebarFilter] = useState("");
   const [changeLogKey, setChangeLogKey] = useState(0);
+  const [totalWarningCount, setTotalWarningCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
@@ -515,6 +516,19 @@ export function TimetablePage() {
     },
     linkedSessionIds,
   );
+
+  const refreshWarningCount = useCallback(async () => {
+    try {
+      const report = await api.violationsReport(sessionId);
+      setTotalWarningCount(report.rows.length);
+    } catch {
+      setTotalWarningCount(0);
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    void refreshWarningCount();
+  }, [refreshWarningCount, changeLogKey]);
 
   useEffect(() => {
     if (!getToken()) {
@@ -1446,7 +1460,7 @@ export function TimetablePage() {
     (isCourseViewKind(viewKind) || viewKind === "block_delivery");
 
   const isEmbedded = searchParams.get("embed") === "1";
-  const warningCount = grid?.violations?.length ?? 0;
+  const warningCount = totalWarningCount;
 
   return (
     <AppShell

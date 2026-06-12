@@ -382,15 +382,15 @@ def export_lecturer_prefs_template(
 @router.get("/sessions/{session_id}/print/timetables/info", response_model=TimetablePrintInfoOut)
 def print_timetables_info(
     session_id: int,
-    kind: str = Query("course", pattern="^(course|staff|room)$"),
+    kind: str = Query("course", pattern="^(course|staff|room|course_staff)$"),
     ctx: AuthContext = Depends(require_editor),
     db: Session = Depends(get_db),
 ):
     """List printable entities and current week label for the print dialog."""
     assert_session_in_org(db, session_id, ctx.organization.id)
-    from timetable.io.timetable_print_layout import PrintKind
+    from timetable.io.timetable_print_layout import PrintJobKind
 
-    pk: PrintKind = kind  # type: ignore[assignment]
+    pk: PrintJobKind = kind  # type: ignore[assignment]
     return TimetablePrintInfoOut(
         week_label=week_label_for_print(db, session_id),
         entities=print_entity_list(db, timetable_session_id=session_id, kind=pk),
@@ -406,15 +406,22 @@ def print_timetables_pdf(
 ):
     """Render selected course/staff/room timetables as a multi-page PDF (A4 landscape)."""
     assert_session_in_org(db, session_id, ctx.organization.id)
-    from timetable.io.timetable_print_layout import PrintKind
+    from timetable.io.timetable_print_layout import PrintJobKind
 
-    pk: PrintKind = body.kind  # type: ignore[assignment]
+    pk: PrintJobKind = body.kind  # type: ignore[assignment]
     try:
         content = export_print_timetables_pdf(
             db,
             timetable_session_id=session_id,
             kind=pk,
-            entities=[(e.id, e.label) for e in body.entities],
+            entities=[
+                {
+                    "id": e.id,
+                    "label": e.label,
+                    **({"entity_kind": e.entity_kind} if e.entity_kind else {}),
+                }
+                for e in body.entities
+            ],
             term_filter=body.term_filter,
             colour_by_class=body.colour_by_class,
             include_index=body.include_index,

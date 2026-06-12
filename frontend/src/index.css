@@ -3932,13 +3932,30 @@ body.staff-editor-resizing {
 }
 
 .timetable-print-list {
-  list-style: none;
   margin: 0 0 1rem;
   padding: 0;
   max-height: 280px;
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 6px;
+}
+
+.timetable-print-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.timetable-print-section-title {
+  margin: 0;
+  padding: 0.45rem 0.6rem 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border);
 }
 
 .timetable-print-list li {

@@ -136,3 +136,27 @@ def test_print_info_and_pdf(client):
         assert multi.status_code == 200
         assert b"/Outlines" in multi.content or b"/Outline" in multi.content
         assert len(multi.content) > len(pdf.content)
+
+    combo_info = test_client.get(
+        f"/sessions/{sid}/print/timetables/info?kind=course_staff", headers=headers
+    )
+    assert combo_info.status_code == 200
+    combo_entities = combo_info.json()["entities"]
+    assert combo_entities
+    assert any(e.get("entity_kind") == "course" for e in combo_entities)
+    assert any(e.get("entity_kind") == "staff" for e in combo_entities)
+
+    combo = test_client.post(
+        f"/sessions/{sid}/print/timetables",
+        headers=headers,
+        json={
+            "kind": "course_staff",
+            "term_filter": "all",
+            "colour_by_class": True,
+            "include_index": True,
+            "entities": combo_entities[: min(3, len(combo_entities))],
+        },
+    )
+    assert combo.status_code == 200, combo.text
+    assert combo.content[:4] == b"%PDF"
+    assert len(combo.content) > 500

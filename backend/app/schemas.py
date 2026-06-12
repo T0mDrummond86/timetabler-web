@@ -825,6 +825,7 @@ class RoomTypeChoicesOut(BaseModel):
 class TimetablePrintEntityOut(BaseModel):
     id: int
     label: str
+    entity_kind: str | None = None
 
 
 class TimetablePrintInfoOut(BaseModel):
@@ -835,10 +836,11 @@ class TimetablePrintInfoOut(BaseModel):
 class TimetablePrintEntityIn(BaseModel):
     id: int
     label: str = Field(min_length=1, max_length=200)
+    entity_kind: str | None = Field(default=None, pattern="^(course|staff)$")
 
 
 class TimetablePrintRequest(BaseModel):
-    kind: str = Field(pattern="^(course|staff|room)$")
+    kind: str = Field(pattern="^(course|staff|room|course_staff)$")
     term_filter: str = Field(default="all", pattern="^(all|t1|t2)$")
     colour_by_class: bool = True
     include_index: bool = True

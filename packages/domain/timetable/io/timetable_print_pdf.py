@@ -14,18 +14,26 @@ from reportlab.pdfgen import canvas
 
 from ..constants import DAYS, NUM_DAYS, NUM_SLOTS, slot_to_time
 from .timetable_print_layout import (
+    PrintEntitySpec,
+    PrintJobKind,
     PrintKind,
     TimetablePrintPage,
     build_print_page,
-    collect_print_colour_map,
+    collect_print_colour_map_for_entities,
 )
 
 PAGE_SIZE = landscape(A4)
 _INDEX_BOOKMARK = "timetable_index"
-_KIND_INDEX_TITLE = {
+_KIND_INDEX_TITLE: dict[PrintJobKind, str] = {
     "course": "Course timetables",
     "staff": "Staff timetables",
     "room": "Room timetables",
+    "course_staff": "Course & staff timetables",
+}
+_SECTION_INDEX_TITLE: dict[PrintKind, str] = {
+    "course": "Courses",
+    "staff": "Staff",
+    "room": "Rooms",
 }
 _MARGIN_PT = 14
 _TITLE_PT = 16
@@ -268,12 +276,44 @@ def _bookmark_key(kind: PrintKind, entity_id: int) -> str:
     return f"tt_{kind}_{entity_id}"
 
 
+def _draw_index_links(
+    c: canvas.Canvas,
+    *,
+    y: float,
+    margin: float,
+    h: float,
+    entities: Sequence[PrintEntitySpec],
+) -> float:
+    line_h = 16
+    link_w = PAGE_SIZE[0] - 2 * margin
+    c.setFont("Helvetica", 11)
+    for spec in entities:
+        if y < margin + line_h:
+            c.showPage()
+            c.setPageSize(PAGE_SIZE)
+            y = h - margin - 20
+        key = _bookmark_key(spec.kind, spec.entity_id)
+        link_y1 = y - 2
+        link_y2 = y + line_h - 2
+        c.linkRect(
+            "",
+            key,
+            Rect=(margin, link_y1, margin + link_w, link_y2),
+            relative=0,
+            addtopage=1,
+        )
+        c.setFillColor(_hex("#1d4ed8"))
+        c.drawString(margin, y, spec.label)
+        y -= line_h
+    return y
+
+
 def _draw_index_page(
     c: canvas.Canvas,
     *,
-    kind: PrintKind,
+    kind: PrintJobKind,
     week_label: str | None,
-    entities: Sequence[tuple[int, str]],
+    entities: Sequence[PrintEntitySpec],
 ) -> None:
     """First page: clickable list of timetables (Excel-style tab navigation)."""
     w, h = PAGE_SIZE
@@ -306,27 +346,23 @@ def _draw_index_page(
     )
     y -= 22
 
-    line_h = 16
-    link_w = w - 2 * margin
-    c.setFont("Helvetica", 11)
-    for eid, label in entities:
-        if y < margin + line_h:
-            c.showPage()
-            c.setPageSize(PAGE_SIZE)
-            y = h - margin - 20
-        key = _bookmark_key(kind, eid)
-        link_y1 = y - 2
-        link_y2 = y + line_h - 2
-        c.linkRect(
-            "",
-            key,
-            Rect=(margin, link_y1, margin + link_w, link_y2),
-            relative=0,
-            addtopage=1,
-        )
-        c.setFillColor(_hex("#1d4ed8"))
-        c.drawString(margin, y, label)
-        y -= line_h
+    if kind == "course_staff":
+        for section_kind in ("course", "staff"):
+            section = [e for e in entities if e.kind == section_kind]
+            if not section:
+                continue
+            if y < margin + 36:
+                c.showPage()
+                c.setPageSize(PAGE_SIZE)
+                y = h - margin - 20
+            c.setFont("Helvetica-Bold", 12)
+            c.setFillColor(_hex("#374151"))
+            c.drawString(margin, y, _SECTION_INDEX_TITLE[section_kind])
+            y -= 18
+            y = _draw_index_links(c, y=y, margin=margin, h=h, entities=section)
+            y -= 8
+    else:
+        y = _draw_index_links(c, y=y, margin=margin, h=h, entities=entities)
 
     c.showPage()
 
@@ -335,8 +371,8 @@ def render_timetable_print_pdf(
     session,
     *,
     week_id: int,
-    kind: PrintKind,
-    entities: Sequence[tuple[int, str]],
+    kind: PrintJobKind,
+    entities: Sequence[PrintEntitySpec],
     term_filter: str = "all",
     colour_by_class: bool = True,
     week_label: str | None = None,
@@ -346,11 +382,10 @@ def render_timetable_print_pdf(
     from ..core.validation import validate_bookings
 
     violations = validate_bookings(session, week_id)
-    colour_map = collect_print_colour_map(
+    colour_map = collect_print_colour_map_for_entities(
         session,
         week_id=week_id,
-        kind=kind,
-        entity_ids=[eid for eid, _ in entities],
+        entities=list(entities),
         term_filter=term_filter,
         colour_by_class=colour_by_class,
         violations_cache=violations,
@@ -361,18 +396,18 @@ def render_timetable_print_pdf(
     if include_index and len(entities) > 1:
         _draw_index_page(c, kind=kind, week_label=week_label, entities=entities)
 
-    for i, (eid, label) in enumerate(entities):
+    for i, spec in enumerate(entities):
         if i > 0:
             c.showPage()
-        key = _bookmark_key(kind, eid)
+        key = _bookmark_key(spec.kind, spec.entity_id)
         c.bookmarkPage(key)
-        c.addOutlineEntry(label, key, level=0)
+        c.addOutlineEntry(spec.label, key, level=0)
         page = build_print_page(
             session,
             week_id=week_id,
-            kind=kind,
-            entity_id=eid,
-            label=label,
+            kind=spec.kind,
+            entity_id=spec.entity_id,
+            label=spec.label,
             term_filter=term_filter,
             colour_by_class=colour_by_class,
             violations_cache=violations,
