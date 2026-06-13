@@ -56,7 +56,7 @@ export type TimetableGlobalLink = {
   member_session_ids?: number[];
 };
 
-export type TimetablePrintKind = "course" | "staff" | "room" | "course_staff";
+export type TimetablePrintKind = "course" | "staff" | "room" | "course_staff" | "changed_courses";
 
 export type TimetablePrintEntity = {
   id: number;

@@ -29,6 +29,7 @@ _KIND_INDEX_TITLE: dict[PrintJobKind, str] = {
     "staff": "Staff timetables",
     "room": "Room timetables",
     "course_staff": "Course & staff timetables",
+    "changed_courses": "Changed course timetables",
 }
 _SECTION_INDEX_TITLE: dict[PrintKind, str] = {
     "course": "Courses",

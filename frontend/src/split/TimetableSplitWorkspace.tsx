@@ -29,6 +29,7 @@ import {
   zoomOut,
 } from "../lib/gridZoom";
 import { notifySessionChanged, useSessionSync } from "../lib/sessionSync";
+import { markGlobalSessionDirty } from "../lib/globalSessionRefresh";
 import { useConfirmPrompt } from "../hooks/useConfirmPrompt";
 
 import { readDisplayPrefs } from "../lib/displayPrefs";
@@ -87,19 +88,25 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
   const [mutating, setMutating] = useState(false);
   const [days, setDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri"]);
   const [globalLink, setGlobalLink] = useState<TimetableGlobalLink | null>(null);
+  const globalLinkRef = useRef(globalLink);
+  globalLinkRef.current = globalLink;
   const { dialogs } = useConfirmPrompt();
 
-  const linkedSessionIds = useMemo(
-    () => (globalLink?.linked && globalLink.member_session_ids?.length ? globalLink.member_session_ids : undefined),
-    [globalLink?.linked, globalLink?.member_session_ids?.join(",")],
-  );
-
   const notifyLinked = useCallback(() => {
-    notifySessionChanged(sessionId, linkedSessionIds);
-  }, [sessionId, linkedSessionIds]);
+    notifySessionChanged(sessionId);
+  }, [sessionId]);
 
   useEffect(() => {
     void api.timetableGlobalLink(sessionId).then(setGlobalLink).catch(() => setGlobalLink(null));
+  }, [sessionId]);
+
+  useEffect(() => {
+    return () => {
+      const link = globalLinkRef.current;
+      if (link?.linked && link.global_session_id) {
+        markGlobalSessionDirty(link.global_session_id);
+      }
+    };
   }, [sessionId]);
 
   const syncingRef = useRef(false);
@@ -185,18 +192,14 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
     [notifyLinked, bumpRefresh, activeIndex, loadBlockPanel, loadSidebarEntities],
   );
 
-  useSessionSync(
-    sessionId,
-    () => {
-      bumpRefresh();
-      const slot = slotsRef.current[activeIndex] ?? slotsRef.current[0];
-      if (slot) void loadSidebarEntities(slot.viewKind);
-      if (slot?.viewKind === "block_delivery" && slot.qualificationId) {
-        void loadBlockPanel(slot);
-      }
-    },
-    linkedSessionIds,
-  );
+  useSessionSync(sessionId, () => {
+    bumpRefresh();
+    const slot = slotsRef.current[activeIndex] ?? slotsRef.current[0];
+    if (slot) void loadSidebarEntities(slot.viewKind);
+    if (slot?.viewKind === "block_delivery" && slot.qualificationId) {
+      void loadBlockPanel(slot);
+    }
+  });
 
   const initAllSlots = useCallback(async () => {
     setLoading(true);

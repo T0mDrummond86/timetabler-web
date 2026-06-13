@@ -71,6 +71,7 @@ import {
   zoomOut,
 } from "../lib/gridZoom";
 import { notifySessionChanged, useSessionSync } from "../lib/sessionSync";
+import { markGlobalSessionDirty } from "../lib/globalSessionRefresh";
 import {
   clashDetectForPrefs,
   readDisplayPrefs,
@@ -204,6 +205,8 @@ export function TimetablePage() {
   const { confirm, prompt, dialogs } = useConfirmPrompt();
   const [pendingEditBookingId, setPendingEditBookingId] = useState<number | null>(null);
   const [globalLink, setGlobalLink] = useState<TimetableGlobalLink | null>(null);
+  const globalLinkRef = useRef(globalLink);
+  globalLinkRef.current = globalLink;
   const [entitySyncToken, setEntitySyncToken] = useState(0);
   const importRef = useRef<HTMLInputElement>(null);
   const colourByClassRef = useRef(colourByClass);
@@ -425,14 +428,9 @@ export function TimetablePage() {
     previewSemesterWeek,
   ]);
 
-  const linkedSessionIds = useMemo(
-    () => (globalLink?.linked && globalLink.member_session_ids?.length ? globalLink.member_session_ids : undefined),
-    [globalLink?.linked, globalLink?.member_session_ids?.join(",")],
-  );
-
   const notifyPeers = useCallback(() => {
-    notifySessionChanged(sessionId, linkedSessionIds);
-  }, [sessionId, linkedSessionIds]);
+    notifySessionChanged(sessionId);
+  }, [sessionId]);
 
   useEffect(() => {
     writeDisplayPrefs({ colourByClass, showAlerts, autoClashDetect });
@@ -506,17 +504,22 @@ export function TimetablePage() {
     await loadHoldingForView(sessionId, viewState());
   }, [sessionId, loadHoldingForView, viewKind, courseId, blockCourseId, blockWeekIndex]);
 
-  useSessionSync(
-    sessionId,
-    () => {
-      void reloadView();
-      void loadSidebarEntities(sessionId, viewKind);
-      setEntitySyncToken((t) => t + 1);
-      setChangeLogKey((k) => k + 1);
-      void refreshHolding();
-    },
-    linkedSessionIds,
-  );
+  useSessionSync(sessionId, () => {
+    void reloadView();
+    void loadSidebarEntities(sessionId, viewKind);
+    setEntitySyncToken((t) => t + 1);
+    setChangeLogKey((k) => k + 1);
+    void refreshHolding();
+  });
+
+  useEffect(() => {
+    return () => {
+      const link = globalLinkRef.current;
+      if (link?.linked && link.global_session_id) {
+        markGlobalSessionDirty(link.global_session_id);
+      }
+    };
+  }, [sessionId]);
 
   const refreshWarningCount = useCallback(async () => {
     try {

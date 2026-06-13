@@ -840,7 +840,7 @@ class TimetablePrintEntityIn(BaseModel):
 
 
 class TimetablePrintRequest(BaseModel):
-    kind: str = Field(pattern="^(course|staff|room|course_staff)$")
+    kind: str = Field(pattern="^(course|staff|room|course_staff|changed_courses)$")
     term_filter: str = Field(default="all", pattern="^(all|t1|t2)$")
     colour_by_class: bool = True
     include_index: bool = True

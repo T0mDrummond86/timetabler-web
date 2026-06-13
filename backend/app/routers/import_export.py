@@ -382,7 +382,7 @@ def export_lecturer_prefs_template(
 @router.get("/sessions/{session_id}/print/timetables/info", response_model=TimetablePrintInfoOut)
 def print_timetables_info(
     session_id: int,
-    kind: str = Query("course", pattern="^(course|staff|room|course_staff)$"),
+    kind: str = Query("course", pattern="^(course|staff|room|course_staff|changed_courses)$"),
     ctx: AuthContext = Depends(require_editor),
     db: Session = Depends(get_db),
 ):

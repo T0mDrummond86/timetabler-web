@@ -27,7 +27,7 @@ from .xlsm_export import (
 )
 
 PrintKind = Literal["course", "staff", "room"]
-PrintJobKind = Literal["course", "staff", "room", "course_staff"]
+PrintJobKind = Literal["course", "staff", "room", "course_staff", "changed_courses"]
 PrintLane = Literal["full", "left", "right"]
 PrintTerm = Literal["t1", "t2"]
 TermLayout = Literal["full", "t1_only", "t2_only", "term_pair", "merged_online"]
@@ -462,6 +462,20 @@ def list_print_entities(
         return list_print_entities(
             session, timetable_session_id=timetable_session_id, kind="course"
         ) + list_print_entities(session, timetable_session_id=timetable_session_id, kind="staff")
+    if kind == "changed_courses":
+        from ..core.change_log_data import affected_course_ids_from_resolved_changelog
+
+        affected = affected_course_ids_from_resolved_changelog(
+            session, timetable_session_id=timetable_session_id
+        )
+        rows = ordered_courses(
+            session, include_block_cohorts=True, timetable_session_id=timetable_session_id
+        )
+        return [
+            PrintEntitySpec(kind="course", entity_id=c.id, label=c.code)
+            for c in rows
+            if c.id in affected
+        ]
     rows = (
         session.query(Room)
         .filter(Room.timetable_session_id == timetable_session_id)

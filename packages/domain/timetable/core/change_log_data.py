@@ -72,6 +72,32 @@ def _session_entries_query(session: Session, timetable_session_id: int):
     )
 
 
+def _course_ids_from_booking_states(*states: dict | None) -> set[int]:
+    ids: set[int] = set()
+    for state in states:
+        if not state:
+            continue
+        cid = state.get("course_id")
+        if cid is not None:
+            ids.add(int(cid))
+    return ids
+
+
+def affected_course_ids_from_resolved_changelog(
+    session: Session,
+    *,
+    timetable_session_id: int,
+) -> set[int]:
+    """Course ids with net booking changes in the session change log (resolved view)."""
+    before_map, after_map = resolve_session_booking_net_maps(
+        session, timetable_session_id=timetable_session_id
+    )
+    course_ids: set[int] = set()
+    for bid in set(before_map) | set(after_map):
+        course_ids |= _course_ids_from_booking_states(before_map.get(bid), after_map.get(bid))
+    return course_ids
+
+
 def gather_timetabling_change_log_display_rows(
     session: Session,
     *,

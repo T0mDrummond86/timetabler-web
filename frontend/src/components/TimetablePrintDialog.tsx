@@ -11,6 +11,7 @@ const KIND_OPTIONS: { id: TimetablePrintKind; label: string }[] = [
   { id: "course", label: "Courses (class group timetables)" },
   { id: "staff", label: "Staff timetables" },
   { id: "course_staff", label: "Courses and staff" },
+  { id: "changed_courses", label: "Changed courses (from change log)" },
   { id: "room", label: "Room timetables" },
 ];
 
@@ -110,7 +111,12 @@ export function TimetablePrintDialog({ sessionId, colourByClass: _colourByClass,
     }
   }
 
-  const canPrint = weekLabel != null && !loading;
+  const kindHint =
+    kind === "changed_courses"
+      ? "Only courses with net changes in the session change log (same as the resolved change log view). All listed courses are selected by default."
+      : 'All timetables are selected by default. Class colours are always used in PDF print so each class appears in a distinct fill (matching the "Class colours" display setting). Placecards use thin black borders. Use the index page or PDF bookmarks to jump between timetables.';
+
+  const canPrint = weekLabel != null && !loading && entities.length > 0;
 
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
@@ -126,12 +132,7 @@ export function TimetablePrintDialog({ sessionId, colourByClass: _colourByClass,
         ) : (
           <p className="error">No week in this session — printing is disabled.</p>
         )}
-        <p className="muted timetable-print-hint">
-          All timetables are selected by default. Class colours are always used in PDF print so
-          each class appears in a distinct fill (matching the &quot;Class colours&quot; display
-          setting). Placecards use thin black borders. Use the index page or PDF bookmarks to jump
-          between timetables.
-        </p>
+        <p className="muted timetable-print-hint">{kindHint}</p>
 
         <fieldset className="timetable-print-kinds">
           {KIND_OPTIONS.map((opt) => (
@@ -181,6 +182,12 @@ export function TimetablePrintDialog({ sessionId, colourByClass: _colourByClass,
 
         {loading ? (
           <p className="muted">Loading…</p>
+        ) : entities.length === 0 ? (
+          <p className="panel-empty">
+            {kind === "changed_courses"
+              ? "No courses with net changes in the change log."
+              : "No timetables available to print."}
+          </p>
         ) : (
           <div className="timetable-print-list">
             {groupedEntities.map((section) => (

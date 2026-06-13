@@ -46,6 +46,8 @@ def _entity_specs_for_print(
             if entity_kind not in ("course", "staff"):
                 raise ValueError("Each selected timetable must include entity_kind (course or staff)")
             specs.append(PrintEntitySpec(kind=entity_kind, entity_id=entity_id, label=label))
+        elif kind == "changed_courses":
+            specs.append(PrintEntitySpec(kind="course", entity_id=entity_id, label=label))
         else:
             specs.append(PrintEntitySpec(kind=kind, entity_id=entity_id, label=label))
     return specs

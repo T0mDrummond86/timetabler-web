@@ -160,3 +160,44 @@ def test_print_info_and_pdf(client):
     assert combo.status_code == 200, combo.text
     assert combo.content[:4] == b"%PDF"
     assert len(combo.content) > 500
+
+    empty_changed = test_client.get(
+        f"/sessions/{sid}/print/timetables/info?kind=changed_courses", headers=headers
+    )
+    assert empty_changed.status_code == 200
+    assert empty_changed.json()["entities"] == []
+
+    booking = (
+        db.query(Booking)
+        .filter(Booking.week_id == week.id, Booking.course_id == course.id)
+        .first()
+    )
+    assert booking is not None
+    patch = test_client.patch(
+        f"/sessions/{sid}/bookings/{booking.id}",
+        headers=headers,
+        json={"course_id": course.id, "day": 2, "start_slot": 6},
+    )
+    assert patch.status_code == 200, patch.text
+
+    changed_info = test_client.get(
+        f"/sessions/{sid}/print/timetables/info?kind=changed_courses", headers=headers
+    )
+    assert changed_info.status_code == 200
+    changed_entities = changed_info.json()["entities"]
+    assert len(changed_entities) == 1
+    assert changed_entities[0]["id"] == course.id
+    assert changed_entities[0]["label"] == course.code
+
+    changed_pdf = test_client.post(
+        f"/sessions/{sid}/print/timetables",
+        headers=headers,
+        json={
+            "kind": "changed_courses",
+            "term_filter": "all",
+            "colour_by_class": True,
+            "entities": changed_entities,
+        },
+    )
+    assert changed_pdf.status_code == 200, changed_pdf.text
+    assert changed_pdf.content[:4] == b"%PDF"

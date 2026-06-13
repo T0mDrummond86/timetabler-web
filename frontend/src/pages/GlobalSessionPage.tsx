@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
   GlobalSession,
@@ -22,7 +22,11 @@ import {
 } from "../components/GlobalFilteredAggregateTable";
 import { LinkedSessionImportPanel } from "../components/LinkedSessionImportPanel";
 import { LoadingMark } from "../components/LoadingMark";
-import { useSessionSync } from "../lib/sessionSync";
+import {
+  clearGlobalSessionDirty,
+  GLOBAL_DIRTY_STORAGE_KEY,
+  isGlobalSessionDirty,
+} from "../lib/globalSessionRefresh";
 
 type Tab = "staff" | "rooms" | "units" | "qualifications" | "custodians" | "members";
 
@@ -81,13 +85,10 @@ export function GlobalSessionPage() {
   const [custodians, setCustodians] = useState<GlobalClassCustodians | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [updatePrompt, setUpdatePrompt] = useState(false);
   const [tabSyncToken, setTabSyncToken] = useState(0);
-
-  const memberSessionIds = useMemo(
-    () => global?.member_sessions.map((m) => m.id) ?? [],
-    [global?.member_sessions.map((m) => m.id).join(",")],
-  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -109,15 +110,77 @@ export function GlobalSessionPage() {
     }
   }, [globalSessionId]);
 
+  const loadTabData = useCallback(async () => {
+    if (tab === "members") return;
+    try {
+      if (tab === "staff") {
+        const data = await api.globalSessionStaff(globalSessionId);
+        setStaff(data.rows);
+      } else if (tab === "rooms") {
+        const data = await api.globalSessionRooms(globalSessionId);
+        setRooms(data.rows);
+      } else if (tab === "units") {
+        const data = await api.globalSessionUnits(globalSessionId);
+        setUnits(data.rows);
+      } else if (tab === "qualifications") {
+        const data = await api.globalSessionQualifications(globalSessionId);
+        setQuals(data.rows);
+      } else if (tab === "custodians") {
+        const data = await api.globalSessionClassCustodians(globalSessionId);
+        setCustodians(data);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load tab");
+    }
+  }, [tab, globalSessionId]);
+
+  const refreshFromLinkedSessions = useCallback(async () => {
+    setRefreshing(true);
+    setError(null);
+    setUpdatePrompt(false);
+    try {
+      const g = await api.globalSession(globalSessionId);
+      setGlobal(g);
+      setSelectedMemberIds(g.member_sessions.map((m) => m.id));
+      if (tab !== "members") {
+        await loadTabData();
+      } else {
+        setTabSyncToken((t) => t + 1);
+      }
+      clearGlobalSessionDirty(globalSessionId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadTabData, tab, globalSessionId]);
+
   useEffect(() => {
     void load();
   }, [load]);
 
-  useSessionSync(
-    memberSessionIds[0] ?? 0,
-    () => setTabSyncToken((t) => t + 1),
-    memberSessionIds.length ? memberSessionIds : undefined,
-  );
+  const autoRefreshOnEntry = useRef(false);
+  useEffect(() => {
+    autoRefreshOnEntry.current = false;
+  }, [globalSessionId]);
+
+  useEffect(() => {
+    if (autoRefreshOnEntry.current || loading) return;
+    if (!isGlobalSessionDirty(globalSessionId)) return;
+    autoRefreshOnEntry.current = true;
+    void refreshFromLinkedSessions();
+  }, [globalSessionId, loading, refreshFromLinkedSessions]);
+
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== GLOBAL_DIRTY_STORAGE_KEY) return;
+      if (isGlobalSessionDirty(globalSessionId)) {
+        setUpdatePrompt(true);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [globalSessionId]);
 
   useEffect(() => {
     if (tab === "members" || loading) return;
@@ -156,6 +219,8 @@ export function GlobalSessionPage() {
       const updated = await api.setGlobalSessionMembers(globalSessionId, selectedMemberIds);
       setGlobal(updated);
       setSelectedMemberIds(updated.member_sessions.map((m) => m.id));
+      clearGlobalSessionDirty(globalSessionId);
+      setUpdatePrompt(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -168,6 +233,11 @@ export function GlobalSessionPage() {
       prev.includes(sessionId) ? prev.filter((id) => id !== sessionId) : [...prev, sessionId],
     );
   }
+
+  const memberSessionIds = useMemo(
+    () => global?.member_sessions.map((m) => m.id) ?? [],
+    [global?.member_sessions.map((m) => m.id).join(",")],
+  );
 
   if (loading && !global) {
     return (
@@ -192,11 +262,27 @@ export function GlobalSessionPage() {
         <span className="muted">
           Combined staff, rooms, and classes from linked timetable sessions. No timetable editing
           here — open a linked session to schedule. Staff busy in one session appear greyed out in
-          others.
+          others. Global tables refresh when you leave a linked timetable or press Update below.
         </span>
       }
     >
       {error && <div className="error-banner">{error}</div>}
+
+      <div className="global-session-toolbar">
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={refreshing || loading}
+          onClick={() => void refreshFromLinkedSessions()}
+        >
+          {refreshing ? "Updating…" : "Update from linked sessions"}
+        </button>
+        {updatePrompt && !refreshing && (
+          <span className="muted global-session-stale-hint">
+            Linked timetables have changed — press Update to refresh.
+          </span>
+        )}
+      </div>
 
       <div className="session-tabs global-session-tabs">
         {TABS.map((t) => (
@@ -216,13 +302,7 @@ export function GlobalSessionPage() {
           targetSessionId={global.member_sessions[0]?.id ?? 0}
           targetOptions={global.member_sessions}
           onImported={() => {
-            void load();
-            void api.globalSessionStaff(globalSessionId).then((d) => setStaff(d.rows)).catch(() => {});
-            void api
-              .globalSessionQualifications(globalSessionId)
-              .then((d) => setQuals(d.rows))
-              .catch(() => {});
-            void api.globalSessionUnits(globalSessionId).then((d) => setUnits(d.rows)).catch(() => {});
+            void refreshFromLinkedSessions();
           }}
         />
       )}

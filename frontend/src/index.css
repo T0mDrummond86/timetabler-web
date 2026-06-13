@@ -3599,6 +3599,18 @@ body.staff-editor-resizing {
   text-align: center;
 }
 
+.global-session-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.global-session-stale-hint {
+  font-size: 0.88rem;
+}
+
 .global-session-tabs {
   margin-bottom: 1rem;
 }
