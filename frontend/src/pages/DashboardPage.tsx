@@ -11,6 +11,7 @@ import {
 } from "../api";
 import { AppShell } from "../components/AppShell";
 import { DropdownGroup } from "../components/DropdownGroup";
+import { LoadingMark } from "../components/LoadingMark";
 import { useConfirmPrompt } from "../hooks/useConfirmPrompt";
 import { useDropdown } from "../hooks/useDropdown";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
@@ -488,7 +489,7 @@ export function DashboardPage() {
           )}
 
           {loading ? (
-            <p className="muted panel-empty">Loading sessions…</p>
+            <LoadingMark label="Loading sessions…" />
           ) : !sessions.length ? (
             <p className="muted panel-empty">No sessions yet.</p>
           ) : filteredSessions.length === 0 ? (
@@ -554,7 +555,7 @@ export function DashboardPage() {
           </div>
 
           {loading ? (
-            <p className="muted panel-empty">Loading…</p>
+            <LoadingMark label="Loading…" />
           ) : !globalSessions.length ? (
             <p className="muted panel-empty">No global sessions yet.</p>
           ) : filteredGlobals.length === 0 ? (

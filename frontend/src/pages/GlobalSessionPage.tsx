@@ -21,6 +21,7 @@ import {
   varianceSignFilter,
 } from "../components/GlobalFilteredAggregateTable";
 import { LinkedSessionImportPanel } from "../components/LinkedSessionImportPanel";
+import { LoadingMark } from "../components/LoadingMark";
 import { useSessionSync } from "../lib/sessionSync";
 
 type Tab = "staff" | "rooms" | "units" | "qualifications" | "custodians" | "members";
@@ -171,7 +172,7 @@ export function GlobalSessionPage() {
   if (loading && !global) {
     return (
       <AppShell title="Global session">
-        <p className="muted">Loading…</p>
+        <LoadingMark label="Loading…" />
       </AppShell>
     );
   }
@@ -372,7 +373,7 @@ export function GlobalSessionPage() {
       {tab === "custodians" && (
         <section className="card class-custodians-panel">
           {loading && !custodians ? (
-            <p className="muted">Loading…</p>
+            <LoadingMark label="Loading…" />
           ) : (
             <ClassCustodiansTable
               amalgamatedSessions

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import type { LapRow } from "../types";
+import { LoadingMark } from "./LoadingMark";
 
 type Props = {
   sessionId: number;
@@ -171,7 +172,7 @@ export function LapCreationPanel({ sessionId, refreshKey = 0 }: Props) {
         </span>
       </div>
       {loading ? (
-        <p className="muted">Loading…</p>
+        <LoadingMark label="Loading…" />
       ) : (
         <div className="table-wrap">
           <table className="data-table lap-table">

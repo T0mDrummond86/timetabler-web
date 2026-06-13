@@ -1,11 +1,10 @@
-import { useState } from "react";
-import { getStoredTheme, toggleTheme, type Theme } from "../lib/theme";
+import { toggleTheme, useTheme } from "../lib/theme";
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>(() => getStoredTheme());
+  const theme = useTheme();
 
   function onToggle() {
-    setTheme(toggleTheme(theme));
+    toggleTheme(theme);
   }
 
   const label = theme === "dark" ? "Light mode" : "Dark mode";

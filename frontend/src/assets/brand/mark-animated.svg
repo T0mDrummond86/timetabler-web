@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 755 640" width="755" height="640">
+
+<style>
+.p{ animation: drop 3.4s cubic-bezier(.18,.7,.28,1) infinite; transform-box: fill-box; }
+.p0{ animation-delay: .00s } .p1{ animation-delay: .13s }
+.p2{ animation-delay: .26s } .p3{ animation-delay: .39s } .p4{ animation-delay: .52s }
+@keyframes drop{
+  0%   { transform: translateY(-760px); opacity:0 }
+  4%   { opacity:1 }
+  28%  { transform: translateY(0) }
+  34%  { transform: translateY(-24px) }
+  40%  { transform: translateY(0) }
+  100% { transform: translateY(0) }
+}
+@media (prefers-reduced-motion: reduce){ .p{ animation:none } }
+</style>
+
+<g transform="translate(40,40)"><g class="p p0"><rect x="115.00" y="0.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#13C2A8"/><rect x="230.00" y="0.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#13C2A8"/><rect x="345.00" y="0.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#13C2A8"/><rect x="230.00" y="115.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#13C2A8"/><rect x="345.00" y="115.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#13C2A8"/></g><g class="p p1"><rect x="460.00" y="0.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#FFB020"/><rect x="575.00" y="0.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#FFB020"/><rect x="460.00" y="115.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#FFB020"/><rect x="575.00" y="115.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#FFB020"/></g><g class="p p2"><rect x="0.00" y="0.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#3D5AF1"/><rect x="0.00" y="115.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#3D5AF1"/><rect x="115.00" y="115.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#3D5AF1"/></g><g class="p p3"><rect x="230.00" y="230.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#8B5CF6"/><rect x="345.00" y="230.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#8B5CF6"/><rect x="230.00" y="345.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#8B5CF6"/><rect x="345.00" y="345.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#8B5CF6"/></g><g class="p p4"><rect x="230.00" y="460.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#FF5C6C"/><rect x="345.00" y="460.00" width="100.00" height="100.00" rx="19.00" ry="19.00" fill="#FF5C6C"/></g></g>
+</svg>

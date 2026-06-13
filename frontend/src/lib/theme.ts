@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 export type Theme = "light" | "dark";
 
 const STORAGE_KEY = "timetabler-theme";
@@ -29,4 +31,25 @@ export function toggleTheme(current: Theme): Theme {
   const next: Theme = current === "dark" ? "light" : "dark";
   setTheme(next);
   return next;
+}
+
+function currentTheme(): Theme {
+  const attr = document.documentElement.getAttribute("data-theme");
+  return attr === "dark" ? "dark" : "light";
+}
+
+export function useTheme(): Theme {
+  const [theme, setLocal] = useState<Theme>(() =>
+    typeof document === "undefined" ? "light" : currentTheme(),
+  );
+  useEffect(() => {
+    setLocal(currentTheme());
+    const observer = new MutationObserver(() => setLocal(currentTheme()));
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => observer.disconnect();
+  }, []);
+  return theme;
 }

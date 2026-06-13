@@ -47,6 +47,7 @@ import { HoldingAreaPanel } from "../components/HoldingAreaPanel";
 import { TimetableSidebar } from "../components/TimetableSidebar";
 import { UsageDashboard } from "../components/UsageDashboard";
 import { LapCreationPanel } from "../components/LapCreationPanel";
+import { LoadingMark } from "../components/LoadingMark";
 import { WeekGridView } from "../components/WeekGridView";
 import { recordSessionOpen } from "../lib/recentSessions";
 import type { TimetableMode, ViewKind } from "../viewKinds";
@@ -1696,7 +1697,7 @@ export function TimetablePage() {
       {importing && (
         <div className="import-overlay" role="alertdialog" aria-busy="true" aria-labelledby="import-overlay-title">
           <div className="import-overlay-card">
-            <div className="import-overlay-spinner" aria-hidden />
+            <LoadingMark size={88} label="" />
             <h2 id="import-overlay-title">Importing timetable…</h2>
             <p>
               {importFileName ? `Processing ${importFileName}` : "This may take up to a minute for large files."}
@@ -1707,10 +1708,7 @@ export function TimetablePage() {
       {sessionTab === "timetable" && (
         <div className="tt-page tt-page--timetable">
           {loading && !grid && viewKind !== "block_overview" && (
-            <div className="loading-state">
-              <span className="loading-dot" />
-              Loading timetable…
-            </div>
+            <LoadingMark label="Loading timetable…" />
           )}
           {!loading && courses.length === 0 && (
             <section className="card">

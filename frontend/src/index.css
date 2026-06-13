@@ -234,16 +234,21 @@ code {
 }
 
 .app-brand {
-  font-weight: 700;
-  font-size: 1.05rem;
-  color: var(--text);
+  display: inline-flex;
+  align-items: center;
   text-decoration: none;
-  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.app-brand-lockup {
+  display: block;
+  height: 28px;
+  width: auto;
 }
 
 .app-brand:hover {
-  color: var(--primary);
   text-decoration: none;
+  opacity: 0.85;
 }
 
 .app-topbar-end {
@@ -2460,22 +2465,27 @@ body:has(.app-shell--fill) {
   color: var(--text-muted);
 }
 
-.loading-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--primary);
-  animation: pulse 1s ease-in-out infinite;
+.loading-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 1.25rem;
+  color: var(--text-muted);
 }
 
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 1;
-  }
+.loading-mark-svg {
+  display: block;
+}
+
+.loading-mark-label {
+  font-size: 0.95rem;
+}
+
+.loading-mark--inline {
+  flex-direction: row;
+  padding: 0.5rem 0;
 }
 
 .row.gap {

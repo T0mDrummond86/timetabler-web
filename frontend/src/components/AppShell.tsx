@@ -1,6 +1,9 @@
 import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
 import { APP_NAME } from "../branding";
+import { useTheme } from "../lib/theme";
+import lockupLight from "../assets/brand/lockup-light.svg";
+import lockupDark from "../assets/brand/lockup-dark.svg";
 import { ThemeToggle } from "./ThemeToggle";
 
 type Props = {
@@ -25,13 +28,15 @@ export function AppShell({
   minimal = false,
   fillViewport = false,
 }: Props) {
+  const theme = useTheme();
+  const lockup = theme === "dark" ? lockupDark : lockupLight;
   return (
     <div className={`app-shell${fillViewport ? " app-shell--fill" : ""}`}>
       {!minimal && (
         <header className="app-topbar">
           <div className="app-topbar-start">
-            <Link to="/dashboard" className="app-brand">
-              {APP_NAME}
+            <Link to="/dashboard" className="app-brand" aria-label={APP_NAME}>
+              <img src={lockup} alt={APP_NAME} className="app-brand-lockup" />
             </Link>
           </div>
           <div className="app-topbar-end">
