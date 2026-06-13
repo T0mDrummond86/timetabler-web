@@ -5,6 +5,7 @@ import { WeekGridView } from "../components/WeekGridView";
 import { api, type Course } from "../api";
 import { EditableGroupTitle } from "../components/EditableGroupTitle";
 import { showsWeekGrid, isGridEditable, isCourseViewKind, COURSE_VIEW_KINDS, canLoadTimetableGrid } from "../viewKinds";
+import { clashDetectForPrefs } from "../lib/displayPrefs";
 import type { SlotPaneState } from "./splitLayout";
 
 const COURSE_VIEWS = COURSE_VIEW_KINDS;

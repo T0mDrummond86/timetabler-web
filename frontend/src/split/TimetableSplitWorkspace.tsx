@@ -31,7 +31,7 @@ import {
 import { notifySessionChanged, useSessionSync } from "../lib/sessionSync";
 import { useConfirmPrompt } from "../hooks/useConfirmPrompt";
 
-import { clashDetectForPrefs, readDisplayPrefs } from "../lib/displayPrefs";
+import { readDisplayPrefs } from "../lib/displayPrefs";
 
 const COURSE_VIEWS = COURSE_VIEW_KINDS;
 const SEMESTER_WEEKS = 52;
