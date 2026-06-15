@@ -1019,7 +1019,10 @@ button.danger {
 }
 
 /* Timetable tab — fill viewport; sidebar list scrolls; grid fits at 100% zoom */
-body:has(.app-shell--fill) {
+body:has(.app-shell--fill),
+body:has(.app-shell--fill) #root {
+  height: 100dvh;
+  max-height: 100dvh;
   overflow: hidden;
 }
 
@@ -1079,8 +1082,19 @@ body:has(.app-shell--fill) {
   gap: 0.5rem;
 }
 
-.app-main--fill .session-tabs {
+.app-main--fill > .tt-page--timetable,
+.app-main--fill > .tt-page--entity {
+  flex: 1;
+  min-height: 0;
+}
+
+.app-main--fill > .session-tabs,
+.app-main--fill > .error-banner,
+.app-main--fill > .success-banner {
   flex-shrink: 0;
+}
+
+.app-main--fill .session-tabs {
   margin-bottom: 0;
   padding: 0 0.35rem;
   border-radius: var(--radius-md) var(--radius-md) 0 0;
@@ -2335,22 +2349,120 @@ body:has(.app-shell--fill) {
   border-radius: var(--radius-sm);
 }
 
-/* Dedicated session tabs (Rooms, Classes, …): grow the list into leftover viewport height. */
+.entity-form-wrap {
+  min-width: 0;
+}
+
+/* Entity editor tabs — viewport split pane; left list scrolls, right pane stays in view */
+.tt-page--entity {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tt-page--entity .entity-editor-panel--fill {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  border-top: none;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.tt-page--entity .entity-editor-panel--fill > .linked-import-panel,
+.tt-page--entity .entity-editor-panel--fill > .muted.entity-hint {
+  flex-shrink: 0;
+  margin: 0.65rem 1rem 0;
+}
+
+.tt-page--entity .entity-editor-workspace {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border: none;
+  border-radius: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.tt-page--entity .entity-editor-workspace.staff-editor-resizable {
+  grid-template-columns: var(--staff-table-col, 48%) 6px minmax(220px, 1fr);
+}
+
+.tt-page--entity .entity-editor-workspace .tt-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+  padding: 0.5rem;
+}
+
+.tt-page--entity .entity-editor-workspace .tt-sidebar .entity-list-toolbar,
+.tt-page--entity .entity-editor-workspace .tt-sidebar .entity-list-filters {
+  flex-shrink: 0;
+}
+
+.tt-page--entity .entity-editor-workspace .tt-sidebar .entity-list {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+
+.tt-page--entity .entity-editor-workspace .tt-sidebar .staff-hours-table-wrap {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+}
+
+.tt-page--entity .entity-editor-workspace .tt-sidebar .staff-hours-table-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+.tt-page--entity .entity-editor-workspace .tt-main {
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 0.75rem;
+}
+
 .entity-editor-panel--fill .entity-editor-layout {
-  min-height: calc(100dvh - 15rem);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   align-items: stretch;
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .entity-editor-panel--fill .entity-list-col {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
+}
+
+.entity-editor-panel--fill .entity-list-toolbar,
+.entity-editor-panel--fill .entity-list-filters {
+  flex-shrink: 0;
 }
 
 .entity-editor-panel--fill .entity-list {
   flex: 1;
   min-height: 0;
   max-height: none;
+  overflow-y: auto;
+}
+
+.entity-editor-panel--fill .entity-form-wrap {
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .entity-editor-panel--fill .staff-hours-table-wrap {
@@ -3042,6 +3154,24 @@ body.staff-editor-resizing {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-elevated);
+}
+
+.staff-hours-table-wrap--loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 10rem;
+}
+
+.staff-hours-loading-mark {
+  margin-left: auto;
+  padding: 0;
+  gap: 0.5rem;
+}
+
+.staff-hours-loading-mark .loading-mark-label {
+  font-size: 0.78rem;
 }
 
 .staff-hours-table-count {

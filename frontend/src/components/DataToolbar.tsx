@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { api } from "../api";
+import { useDelayedBusy } from "../hooks/useDelayedBusy";
 import { useDropdown } from "../hooks/useDropdown";
+import { LoadingMark } from "./LoadingMark";
 import { TimetablePrintDialog } from "./TimetablePrintDialog";
 
 type Props = {
@@ -30,6 +32,7 @@ export function DataToolbar({
   onCheckClashes,
   checkingClashes = false,
   onImport,
+  onError,
   importing,
   showDisplay = true,
 }: Props) {
@@ -40,6 +43,8 @@ export function DataToolbar({
   const importKindRef = useRef<ImportKind>("session");
   const [importKind, setImportKind] = useState<ImportKind>("session");
   const [printOpen, setPrintOpen] = useState(false);
+  const [exportLabel, setExportLabel] = useState("");
+  const { busy: exporting, showBusy: showExportOverlay, run: runExport } = useDelayedBusy(5000);
 
   function importAcceptFor(kind: ImportKind) {
     if (kind === "qualifications-csp") return ".docx";
@@ -50,9 +55,17 @@ export function DataToolbar({
 
   const importAccept = importAcceptFor(importKind);
 
-  function exportPath(path: string, filename: string) {
+  function exportPath(path: string, filename: string, label: string) {
     exportMenu.close();
-    api.downloadExport(path, filename);
+    setExportLabel(label);
+    void runExport(async () => {
+      try {
+        await api.downloadExport(path, filename);
+      } catch (err) {
+        onError?.(err instanceof Error ? err.message : "Export failed");
+        throw err;
+      }
+    });
   }
 
   function pickImport(kind: ImportKind) {
@@ -173,10 +186,11 @@ export function DataToolbar({
           type="button"
           className="btn-secondary"
           onClick={exportMenu.toggle}
+          disabled={exporting}
           aria-expanded={exportMenu.open}
           aria-haspopup="menu"
         >
-          Export ▾
+          {exporting ? "Exporting…" : "Export ▾"}
         </button>
         {exportMenu.open && (
           <div className="tt-dropdown-menu tt-dropdown-menu-wide" role="menu">
@@ -189,6 +203,7 @@ export function DataToolbar({
                 exportPath(
                   `/sessions/${sessionId}/export/timetable?variant=v2&colour_by_class=${colourByClass}`,
                   "timetable_export.xlsm",
+                  "Timetable",
                 )
               }
             >
@@ -199,7 +214,7 @@ export function DataToolbar({
               type="button"
               className="ctx-item ctx-item-desc"
               role="menuitem"
-              onClick={() => void exportPath(`/sessions/${sessionId}/export/admin`, "admin_export.xlsx")}
+              onClick={() => void exportPath(`/sessions/${sessionId}/export/admin`, "admin_export.xlsx", "Admin export")}
             >
               <span className="ctx-item-title">Admin export</span>
               <span className="ctx-item-hint">Term week grid for administrators</span>
@@ -209,7 +224,11 @@ export function DataToolbar({
               className="ctx-item ctx-item-desc"
               role="menuitem"
               onClick={() =>
-                void exportPath(`/sessions/${sessionId}/export/admin?co_teach_only=true`, "co_teach_export.xlsx")
+                void exportPath(
+                  `/sessions/${sessionId}/export/admin?co_teach_only=true`,
+                  "co_teach_export.xlsx",
+                  "SFS co-teach export",
+                )
               }
             >
               <span className="ctx-item-title">SFS co-teach export</span>
@@ -219,7 +238,7 @@ export function DataToolbar({
               type="button"
               className="ctx-item ctx-item-desc"
               role="menuitem"
-              onClick={() => void exportPath(`/sessions/${sessionId}/export/staff-tab`, "staff_tab.xlsx")}
+              onClick={() => void exportPath(`/sessions/${sessionId}/export/staff-tab`, "staff_tab.xlsx", "Staff tab")}
             >
               <span className="ctx-item-title">Staff tab</span>
               <span className="ctx-item-hint">Lecturer hours spreadsheet</span>
@@ -244,7 +263,9 @@ export function DataToolbar({
               type="button"
               className="ctx-item ctx-item-desc"
               role="menuitem"
-              onClick={() => void exportPath(`/sessions/${sessionId}/export/warnings`, "warnings_report.xlsx")}
+              onClick={() =>
+                void exportPath(`/sessions/${sessionId}/export/warnings`, "warnings_report.xlsx", "Warnings report")
+              }
             >
               <span className="ctx-item-title">Warnings report</span>
               <span className="ctx-item-hint">All validation warnings as Excel</span>
@@ -253,7 +274,13 @@ export function DataToolbar({
               type="button"
               className="ctx-item ctx-item-desc"
               role="menuitem"
-              onClick={() => void exportPath(`/sessions/${sessionId}/export/change-log`, "change_log_resolved.xlsx")}
+              onClick={() =>
+                void exportPath(
+                  `/sessions/${sessionId}/export/change-log`,
+                  "change_log_resolved.xlsx",
+                  "Change log",
+                )
+              }
             >
               <span className="ctx-item-title">Change log</span>
               <span className="ctx-item-hint">Resolved net changes</span>
@@ -266,6 +293,7 @@ export function DataToolbar({
                 void exportPath(
                   `/sessions/${sessionId}/export/lecturer-preferences-template`,
                   "lecturer_preferences.xlsx",
+                  "Lecturer prefs template",
                 )
               }
             >
@@ -280,7 +308,15 @@ export function DataToolbar({
               role="menuitem"
               onClick={() => {
                 exportMenu.close();
-                void api.exportSessionJson(sessionId);
+                setExportLabel("JSON backup");
+                void runExport(async () => {
+                  try {
+                    await api.exportSessionJson(sessionId);
+                  } catch (err) {
+                    onError?.(err instanceof Error ? err.message : "Export failed");
+                    throw err;
+                  }
+                });
               }}
             >
               <span className="ctx-item-title">JSON backup</span>
@@ -296,6 +332,15 @@ export function DataToolbar({
           colourByClass={colourByClass}
           onClose={() => setPrintOpen(false)}
         />
+      )}
+      {showExportOverlay && (
+        <div className="import-overlay" role="alertdialog" aria-busy="true" aria-labelledby="export-overlay-title">
+          <div className="import-overlay-card">
+            <LoadingMark size={88} label="" />
+            <h2 id="export-overlay-title">Exporting{exportLabel ? ` ${exportLabel.toLowerCase()}` : ""}…</h2>
+            <p>Large timetables can take a minute or more to prepare.</p>
+          </div>
+        </div>
       )}
     </>
   );

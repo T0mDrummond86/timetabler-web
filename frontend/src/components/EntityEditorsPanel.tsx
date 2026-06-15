@@ -506,6 +506,26 @@ export function EntityEditorsPanel({
     }
   }
 
+  const layoutClass =
+    activeTab === "staff"
+      ? fixedTab
+        ? "tt-workspace entity-editor-workspace staff-editor-layout staff-editor-resizable"
+        : "entity-editor-layout staff-editor-layout staff-editor-resizable"
+      : fixedTab
+        ? "tt-workspace entity-editor-workspace"
+        : "entity-editor-layout";
+
+  const listColClass =
+    activeTab === "staff"
+      ? fixedTab
+        ? "tt-sidebar entity-list-col staff-hours-list-col"
+        : "entity-list-col staff-hours-list-col"
+      : fixedTab
+        ? "tt-sidebar entity-list-col"
+        : "entity-list-col";
+
+  const formWrapClass = fixedTab ? "tt-main entity-form-wrap" : "entity-form-wrap";
+
   return (
     <section className={`panel${fixedTab ? " entity-editor-panel--fill" : ""}`}>
       {!fixedTab && (
@@ -538,18 +558,14 @@ export function EntityEditorsPanel({
       )}
       <div
         ref={activeTab === "staff" ? staffLayoutRef : undefined}
-        className={
-          activeTab === "staff"
-            ? "entity-editor-layout staff-editor-layout staff-editor-resizable"
-            : "entity-editor-layout"
-        }
+        className={layoutClass}
         style={
           activeTab === "staff"
             ? ({ ["--staff-table-col" as string]: `${staffTableWidthPct}%` } as CSSProperties)
             : undefined
         }
       >
-        <div className={activeTab === "staff" ? "entity-list-col staff-hours-list-col" : "entity-list-col"}>
+        <div className={listColClass}>
           {activeTab === "units" && (
             <div className="entity-list-filters">
               <input
@@ -649,7 +665,7 @@ export function EntityEditorsPanel({
             }}
           />
         )}
-        <div className="entity-form-wrap">
+        <div className={formWrapClass}>
           {selectedId == null && <p className="muted">Select an item to edit.</p>}
           {selectedStaff && activeTab === "staff" && (
             <form key={selectedStaff.id} className="form" onSubmit={save}>

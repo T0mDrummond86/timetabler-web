@@ -143,15 +143,18 @@ class AdminExportReport:
 
 
 def _sheet_title(code: str, used: set[str]) -> str:
-    title = (code or "Course").strip()[:31] or "Course"
-    base = title
+    """Excel sheet names: ≤31 chars, no [\\:/?*[]] characters, must be unique."""
+    bad = set("[]:*?/\\")
+    cleaned = "".join("_" if ch in bad else ch for ch in str(code or "Course")).strip()
+    cleaned = cleaned[:31] or "Course"
+    base = cleaned
     n = 1
-    while title in used:
+    while cleaned in used:
         n += 1
         suffix = f" ({n})"
-        title = (base[: 31 - len(suffix)] + suffix).strip()
-    used.add(title)
-    return title
+        cleaned = (base[: 31 - len(suffix)] + suffix).strip()
+    used.add(cleaned)
+    return cleaned
 
 
 def _fmt_time(start_slot: int, end_slot: int) -> str:

@@ -732,17 +732,11 @@ def _generate_v2_entity_tabs(
             del wb[tpl_name]
 
 
-def _apply_v2_readonly_protection(wb) -> None:
-    """Protect all worksheets so exported timetables open read-only in Excel."""
-    from openpyxl.workbook.protection import WorkbookProtection
-
+def _clear_workbook_protection(wb) -> None:
+    """Ensure exported timetables are editable in Excel (no sheet/workbook locks)."""
     for ws in wb.worksheets:
-        prot = ws.protection
-        prot.enable()
-        # Allow viewing/selecting cells; locked cells cannot be edited once protected.
-        prot.selectLockedCells = True
-        prot.selectUnlockedCells = True
-    wb.security = WorkbookProtection(lockStructure=True)
+        ws.protection.disable()
+    wb.security = None
 
 
 def write_v2(
@@ -801,6 +795,6 @@ def write_v2(
     )
     report.bookings = len(_week_bookings(session, week.id))
     write_backup_sheet(wb, session, timetable_session_id=timetable_session_id)
-    _apply_v2_readonly_protection(wb)
+    _clear_workbook_protection(wb)
     wb.save(out_path)
     return report

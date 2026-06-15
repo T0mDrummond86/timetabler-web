@@ -1,1 +1,1 @@
-export const APP_NAME = "TAFEtabler";
+export const APP_NAME = "TAFE Tabler";

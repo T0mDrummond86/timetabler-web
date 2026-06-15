@@ -971,9 +971,42 @@ export const api = {
     URL.revokeObjectURL(url);
   },
 
-  /** Start a file download in the same user gesture (avoids multi-click blob downloads). */
-  downloadExport(path: string, _filename: string): void {
-    triggerAuthDownload(path);
+  async downloadExport(path: string, fallbackFilename: string): Promise<void> {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}${path}`, { headers });
+    } catch (err) {
+      const base = API_BASE || "(same origin — set VITE_API_URL)";
+      const hint =
+        err instanceof TypeError
+          ? `Cannot reach the API at ${base}. Check that the API is running and try again.`
+          : "Network error";
+      throw new Error(hint);
+    }
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        if (body.detail) detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      } catch {
+        /* ignore */
+      }
+      throw new Error(detail);
+    }
+    const blob = await res.blob();
+    let filename = fallbackFilename;
+    const cd = res.headers.get("Content-Disposition");
+    const match = cd?.match(/filename="([^"]+)"/);
+    if (match) filename = match[1];
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
   },
 
   async importFile(sessionId: number, kind: "session" | "qualifications" | "qualifications-csp" | "qualifications-ep-nb-csp" | "asc" | "lecturer-preferences" | "overall-visual" | "admin-visual", file: File) {

@@ -35,6 +35,7 @@ Behaviour
 """
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import time
 from pathlib import Path
@@ -137,6 +138,16 @@ def _text(v) -> str | None:
 
 def _norm(s: str) -> str:
     return " ".join(s.split()).strip().lower()
+
+
+_ASC_GROUP_SUFFIX_RE = re.compile(r"(?:\s+Grp[0-9A-Za-z]+|[\s-]+GRP\d+)$", re.I)
+
+
+def _base_qualification_name_from_cohort(cohort_name: str) -> str:
+    """Strip trailing group suffix (e.g. '… GRP1', '… GrpA')."""
+    cc = (cohort_name or "").strip() or "Untitled"
+    base = _ASC_GROUP_SUFFIX_RE.sub("", cc).strip()
+    return base or cc
 
 
 def _model_has_session_id(model) -> bool:
@@ -437,6 +448,144 @@ def _ensure_qualification(
     return qual
 
 
+def _ensure_asc_course(
+    session: Session,
+    timetable_session_id: int | None,
+    *,
+    course_code: str,
+    course_name: str,
+    qualification_id: int,
+    rep: AscImportReport,
+) -> Course:
+    code = course_code.strip()
+    row = _scoped_filter_by(session, Course, timetable_session_id, code=code).first()
+    if row is None:
+        row = Course(
+            **_create_kwargs(
+                Course,
+                timetable_session_id,
+                code=code,
+                name=course_name,
+                qualification_id=qualification_id,
+            )
+        )
+        session.add(row)
+        session.flush()
+        rep.courses_created += 1
+    elif row.qualification_id != qualification_id:
+        row.qualification_id = qualification_id
+    return row
+
+
+def _ensure_asc_cohort_qualifications(
+    session: Session,
+    timetable_session_id: int | None,
+    *,
+    cohort_keys: list[str],
+    cohort_names: dict[str, str],
+    cohort_shorts: dict[str, str],
+    cohort_subject_sets: dict[str, frozenset[str]],
+    rep: AscImportReport,
+) -> tuple[dict[str, Qualification], dict[str, Course]]:
+    """Group aSc cohorts with identical subject sets into one qualification (multi-group)."""
+    qual_by_cohort: dict[str, Qualification] = {}
+    course_by_cohort: dict[str, Course] = {}
+
+    sig_to_cohorts: dict[frozenset[str], list[str]] = defaultdict(list)
+    for key in cohort_keys:
+        sig_to_cohorts[cohort_subject_sets.get(key, frozenset())].append(key)
+
+    used_qual_names: set[str] = set()
+
+    def _ensure_single(cohort_key: str) -> None:
+        name = cohort_names[cohort_key]
+        qual = _scoped_filter_by(session, Qualification, timetable_session_id, name=name).first()
+        if qual is None:
+            qual = Qualification(
+                **_create_kwargs(
+                    Qualification,
+                    timetable_session_id,
+                    name=name,
+                    num_groups=1,
+                    schedule_period=SCHEDULE_PERIOD_DAY,
+                )
+            )
+            session.add(qual)
+            session.flush()
+            replace_qualification_time_windows(session, qual)
+            rep.qualifications_created += 1
+        else:
+            rep.qualifications_linked += 1
+        short = cohort_shorts.get(cohort_key)
+        course_code = short or f"{name} GrpA"
+        course = _ensure_asc_course(
+            session,
+            timetable_session_id,
+            course_code=course_code,
+            course_name=name,
+            qualification_id=qual.id,
+            rep=rep,
+        )
+        qual_by_cohort[cohort_key] = qual
+        course_by_cohort[cohort_key] = course
+
+    for sig, keys in sig_to_cohorts.items():
+        if not sig:
+            for cohort_key in keys:
+                _ensure_single(cohort_key)
+            continue
+
+        keys_sorted = sorted(keys, key=lambda k: cohort_names.get(k, k))
+        base_name = _base_qualification_name_from_cohort(cohort_names[keys_sorted[0]])
+        qual_name = base_name
+        suffix_n = 1
+        while qual_name in used_qual_names:
+            suffix_n += 1
+            qual_name = f"{base_name} ({suffix_n})"
+        used_qual_names.add(qual_name)
+
+        qual = _scoped_filter_by(session, Qualification, timetable_session_id, name=qual_name).first()
+        if qual is None:
+            qual = Qualification(
+                **_create_kwargs(
+                    Qualification,
+                    timetable_session_id,
+                    name=qual_name,
+                    num_groups=len(keys_sorted),
+                    schedule_period=SCHEDULE_PERIOD_DAY,
+                )
+            )
+            session.add(qual)
+            session.flush()
+            replace_qualification_time_windows(session, qual)
+            rep.qualifications_created += 1
+        else:
+            qual.num_groups = max(qual.num_groups or 1, len(keys_sorted))
+            rep.qualifications_linked += 1
+
+        for i, cohort_key in enumerate(keys_sorted):
+            name = cohort_names[cohort_key]
+            short = cohort_shorts.get(cohort_key)
+            if short:
+                course_code = short
+            elif len(keys_sorted) == 1:
+                course_code = f"{base_name} GrpA"
+            else:
+                course_code = f"{base_name} Grp{chr(ord('A') + i)}"
+            course = _ensure_asc_course(
+                session,
+                timetable_session_id,
+                course_code=course_code,
+                course_name=name,
+                qualification_id=qual.id,
+                rep=rep,
+            )
+            qual_by_cohort[cohort_key] = qual
+            course_by_cohort[cohort_key] = course
+
+    return qual_by_cohort, course_by_cohort
+
+
 def _unit_storage_name(
     subject_code: str,
     subject_title: str | None,
@@ -641,8 +790,8 @@ def _import_bookings(
     class_shorts: dict[str, str],
     subject_titles: dict[str, str],
     assignments: dict[tuple[str, str], _LessonAssignment],
-    qual_cache: dict[str, Qualification],
-    course_cache: dict[str, Course],
+    qual_by_cohort: dict[str, Qualification],
+    course_by_cohort: dict[str, Course],
     unit_cache: dict[tuple[str, str], Unit],
     staff_cache: dict[str, Staff],
     room_cache: dict[str, Room],
@@ -667,8 +816,8 @@ def _import_bookings(
             continue
 
         qual_key = _norm(class_name)
-        qual = qual_cache.get(qual_key)
-        course = course_cache.get(qual_key)
+        qual = qual_by_cohort.get(qual_key)
+        course = course_by_cohort.get(qual_key)
         if qual is None or course is None:
             rep.warnings.append(
                 f"{block.sheet_name}: no course for class {class_name!r} ({block.subject_code})"
@@ -765,8 +914,6 @@ def import_asc_export(
 
     staff_cache: dict[str, Staff] = {}
     room_cache: dict[str, Room] = {}
-    qual_cache: dict[str, Qualification] = {}
-    course_cache: dict[str, Course] = {}
     unit_cache: dict[tuple[str, str], Unit] = {}
 
     ws_teachers = wb["Teachers"]
@@ -797,19 +944,29 @@ def import_asc_export(
     subject_codes = _read_subject_codes(wb["Subjects"]) if "Subjects" in wb.sheetnames else []
     subject_titles = _read_subjects(wb["Subjects"]) if "Subjects" in wb.sheetnames else {}
 
-    for key, canonical in class_names.items():
-        _ensure_qualification(
-            session,
-            timetable_session_id,
-            name=canonical,
-            course_code_hint=class_shorts.get(key),
-            rep=rep,
-            qual_cache=qual_cache,
-            course_cache=course_cache,
-        )
-
+    cohort_subject_sets: dict[str, set[str]] = defaultdict(set)
     ws_lessons = wb["Lessons"]
     l_hdr = _sheet_header_row(ws_lessons, _LESSONS_HEADER) or 1
+    for row in ws_lessons.iter_rows(min_row=l_hdr + 1, values_only=True):
+        class_raw = _text(row[1] if len(row) > 1 else None)
+        subject_code = _text(row[3] if len(row) > 3 else None)
+        if not class_raw or not subject_code:
+            continue
+        class_name = _resolve_class(class_raw, class_names)
+        if class_name is None:
+            continue
+        cohort_subject_sets[_norm(class_name)].add(_norm(subject_code))
+
+    qual_by_cohort, course_by_cohort = _ensure_asc_cohort_qualifications(
+        session,
+        timetable_session_id,
+        cohort_keys=list(class_names.keys()),
+        cohort_names=class_names,
+        cohort_shorts=class_shorts,
+        cohort_subject_sets={k: frozenset(v) for k, v in cohort_subject_sets.items()},
+        rep=rep,
+    )
+
     for row in ws_lessons.iter_rows(min_row=l_hdr + 1, values_only=True):
         teacher = _text(row[0] if len(row) > 0 else None)
         class_raw = _text(row[1] if len(row) > 1 else None)
@@ -826,17 +983,9 @@ def import_asc_export(
             continue
 
         qual_key = _norm(class_name)
-        qual = qual_cache.get(qual_key)
+        qual = qual_by_cohort.get(qual_key)
         if qual is None:
-            qual = _ensure_qualification(
-                session,
-                timetable_session_id,
-                name=class_name,
-                course_code_hint=class_shorts.get(qual_key),
-                rep=rep,
-                qual_cache=qual_cache,
-                course_cache=course_cache,
-            )
+            continue
 
         subj_key = _norm(subject_code)
         unit_key = (qual_key, subj_key)
@@ -917,8 +1066,8 @@ def import_asc_export(
         class_shorts=class_shorts,
         subject_titles=subject_titles,
         assignments=assignments,
-        qual_cache=qual_cache,
-        course_cache=course_cache,
+        qual_by_cohort=qual_by_cohort,
+        course_by_cohort=course_by_cohort,
         unit_cache=unit_cache,
         staff_cache=staff_cache,
         room_cache=room_cache,

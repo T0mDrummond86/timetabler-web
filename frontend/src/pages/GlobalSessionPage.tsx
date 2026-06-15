@@ -234,11 +234,6 @@ export function GlobalSessionPage() {
     );
   }
 
-  const memberSessionIds = useMemo(
-    () => global?.member_sessions.map((m) => m.id) ?? [],
-    [global?.member_sessions.map((m) => m.id).join(",")],
-  );
-
   if (loading && !global) {
     return (
       <AppShell title="Global session">

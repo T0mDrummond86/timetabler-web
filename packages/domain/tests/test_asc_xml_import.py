@@ -130,13 +130,70 @@ def test_import_multi_cohort_lesson_creates_booking_per_class(session, tmp_path)
 
     assert rep.bookings_created == 2
     assert session.query(Booking).count() == 2
-    quals = {q.name for q in session.query(Qualification).all()}
-    assert quals == {"Diploma Stage 1", "Diploma Stage 2"}
+    assert session.query(Qualification).count() == 1
+    qual = session.query(Qualification).one()
+    assert qual.num_groups == 2
+    from timetable.core.models import Course
+
+    courses = session.query(Course).filter(Course.qualification_id == qual.id).all()
+    assert len(courses) == 2
     bookings = session.query(Booking).order_by(Booking.course_id).all()
     assert bookings[0].day == bookings[1].day == 0
     assert bookings[0].start_slot == bookings[1].start_slot == 1
     assert bookings[0].end_slot == bookings[1].end_slot == 3
     assert bookings[0].course_id != bookings[1].course_id
+
+
+def _write_grouped_qualification_asc_xml(path: Path) -> None:
+    path.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<timetable displayname="aSc Timetables 2012 XML">
+  <teachers>
+    <teacher id="T1" name="Ada Lovelace" short="AL"/>
+  </teachers>
+  <classrooms>
+    <classroom id="R1" name="Room 101" short="R101"/>
+  </classrooms>
+  <classes>
+    <class id="C1" name="Bootcamp SS STG1 GRP1" short="BC-GRP1"/>
+    <class id="C2" name="Bootcamp SS STG1 GRP2" short="BC-GRP2"/>
+  </classes>
+  <subjects>
+    <subject id="S1" name="Workshop A" short="WSA"/>
+    <subject id="S2" name="Workshop B" short="WSB"/>
+  </subjects>
+  <lessons>
+    <lesson id="L1" classids="C1" subjectid="S1" periodspercard="2" teacherids="T1" classroomids="R1"/>
+    <lesson id="L2" classids="C1" subjectid="S2" periodspercard="2" teacherids="T1" classroomids="R1"/>
+    <lesson id="L3" classids="C2" subjectid="S1" periodspercard="2" teacherids="T1" classroomids="R1"/>
+    <lesson id="L4" classids="C2" subjectid="S2" periodspercard="2" teacherids="T1" classroomids="R1"/>
+  </lessons>
+  <cards>
+    <card lessonid="L1" classroomids="R1" period="1" days="100000" terms="11"/>
+    <card lessonid="L1" classroomids="R1" period="2" days="100000" terms="11"/>
+    <card lessonid="L3" classroomids="R1" period="1" days="100000" terms="11"/>
+    <card lessonid="L3" classroomids="R1" period="2" days="100000" terms="11"/>
+  </cards>
+</timetable>
+""",
+        encoding="utf-8",
+    )
+
+
+def test_import_groups_cohorts_with_identical_class_sets(session, tmp_path):
+    path = tmp_path / "grouped.xml"
+    _write_grouped_qualification_asc_xml(path)
+    rep = import_asc_export(session, path)
+
+    from timetable.core.models import Course
+
+    assert rep.qualifications_created == 1
+    qual = session.query(Qualification).one()
+    assert qual.name == "Bootcamp SS STG1"
+    assert qual.num_groups == 2
+    courses = {c.code for c in session.query(Course).filter(Course.qualification_id == qual.id).all()}
+    assert courses == {"BC-GRP1", "BC-GRP2"}
+    assert session.query(Booking).count() == 2
 
 
 def test_import_multi_cohort_reimport_is_idempotent(session, tmp_path):
@@ -147,6 +204,20 @@ def test_import_multi_cohort_reimport_is_idempotent(session, tmp_path):
     assert first.bookings_created == 2
     assert second.bookings_created == 2
     assert session.query(Booking).count() == 2
+
+
+def _course_for_cohort_name(session, root, cohort_name: str):
+    """Resolve the timetable course row for an aSc cohort (by class short code)."""
+    from timetable.core.models import Course
+
+    def attr(e, n):
+        return (e.get(n) or "").strip()
+
+    class_row = next(
+        c for c in root.find("classes").findall("class") if attr(c, "name") == cohort_name
+    )
+    short = attr(class_row, "short")
+    return session.query(Course).filter(Course.code == short).one()
 
 
 def test_import_multi_cohort_lesson_4103535120799b7b(session):
@@ -186,8 +257,7 @@ def test_import_multi_cohort_lesson_4103535120799b7b(session):
     start_slot, end_slot = _asc_periods_to_slots(periods[0], periods[-1], period_map=period_map)
 
     for cohort in cohort_names:
-        qual = session.query(Qualification).filter(Qualification.name == cohort).one()
-        course = session.query(Course).filter(Course.qualification_id == qual.id).first()
+        course = _course_for_cohort_name(session, root, cohort)
         assert course is not None
         matches = (
             session.query(Booking)
@@ -267,9 +337,7 @@ def test_import_six_dip_cohorts_share_combined_lesson_days(session):
     for cohort, slots in expected.items():
         if not slots:
             continue
-        qual = session.query(Qualification).filter(Qualification.name == cohort).one()
-        course = session.query(Course).filter(Course.qualification_id == qual.id).first()
-        assert course is not None
+        course = _course_for_cohort_name(session, root, cohort)
         booked = {
             (b.day, b.start_slot, b.end_slot)
             for b in session.query(Booking).filter(Booking.course_id == course.id).all()

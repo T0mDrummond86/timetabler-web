@@ -26,8 +26,8 @@ from .asc_import import (
     AscImportReport,
     _asc_periods_to_slots,
     _create_kwargs,
+    _ensure_asc_cohort_qualifications,
     _ensure_course_unit,
-    _ensure_qualification,
     _ensure_room,
     _ensure_staff,
     _find_room,
@@ -239,8 +239,8 @@ def _ensure_cohort_unit_from_lesson(
     subjects_by_id: dict[str, tuple[str, str]],
     timetable_session_id: int | None,
     rep: AscImportReport,
-    qual_cache: dict[str, Qualification],
-    course_cache: dict[str, Course],
+    qual_by_cohort: dict[str, Qualification],
+    course_by_cohort: dict[str, Course],
     unit_cache: dict[tuple[str, str], Unit],
     unit_qual_linked: set[tuple[int, int]],
     staff_comp_linked: set[tuple[int, int]],
@@ -257,24 +257,13 @@ def _ensure_cohort_unit_from_lesson(
     if not class_name or not subject:
         return None, None
     subject_code, subject_title = subject
-    qual_key = _norm(class_name)
-    if qual_key not in qual_cache:
-        _ensure_qualification(
-            session,
-            timetable_session_id,
-            name=class_name,
-            course_code_hint=class_shorts.get(class_id),
-            rep=rep,
-            qual_cache=qual_cache,
-            course_cache=course_cache,
-        )
-    qual = qual_cache.get(qual_key)
-    course = course_cache.get(qual_key)
+    qual = qual_by_cohort.get(class_id)
+    course = course_by_cohort.get(class_id)
     if qual is None or course is None:
         return None, None
 
     subj_key = _norm(subject_code)
-    unit_key = (qual_key, subj_key)
+    unit_key = (class_id, subj_key)
     storage_name = _unit_storage_name(
         subject_code,
         subject_title,
@@ -369,8 +358,6 @@ def import_asc_xml_export(
 
     staff_cache = {}
     room_cache: dict[str, object] = {}
-    qual_cache = {}
-    course_cache = {}
     unit_cache: dict[tuple[str, str], Unit] = {}
     unit_qual_linked: set[tuple[int, int]] = set()
     staff_comp_linked: set[tuple[int, int]] = set()
@@ -415,16 +402,6 @@ def import_asc_xml_export(
             continue
         class_names[cid] = name
         class_shorts[cid] = short or name
-        qual_key = _norm(name)
-        _ensure_qualification(
-            session,
-            timetable_session_id,
-            name=name,
-            course_code_hint=short,
-            rep=rep,
-            qual_cache=qual_cache,
-            course_cache=course_cache,
-        )
 
     subjects_by_id: dict[str, tuple[str, str]] = {}
     for elem in _section_items(root, "subjects", "subject"):
@@ -442,6 +419,26 @@ def import_asc_xml_export(
             if lid:
                 lessons_by_id[lid] = elem
 
+    cohort_subject_sets: dict[str, set[str]] = defaultdict(set)
+    for elem in lessons_by_id.values():
+        subject_id = _attr(elem, "subjectid")
+        subject = subjects_by_id.get(subject_id or "")
+        if not subject:
+            continue
+        subj_key = _norm(subject[0])
+        for class_id in _split_ids(_attr(elem, "classids")):
+            cohort_subject_sets[class_id].add(subj_key)
+
+    qual_by_cohort, course_by_cohort = _ensure_asc_cohort_qualifications(
+        session,
+        timetable_session_id,
+        cohort_keys=list(class_names.keys()),
+        cohort_names=class_names,
+        cohort_shorts=class_shorts,
+        cohort_subject_sets={k: frozenset(v) for k, v in cohort_subject_sets.items()},
+        rep=rep,
+    )
+
     for _lid, elem in lessons_by_id.items():
         class_ids = _split_ids(_attr(elem, "classids"))
         subject_id = _attr(elem, "subjectid")
@@ -458,8 +455,8 @@ def import_asc_xml_export(
                 subjects_by_id=subjects_by_id,
                 timetable_session_id=timetable_session_id,
                 rep=rep,
-                qual_cache=qual_cache,
-                course_cache=course_cache,
+                qual_by_cohort=qual_by_cohort,
+                course_by_cohort=course_by_cohort,
                 unit_cache=unit_cache,
                 unit_qual_linked=unit_qual_linked,
                 staff_comp_linked=staff_comp_linked,
@@ -548,9 +545,8 @@ def import_asc_xml_export(
                     class_name = class_names.get(class_id)
                     if not class_name:
                         continue
-                    qual_key = _norm(class_name)
-                    course = course_cache.get(qual_key)
-                    unit = unit_cache.get((qual_key, subj_key))
+                    course = course_by_cohort.get(class_id)
+                    unit = unit_cache.get((class_id, subj_key))
                     if course is None or unit is None:
                         course, unit = _ensure_cohort_unit_from_lesson(
                             session,
@@ -562,8 +558,8 @@ def import_asc_xml_export(
                             subjects_by_id=subjects_by_id,
                             timetable_session_id=timetable_session_id,
                             rep=rep,
-                            qual_cache=qual_cache,
-                            course_cache=course_cache,
+                            qual_by_cohort=qual_by_cohort,
+                            course_by_cohort=course_by_cohort,
                             unit_cache=unit_cache,
                             unit_qual_linked=unit_qual_linked,
                             staff_comp_linked=staff_comp_linked,

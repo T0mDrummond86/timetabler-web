@@ -118,6 +118,8 @@ const SESSION_TABS: { id: SessionTab; label: string; secondary?: boolean }[] = [
   { id: "lap", label: "LAP creation", secondary: true },
 ];
 
+const ENTITY_SPLIT_TABS = new Set<SessionTab>(["staff", "rooms", "units", "qualifications"]);
+
 const SESSION_TAB_IDS = new Set<SessionTab>(SESSION_TABS.map((t) => t.id));
 const VIEW_KIND_IDS = new Set<ViewKind>([
   "course",
@@ -1470,7 +1472,9 @@ export function TimetablePage() {
     <AppShell
       wide
       minimal={isEmbedded}
-      fillViewport={sessionTab === "timetable" && courses.length > 0}
+      fillViewport={
+        (sessionTab === "timetable" && courses.length > 0) || ENTITY_SPLIT_TABS.has(sessionTab)
+      }
       breadcrumb={
         <>
           <Link to="/dashboard">Dashboard</Link>
@@ -1859,61 +1863,69 @@ export function TimetablePage() {
       )}
 
       {sessionTab === "staff" && (
-        <EntityEditorsPanel
-          sessionId={sessionId}
-          staff={staff}
-          rooms={rooms}
-          units={units}
-          courses={courses}
-          qualifications={qualifications}
-          onUpdated={onEntityUpdated}
-          fixedTab="staff"
-          showLinkedImport={globalLink?.linked === true}
-          syncToken={entitySyncToken}
-        />
+        <div className="tt-page tt-page--entity">
+          <EntityEditorsPanel
+            sessionId={sessionId}
+            staff={staff}
+            rooms={rooms}
+            units={units}
+            courses={courses}
+            qualifications={qualifications}
+            onUpdated={onEntityUpdated}
+            fixedTab="staff"
+            showLinkedImport={globalLink?.linked === true}
+            syncToken={entitySyncToken}
+          />
+        </div>
       )}
       {sessionTab === "rooms" && (
-        <EntityEditorsPanel
-          sessionId={sessionId}
-          staff={staff}
-          rooms={rooms}
-          units={units}
-          courses={courses}
-          qualifications={qualifications}
-          onUpdated={onEntityUpdated}
-          fixedTab="rooms"
-        />
+        <div className="tt-page tt-page--entity">
+          <EntityEditorsPanel
+            sessionId={sessionId}
+            staff={staff}
+            rooms={rooms}
+            units={units}
+            courses={courses}
+            qualifications={qualifications}
+            onUpdated={onEntityUpdated}
+            fixedTab="rooms"
+          />
+        </div>
       )}
       {sessionTab === "units" && (
-        <EntityEditorsPanel
-          sessionId={sessionId}
-          staff={staff}
-          rooms={rooms}
-          units={units}
-          courses={courses}
-          qualifications={qualifications}
-          onUpdated={onEntityUpdated}
-          fixedTab="units"
-          focusEntityId={focusUnitId}
-          onFocusConsumed={() => setFocusUnitId(null)}
-        />
+        <div className="tt-page tt-page--entity">
+          <EntityEditorsPanel
+            sessionId={sessionId}
+            staff={staff}
+            rooms={rooms}
+            units={units}
+            courses={courses}
+            qualifications={qualifications}
+            onUpdated={onEntityUpdated}
+            fixedTab="units"
+            focusEntityId={focusUnitId}
+            onFocusConsumed={() => setFocusUnitId(null)}
+          />
+        </div>
       )}
       {sessionTab === "qualifications" && (
-        <EntityEditorsPanel
-          sessionId={sessionId}
-          staff={staff}
-          rooms={rooms}
-          units={units}
-          courses={courses}
-          qualifications={qualifications}
-          onUpdated={onEntityUpdated}
-          fixedTab="qualifications"
-          onNavigateToUnit={(unitId) => {
-            setFocusUnitId(unitId);
-            setSessionTab("units");
-          }}
-          showLinkedImport={globalLink?.linked === true}
-        />
+        <div className="tt-page tt-page--entity">
+          <EntityEditorsPanel
+            sessionId={sessionId}
+            staff={staff}
+            rooms={rooms}
+            units={units}
+            courses={courses}
+            qualifications={qualifications}
+            onUpdated={onEntityUpdated}
+            fixedTab="qualifications"
+            onNavigateToUnit={(unitId) => {
+              setFocusUnitId(unitId);
+              setSessionTab("units");
+            }}
+            showLinkedImport={globalLink?.linked === true}
+          />
+        </div>
       )}
       {sessionTab === "changelog" && courses.length > 0 && (
         <ChangeLogPanel

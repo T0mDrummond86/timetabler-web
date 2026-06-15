@@ -7,6 +7,7 @@ import {
   varianceTooltip,
   type StaffVarianceCategory,
 } from "../lib/staffVariance";
+import { LoadingMark } from "./LoadingMark";
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 
@@ -200,7 +201,11 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
   };
 
   return (
-    <div className="staff-hours-table-wrap">
+    <div className={`staff-hours-table-wrap${loading && rows.length === 0 ? " staff-hours-table-wrap--loading" : ""}`}>
+      {loading && rows.length === 0 ? (
+        <LoadingMark label="Loading hours…" />
+      ) : (
+        <>
       <StaffSummaryCards rows={rows} />
 
       <div className="staff-hours-table-toolbar">
@@ -218,12 +223,14 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
             ))}
           </select>
         </label>
-        <span className="muted staff-hours-table-count">
-          {filtered.length} of {rows.length} lecturer{rows.length === 1 ? "" : "s"}
-        </span>
+        {loading ? (
+          <LoadingMark size={40} label="Loading hours…" className="loading-mark--inline staff-hours-loading-mark" />
+        ) : (
+          <span className="muted staff-hours-table-count">
+            {filtered.length} of {rows.length} lecturer{rows.length === 1 ? "" : "s"}
+          </span>
+        )}
       </div>
-
-      {loading && <p className="muted staff-hours-loading">Loading hours…</p>}
 
       <div className="staff-hours-table-scroll">
         <table className="staff-hours-table">
@@ -365,6 +372,8 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
           </tbody>
         </table>
       </div>
+        </>
+      )}
     </div>
   );
 }
