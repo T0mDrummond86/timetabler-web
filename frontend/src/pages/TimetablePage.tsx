@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
   Course,
