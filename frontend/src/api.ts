@@ -17,7 +17,29 @@ import {
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
 export type TokenResponse = { access_token: string; token_type: string };
-export type User = { id: number; email: string; name: string };
+export type User = {
+  id: number;
+  username: string;
+  name: string;
+  is_admin: boolean;
+  is_active: boolean;
+  must_change_password: boolean;
+};
+export type AdminUser = {
+  id: number;
+  username: string;
+  name: string;
+  is_admin: boolean;
+  is_active: boolean;
+  must_change_password: boolean;
+  role: string;
+};
+export type GlobalSessionAccess = {
+  user_id: number;
+  username: string;
+  name: string;
+  granted_at: string;
+};
 export type Organization = { id: number; name: string; slug: string; role: string };
 export type TimetableSession = {
   id: number;
@@ -281,16 +303,47 @@ function triggerAuthDownload(path: string): void {
 
 export const api = {
   register: (body: {
-    email: string;
+    username: string;
     password: string;
     name: string;
     organization_name: string;
   }) => apiFetch<TokenResponse>("/auth/register", { method: "POST", body: JSON.stringify(body) }, false),
 
-  login: (body: { email: string; password: string; organization_id?: number }) =>
+  login: (body: { username: string; password: string; organization_id?: number }) =>
     apiFetch<TokenResponse>("/auth/login", { method: "POST", body: JSON.stringify(body) }, false),
 
+  adminUsers: () => apiFetch<AdminUser[]>("/admin/users"),
+
+  adminCreateUser: (body: {
+    username: string;
+    password: string;
+    name?: string;
+    role?: "editor" | "viewer";
+  }) =>
+    apiFetch<AdminUser>("/admin/users", { method: "POST", body: JSON.stringify(body) }),
+
+  adminPatchUser: (
+    userId: number,
+    body: { name?: string; is_active?: boolean; password?: string; role?: "editor" | "viewer" },
+  ) =>
+    apiFetch<AdminUser>(`/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify(body) }),
+
+  adminDeleteUser: (userId: number) =>
+    apiFetch<void>(`/admin/users/${userId}`, { method: "DELETE" }),
+
+  adminGlobalAccess: (globalSessionId: number) =>
+    apiFetch<GlobalSessionAccess[]>(`/admin/global-sessions/${globalSessionId}/access`),
+
+  adminSetGlobalAccess: (globalSessionId: number, userIds: number[]) =>
+    apiFetch<GlobalSessionAccess[]>(`/admin/global-sessions/${globalSessionId}/access`, {
+      method: "PUT",
+      body: JSON.stringify({ user_ids: userIds }),
+    }),
+
   me: () => apiFetch<User>("/auth/me"),
+
+  changePassword: (body: { current_password: string; new_password: string }) =>
+    apiFetch<User>("/auth/change-password", { method: "POST", body: JSON.stringify(body) }),
 
   orgs: () => apiFetch<Organization[]>("/orgs"),
 

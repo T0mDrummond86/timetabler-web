@@ -1,18 +1,18 @@
-import { Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
-import { FormEvent, useState } from "react";
+import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { FormEvent, useEffect, useState } from "react";
 import { api, getToken, setToken } from "./api";
 import { AppShell } from "./components/AppShell";
+import { AdminPage } from "./pages/AdminPage";
+import { ChangePasswordPage } from "./pages/ChangePasswordPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { GlobalSessionPage } from "./pages/GlobalSessionPage";
 import { TimetablePage } from "./pages/TimetablePage";
 import { TimetableSplitPage } from "./pages/TimetableSplitPage";
 
-function AuthForm({ mode }: { mode: "login" | "register" }) {
+function LoginForm() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [orgName, setOrgName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -21,17 +21,10 @@ function AuthForm({ mode }: { mode: "login" | "register" }) {
     setError(null);
     setLoading(true);
     try {
-      const res =
-        mode === "register"
-          ? await api.register({
-              email,
-              password,
-              name,
-              organization_name: orgName || "My organization",
-            })
-          : await api.login({ email, password });
+      const res = await api.login({ username, password });
       setToken(res.access_token);
-      navigate("/dashboard");
+      const me = await api.me();
+      navigate(me.must_change_password ? "/change-password" : "/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
     } finally {
@@ -40,75 +33,72 @@ function AuthForm({ mode }: { mode: "login" | "register" }) {
   }
 
   return (
-    <AppShell>
+    <AppShell minimal>
       <div className="auth-page">
         <div className="card auth-card">
-          <h1>{mode === "register" ? "Create account" : "Sign in"}</h1>
+          <h1>Sign in</h1>
           <form className="form" onSubmit={onSubmit}>
             <label>
-              Email
-              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+              Username
+              <input
+                required
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
             </label>
             <label>
               Password
               <input
                 type="password"
                 required
-                minLength={8}
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
             </label>
-            {mode === "register" && (
-              <>
-                <label>
-                  Your name
-                  <input value={name} onChange={(e) => setName(e.target.value)} />
-                </label>
-                <label>
-                  Organization name
-                  <input
-                    required
-                    value={orgName}
-                    onChange={(e) => setOrgName(e.target.value)}
-                    placeholder="e.g. Joondalup campus"
-                  />
-                </label>
-              </>
-            )}
             {error && <p className="error">{error}</p>}
             <button type="submit" className="btn-primary" disabled={loading} style={{ width: "100%" }}>
-              {loading ? "Please wait…" : mode === "register" ? "Create account" : "Sign in"}
+              {loading ? "Please wait…" : "Sign in"}
             </button>
           </form>
+          <p className="muted center" style={{ marginTop: "1rem" }}>
+            Contact an administrator if you need an account.
+          </p>
         </div>
-        <p className="muted center" style={{ marginTop: "1rem" }}>
-          {mode === "register" ? (
-            <>
-              Already have an account? <Link to="/login">Sign in</Link>
-            </>
-          ) : (
-            <>
-              New here? <Link to="/register">Create account</Link>
-            </>
-          )}
-        </p>
       </div>
     </AppShell>
   );
 }
 
 function HomeRedirect() {
-  return getToken() ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
+  const [target, setTarget] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!getToken()) {
+      setTarget("/login");
+      return;
+    }
+    void api.me().then(
+      (me) => setTarget(me.must_change_password ? "/change-password" : "/dashboard"),
+      () => setTarget("/login"),
+    );
+  }, []);
+
+  if (!target) return null;
+  return <Navigate to={target} replace />;
 }
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<HomeRedirect />} />
-      <Route path="/login" element={<AuthForm mode="login" />} />
-      <Route path="/register" element={<AuthForm mode="register" />} />
+      <Route path="/login" element={<LoginForm />} />
+      <Route path="/change-password" element={<ChangePasswordPage />} />
+      <Route path="/account/password" element={<ChangePasswordPage voluntary />} />
+      <Route path="/register" element={<Navigate to="/login" replace />} />
       <Route path="/dashboard" element={<DashboardPage />} />
+      <Route path="/admin" element={<AdminPage />} />
       <Route path="/global/:globalSessionId" element={<GlobalSessionPage />} />
       <Route path="/timetable/:sessionId" element={<TimetablePage />} />
       <Route path="/timetable/:sessionId/split" element={<TimetableSplitPage />} />

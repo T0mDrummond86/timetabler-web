@@ -17,6 +17,15 @@ _bearer = HTTPBearer(auto_error=False)
 
 EDITOR_ROLES = frozenset({"owner", "editor"})
 VIEWER_ROLES = frozenset({"owner", "editor", "viewer"})
+PASSWORD_CHANGE_REQUIRED = "password_change_required"
+
+
+def ensure_password_changed(user: User) -> None:
+    if user.must_change_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=PASSWORD_CHANGE_REQUIRED,
+        )
 
 
 @dataclass(frozen=True)
@@ -59,6 +68,17 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
         )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is disabled",
+        )
+    return user
+
+
+def require_admin(user: User = Depends(get_current_user)) -> User:
+    if not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return user
 
 
@@ -86,6 +106,10 @@ def get_auth_context(
     org = db.get(Organization, org_id)
     if user is None or org is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled")
+
+    ensure_password_changed(user)
 
     membership = (
         db.query(Membership)

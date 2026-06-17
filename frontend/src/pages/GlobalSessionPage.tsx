@@ -87,6 +87,7 @@ export function GlobalSessionPage() {
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [canLinkSessions, setCanLinkSessions] = useState(false);
   const [updatePrompt, setUpdatePrompt] = useState(false);
   const [tabSyncToken, setTabSyncToken] = useState(0);
 
@@ -96,10 +97,13 @@ export function GlobalSessionPage() {
     try {
       const orgs = await api.orgs();
       if (!orgs.length) throw new Error("No organization");
-      const [g, sessions] = await Promise.all([
+      const [me, g, sessions] = await Promise.all([
+        api.me(),
         api.globalSession(globalSessionId),
         api.sessions(orgs[0].id),
       ]);
+      const orgRole = orgs[0].role;
+      setCanLinkSessions(me.is_admin || orgRole === "owner" || orgRole === "editor");
       setGlobal(g);
       setAllSessions(sessions);
       setSelectedMemberIds(g.member_sessions.map((m) => m.id));
@@ -306,31 +310,39 @@ export function GlobalSessionPage() {
         <section className="card global-members-card">
           <h2>Linked timetable sessions</h2>
           <p className="muted">
-            Select which individual timetable sessions belong to this global group.
+            {canLinkSessions
+              ? "Select which individual timetable sessions belong to this global group."
+              : "Timetable sessions linked to this global workspace."}
           </p>
           <ul className="global-member-list">
             {allSessions.map((s) => {
               const inOther =
                 s.global_session_id != null && s.global_session_id !== globalSessionId;
+              const linked = selectedMemberIds.includes(s.id);
+              if (!canLinkSessions && !linked) return null;
               return (
                 <li key={s.id}>
-                  <label className={inOther ? "global-member-disabled" : "checkbox"}>
-                    <input
-                      type="checkbox"
-                      checked={selectedMemberIds.includes(s.id)}
-                      disabled={inOther}
-                      onChange={() => toggleMember(s.id)}
-                    />
-                    <span>
-                      {s.name}
-                      {s.global_session_id === globalSessionId && (
-                        <span className="muted"> (linked)</span>
-                      )}
-                      {inOther && (
-                        <span className="muted"> — in {s.global_session_name}</span>
-                      )}
-                    </span>
-                  </label>
+                  {canLinkSessions ? (
+                    <label className={inOther ? "global-member-disabled" : "checkbox"}>
+                      <input
+                        type="checkbox"
+                        checked={linked}
+                        disabled={inOther}
+                        onChange={() => toggleMember(s.id)}
+                      />
+                      <span>
+                        {s.name}
+                        {s.global_session_id === globalSessionId && (
+                          <span className="muted"> (linked)</span>
+                        )}
+                        {inOther && (
+                          <span className="muted"> — in {s.global_session_name}</span>
+                        )}
+                      </span>
+                    </label>
+                  ) : (
+                    <span>{s.name}</span>
+                  )}
                   <Link to={`/timetable/${s.id}`} className="btn-secondary btn-xs">
                     Open timetable
                   </Link>
@@ -338,14 +350,16 @@ export function GlobalSessionPage() {
               );
             })}
           </ul>
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={saving}
-            onClick={() => void saveMembers()}
-          >
-            {saving ? "Saving…" : "Save linked sessions"}
-          </button>
+          {canLinkSessions && (
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={saving}
+              onClick={() => void saveMembers()}
+            >
+              {saving ? "Saving…" : "Save linked sessions"}
+            </button>
+          )}
         </section>
       )}
 

@@ -60,7 +60,7 @@ def _register(client: TestClient) -> tuple[str, int]:
     r = client.post(
         "/auth/register",
         json={
-            "email": "import@test.example",
+            "username": "import",
             "password": "password123",
             "name": "Tester",
             "organization_name": "Test Org",

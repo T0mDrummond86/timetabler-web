@@ -11,6 +11,7 @@ from timetable.core.models import Base
 from timetable.core.tenancy_models import (  # noqa: F401 — register mappers
     GlobalSession,
     GlobalSessionMember,
+    GlobalSessionUserAccess,
     Membership,
     Organization,
     TimetableSession,

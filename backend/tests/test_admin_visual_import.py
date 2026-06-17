@@ -61,7 +61,7 @@ def _auth(client: TestClient) -> tuple[str, int]:
     reg = client.post(
         "/auth/register",
         json={
-            "email": "admin-visual@example.com",
+            "username": "admin-visual",
             "password": "password123",
             "name": "Admin Visual",
             "organization_name": "Org",
@@ -138,7 +138,7 @@ def test_admin_visual_import_tolerates_duplicate_unit_names_across_sessions(
     reg_a = client.post(
         "/auth/register",
         json={
-            "email": "admin-visual-a@example.com",
+            "username": "admin-visual-a",
             "password": "password123",
             "name": "A",
             "organization_name": "Org A",
@@ -153,7 +153,7 @@ def test_admin_visual_import_tolerates_duplicate_unit_names_across_sessions(
     reg_b = client.post(
         "/auth/register",
         json={
-            "email": "admin-visual-b@example.com",
+            "username": "admin-visual-b",
             "password": "password123",
             "name": "B",
             "organization_name": "Org B",

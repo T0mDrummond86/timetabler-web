@@ -4,9 +4,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
-from timetable.core.tenancy_models import GlobalSession, GlobalSessionMember
+from timetable.core.tenancy_models import GlobalSession, GlobalSessionMember, User
 
-from ..auth.deps import AuthContext, get_auth_context, require_editor
+from ..auth.deps import AuthContext, get_auth_context, require_admin, require_editor
 from ..database import get_db
 from ..schemas import (
     GlobalSessionCreate,
@@ -25,6 +25,7 @@ from ..services.global_session_import import (
     linked_sessions_for_timetable,
 )
 from ..services.timetable_grid import assert_session_in_org
+from ..services.global_access import assert_global_user_access, visible_global_session_ids
 from ..services.global_sessions import (
     aggregated_class_custodians,
     aggregated_qualifications,
@@ -72,12 +73,13 @@ def list_global_sessions(
 ):
     if ctx.organization.id != org_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong organization")
-    rows = (
-        db.query(GlobalSession)
-        .filter(GlobalSession.organization_id == org_id)
-        .order_by(GlobalSession.name)
-        .all()
-    )
+    q = db.query(GlobalSession).filter(GlobalSession.organization_id == org_id)
+    visible = visible_global_session_ids(ctx.user, org_id, db)
+    if visible is not None:
+        if not visible:
+            return []
+        q = q.filter(GlobalSession.id.in_(visible))
+    rows = q.order_by(GlobalSession.name).all()
     out: list[GlobalSessionSummaryOut] = []
     for row in rows:
         n = (
@@ -106,9 +108,11 @@ def list_global_sessions(
 def create_global_session(
     org_id: int,
     body: GlobalSessionCreate,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(get_auth_context),
+    admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    del admin
     if ctx.organization.id != org_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong organization")
     name = body.name.strip()
@@ -135,7 +139,9 @@ def get_global_session(
     ctx: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
-    row = assert_global_in_org(db, global_session_id, ctx.organization.id)
+    row = assert_global_user_access(
+        db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
+    )
     return _global_out(row, db)
 
 
@@ -143,9 +149,11 @@ def get_global_session(
 def patch_global_session(
     global_session_id: int,
     body: GlobalSessionCreate,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(get_auth_context),
+    admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    del admin
     row = assert_global_in_org(db, global_session_id, ctx.organization.id)
     name = body.name.strip()
     existing = (
@@ -171,9 +179,11 @@ def patch_global_session(
 @router.delete("/global-sessions/{global_session_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_global_session(
     global_session_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(get_auth_context),
+    admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    del admin
     row = assert_global_in_org(db, global_session_id, ctx.organization.id)
     db.delete(row)
     db.commit()
@@ -187,7 +197,9 @@ def put_global_members(
     ctx: AuthContext = Depends(require_editor),
     db: Session = Depends(get_db),
 ):
-    row = assert_global_in_org(db, global_session_id, ctx.organization.id)
+    row = assert_global_user_access(
+        db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
+    )
     set_global_members(db, global_session=row, timetable_session_ids=body.timetable_session_ids)
     db.commit()
     db.refresh(row)
@@ -200,7 +212,9 @@ def global_staff(
     ctx: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
-    assert_global_in_org(db, global_session_id, ctx.organization.id)
+    assert_global_user_access(
+        db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
+    )
     return {"rows": aggregated_staff(db, global_session_id)}
 
 
@@ -210,7 +224,9 @@ def global_rooms(
     ctx: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
-    assert_global_in_org(db, global_session_id, ctx.organization.id)
+    assert_global_user_access(
+        db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
+    )
     return {"rows": aggregated_rooms(db, global_session_id)}
 
 
@@ -220,7 +236,9 @@ def global_units(
     ctx: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
-    assert_global_in_org(db, global_session_id, ctx.organization.id)
+    assert_global_user_access(
+        db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
+    )
     return {"rows": aggregated_units(db, global_session_id)}
 
 
@@ -230,7 +248,9 @@ def global_qualifications(
     ctx: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
-    assert_global_in_org(db, global_session_id, ctx.organization.id)
+    assert_global_user_access(
+        db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
+    )
     return {"rows": aggregated_qualifications(db, global_session_id)}
 
 
@@ -240,7 +260,9 @@ def global_class_custodians(
     ctx: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
-    assert_global_in_org(db, global_session_id, ctx.organization.id)
+    assert_global_user_access(
+        db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
+    )
     return aggregated_class_custodians(db, global_session_id)
 
 

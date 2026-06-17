@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from timetable.core.tenancy_models import GlobalSessionMember, TimetableSession
@@ -17,6 +18,7 @@ from ..schemas import (
 from ..services.session_data import duplicate_timetable_session
 from ..services.session_seed import seed_timetable_session_data
 from ..services.session_stats import session_stats_map
+from ..services.global_access import visible_global_session_ids
 
 router = APIRouter(tags=["sessions"])
 
@@ -59,13 +61,32 @@ def _session_out_with_stats(row: TimetableSession, db: Session) -> TimetableSess
     return _session_out(row, db, stats=stats.get(row.id))
 
 
-def _session_in_org(db: Session, session_id: int, org_id: int) -> TimetableSession:
-    row = (
-        db.query(TimetableSession)
-        .filter(
-            TimetableSession.id == session_id,
-            TimetableSession.organization_id == org_id,
+def _visible_sessions_query(db: Session, *, org_id: int, ctx: AuthContext):
+    q = db.query(TimetableSession).filter(TimetableSession.organization_id == org_id)
+    if ctx.user.is_admin:
+        return q
+    visible_global_ids = visible_global_session_ids(ctx.user, org_id, db) or []
+    if not visible_global_ids:
+        return q.filter(TimetableSession.created_by_id == ctx.user.id)
+    return (
+        q.outerjoin(
+            GlobalSessionMember,
+            GlobalSessionMember.timetable_session_id == TimetableSession.id,
         )
+        .filter(
+            or_(
+                TimetableSession.created_by_id == ctx.user.id,
+                GlobalSessionMember.global_session_id.in_(visible_global_ids),
+            )
+        )
+        .distinct()
+    )
+
+
+def _session_in_org(db: Session, session_id: int, org_id: int, ctx: AuthContext) -> TimetableSession:
+    row = (
+        _visible_sessions_query(db, org_id=org_id, ctx=ctx)
+        .filter(TimetableSession.id == session_id)
         .first()
     )
     if row is None:
@@ -81,12 +102,7 @@ def list_sessions(
 ):
     if ctx.organization.id != org_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong organization")
-    rows = (
-        db.query(TimetableSession)
-        .filter(TimetableSession.organization_id == org_id)
-        .order_by(TimetableSession.name)
-        .all()
-    )
+    rows = _visible_sessions_query(db, org_id=org_id, ctx=ctx).order_by(TimetableSession.name).all()
     stats = session_stats_map(db, [r.id for r in rows])
     return [_session_out(r, db, stats=stats.get(r.id)) for r in rows]
 
@@ -139,7 +155,7 @@ def get_session(
     ctx: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
-    return _session_out_with_stats(_session_in_org(db, session_id, ctx.organization.id), db)
+    return _session_out_with_stats(_session_in_org(db, session_id, ctx.organization.id, ctx), db)
 
 
 @router.patch("/sessions/{session_id}", response_model=TimetableSessionOut)
@@ -149,7 +165,7 @@ def update_session(
     ctx: AuthContext = Depends(require_editor),
     db: Session = Depends(get_db),
 ):
-    row = _session_in_org(db, session_id, ctx.organization.id)
+    row = _session_in_org(db, session_id, ctx.organization.id, ctx)
     name = body.name.strip()
     existing = (
         db.query(TimetableSession)
@@ -182,7 +198,7 @@ def duplicate_session(
     ctx: AuthContext = Depends(require_editor),
     db: Session = Depends(get_db),
 ):
-    _session_in_org(db, session_id, ctx.organization.id)
+    _session_in_org(db, session_id, ctx.organization.id, ctx)
     try:
         row = duplicate_timetable_session(
             db,
@@ -202,7 +218,7 @@ def delete_session(
     ctx: AuthContext = Depends(require_editor),
     db: Session = Depends(get_db),
 ):
-    row = _session_in_org(db, session_id, ctx.organization.id)
+    row = _session_in_org(db, session_id, ctx.organization.id, ctx)
     db.delete(row)
     db.commit()
     return None

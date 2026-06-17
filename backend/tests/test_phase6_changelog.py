@@ -53,7 +53,7 @@ def _seed(client: TestClient) -> tuple[str, int, int, int, dict]:
     reg = client.post(
         "/auth/register",
         json={
-            "email": "changelog@example.com",
+            "username": "changelog",
             "password": "password123",
             "name": "Log Tester",
             "organization_name": "Log Org",

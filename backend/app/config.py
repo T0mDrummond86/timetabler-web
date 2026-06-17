@@ -25,7 +25,10 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     auto_create_tables: bool = True
     environment: str = "development"
-    allow_registration: bool = True
+    allow_registration: bool = False
+    bootstrap_admin_username: str | None = None
+    bootstrap_admin_password: str | None = None
+    bootstrap_org_name: str = "TAFE Tabler"
     max_upload_bytes: int = 50 * 1024 * 1024  # 50 MB
     auth_rate_limit_requests: int = 10
     auth_rate_limit_window_seconds: int = 60
@@ -50,6 +53,15 @@ class Settings(BaseSettings):
         reg = os.environ.get("ALLOW_REGISTRATION")
         if reg is not None and "allow_registration" not in kwargs:
             self.allow_registration = reg.lower() in ("1", "true", "yes")
+        bootstrap_user = os.environ.get("BOOTSTRAP_ADMIN_USERNAME")
+        if bootstrap_user is not None and "bootstrap_admin_username" not in kwargs:
+            self.bootstrap_admin_username = bootstrap_user.strip() or None
+        bootstrap_pass = os.environ.get("BOOTSTRAP_ADMIN_PASSWORD")
+        if bootstrap_pass is not None and "bootstrap_admin_password" not in kwargs:
+            self.bootstrap_admin_password = bootstrap_pass or None
+        bootstrap_org = os.environ.get("BOOTSTRAP_ORG_NAME")
+        if bootstrap_org is not None and "bootstrap_org_name" not in kwargs:
+            self.bootstrap_org_name = bootstrap_org.strip() or self.bootstrap_org_name
 
     @property
     def cors_origin_list(self) -> list[str]:

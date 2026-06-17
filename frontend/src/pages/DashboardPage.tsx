@@ -141,6 +141,10 @@ export function DashboardPage() {
       setLoading(true);
       try {
         const [u, o] = await Promise.all([api.me(), api.orgs()]);
+        if (u.must_change_password) {
+          navigate("/change-password");
+          return;
+        }
         setUser(u);
         setOrgs(o);
         if (o.length) {
@@ -149,7 +153,12 @@ export function DashboardPage() {
           setGlobalSessions(g);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load");
+        const msg = err instanceof Error ? err.message : "Failed to load";
+        if (msg.includes("password_change_required")) {
+          navigate("/change-password");
+          return;
+        }
+        setError(msg);
         setToken(null);
         navigate("/login");
       } finally {
@@ -414,16 +423,32 @@ export function DashboardPage() {
       title="Dashboard"
       subtitle={
         user
-          ? `${user.name || user.email}${org ? ` · ${org.name}` : ""}`
+          ? `${user.name || user.username}${org ? ` · ${org.name}` : ""}`
           : undefined
       }
       actions={
-        <button type="button" className="btn-secondary" onClick={() => {
-          setToken(null);
-          navigate("/login");
-        }}>
-          Sign out
-        </button>
+        <>
+          {user?.is_admin && (
+            <>
+              <Link to="/admin" className="btn-secondary">
+                Admin
+              </Link>
+              <Link to="/account/password" className="btn-secondary">
+                Change password
+              </Link>
+            </>
+          )}
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => {
+              setToken(null);
+              navigate("/login");
+            }}
+          >
+            Sign out
+          </button>
+        </>
       }
     >
       <DropdownGroup>
@@ -536,28 +561,34 @@ export function DashboardPage() {
         <section className="card dashboard-card">
           <div className="dashboard-card-header">
             <h2>Global sessions</h2>
-            <form className="dashboard-create-form" onSubmit={(e) => void createGlobalSession(e)}>
-              <input
-                className="field-input"
-                placeholder="New global session name"
-                value={newGlobalName}
-                onChange={(e) => setNewGlobalName(e.target.value)}
-                aria-label="New global session name"
-              />
-              <button
-                type="submit"
-                className="btn-secondary"
-                disabled={!newGlobalName.trim() || creatingGlobal}
-              >
-                {creatingGlobal ? "Creating…" : "New global"}
-              </button>
-            </form>
+            {user?.is_admin && (
+              <form className="dashboard-create-form" onSubmit={(e) => void createGlobalSession(e)}>
+                <input
+                  className="field-input"
+                  placeholder="New global session name"
+                  value={newGlobalName}
+                  onChange={(e) => setNewGlobalName(e.target.value)}
+                  aria-label="New global session name"
+                />
+                <button
+                  type="submit"
+                  className="btn-secondary"
+                  disabled={!newGlobalName.trim() || creatingGlobal}
+                >
+                  {creatingGlobal ? "Creating…" : "New global"}
+                </button>
+              </form>
+            )}
           </div>
 
           {loading ? (
             <LoadingMark label="Loading…" />
           ) : !globalSessions.length ? (
-            <p className="muted panel-empty">No global sessions yet.</p>
+            <p className="muted panel-empty">
+              {user?.is_admin
+                ? "No global sessions yet."
+                : "No global workspaces assigned to your account."}
+            </p>
           ) : filteredGlobals.length === 0 ? (
             <p className="muted panel-empty">No global sessions match your search.</p>
           ) : (
@@ -575,23 +606,25 @@ export function DashboardPage() {
                       Updated {formatRelativeTime(g.updated_at)}
                     </span>
                   </Link>
-                  <RowMenu
-                    label={g.name}
-                    busy={busyGlobalId === g.id}
-                    items={[
-                      {
-                        id: "rename",
-                        label: "Rename…",
-                        onClick: () => void renameGlobalSession(g),
-                      },
-                      {
-                        id: "delete",
-                        label: "Delete",
-                        danger: true,
-                        onClick: () => void deleteGlobalSession(g),
-                      },
-                    ]}
-                  />
+                  {user?.is_admin && (
+                    <RowMenu
+                      label={g.name}
+                      busy={busyGlobalId === g.id}
+                      items={[
+                        {
+                          id: "rename",
+                          label: "Rename…",
+                          onClick: () => void renameGlobalSession(g),
+                        },
+                        {
+                          id: "delete",
+                          label: "Delete",
+                          danger: true,
+                          onClick: () => void deleteGlobalSession(g),
+                        },
+                      ]}
+                    />
+                  )}
                 </li>
               ))}
             </ul>

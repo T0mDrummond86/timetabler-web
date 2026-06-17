@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import datetime as _dt
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .models import Base
@@ -33,9 +33,13 @@ class Organization(Base):
 class User(Base):
     __tablename__ = "user_account"
     id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(String(320), unique=True)
+    username: Mapped[str] = mapped_column(String(80), unique=True)
+    email: Mapped[str | None] = mapped_column(String(320), unique=True, nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     name: Mapped[str] = mapped_column(String(200), default="")
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[_dt.datetime] = mapped_column(
         DateTime,
         default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
@@ -43,6 +47,9 @@ class User(Base):
 
     memberships: Mapped[list["Membership"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
+    )
+    global_session_access: Mapped[list["GlobalSessionUserAccess"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", foreign_keys="GlobalSessionUserAccess.user_id"
     )
 
 
@@ -108,9 +115,41 @@ class GlobalSession(Base):
     members: Mapped[list["GlobalSessionMember"]] = relationship(
         back_populates="global_session", cascade="all, delete-orphan"
     )
+    user_access: Mapped[list["GlobalSessionUserAccess"]] = relationship(
+        back_populates="global_session", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         UniqueConstraint("organization_id", "name", name="global_session_org_name_uk"),
+    )
+
+
+class GlobalSessionUserAccess(Base):
+    """Grants a user access to view and use a global workspace."""
+
+    __tablename__ = "global_session_user_access"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    global_session_id: Mapped[int] = mapped_column(
+        ForeignKey("global_session.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE"), index=True
+    )
+    granted_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL"), nullable=True
+    )
+    granted_at: Mapped[_dt.datetime] = mapped_column(
+        DateTime,
+        default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
+    )
+
+    global_session: Mapped[GlobalSession] = relationship(back_populates="user_access")
+    user: Mapped[User] = relationship(
+        back_populates="global_session_access", foreign_keys=[user_id]
+    )
+
+    __table_args__ = (
+        UniqueConstraint("global_session_id", "user_id", name="global_session_user_access_uk"),
     )
 
 

@@ -53,7 +53,7 @@ def client():
     app.dependency_overrides.clear()
 
 
-def _register(client: TestClient, email: str, org_name: str) -> tuple[str, int, int]:
+def _register(client: TestClient, username: str, org_name: str) -> tuple[str, int, int]:
     r = client.post(
         "/auth/register",
         json={
@@ -117,7 +117,7 @@ def test_registration_disabled(client: TestClient, monkeypatch):
     resp = client.post(
         "/auth/register",
         json={
-            "email": "blocked@example.com",
+            "username": "blocked",
             "password": "password123",
             "name": "Blocked",
             "organization_name": "Blocked Org",

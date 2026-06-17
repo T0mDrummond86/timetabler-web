@@ -60,7 +60,7 @@ def test_class_custodians_includes_qualifications(client):
     r = test_client.post(
         "/auth/register",
         json={
-            "email": "cust@test.example",
+            "username": "cust",
             "password": "password123",
             "name": "Tester",
             "organization_name": "Test Org",

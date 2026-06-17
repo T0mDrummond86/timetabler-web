@@ -18,9 +18,7 @@ sys.path.insert(0, str(DOMAIN))
 
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["AUTO_CREATE_TABLES"] = "false"
-os.environ["JWT_SECRET"] = "test-secret"
-
-from timetable.core.models import Base  # noqa: E402
+os.environ["ALLOW_REGISTRATION"] = "true"
 from timetable.core.tenancy_models import TimetableSession  # noqa: E402, F401
 
 from app.database import get_db  # noqa: E402
@@ -54,7 +52,7 @@ def test_register_login_and_sessions(client: TestClient):
     reg = client.post(
         "/auth/register",
         json={
-            "email": "alice@example.com",
+            "username": "alice",
             "password": "password123",
             "name": "Alice",
             "organization_name": "Joondalup Campus",
@@ -65,7 +63,7 @@ def test_register_login_and_sessions(client: TestClient):
 
     me = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert me.status_code == 200
-    assert me.json()["email"] == "alice@example.com"
+    assert me.json()["username"] == "alice"
 
     orgs = client.get("/orgs", headers={"Authorization": f"Bearer {token}"})
     assert orgs.status_code == 200

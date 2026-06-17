@@ -18,9 +18,7 @@ sys.path.insert(0, str(DOMAIN))
 
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["AUTO_CREATE_TABLES"] = "false"
-os.environ["JWT_SECRET"] = "test-secret"
-
-from timetable.core.models import Base, Booking, Staff  # noqa: E402
+os.environ["ALLOW_REGISTRATION"] = "true"
 from timetable.core.tenancy_models import TimetableSession  # noqa: E402, F401
 
 from app.database import get_db  # noqa: E402
@@ -56,7 +54,7 @@ def _register(client: TestClient) -> tuple[str, int]:
     r = client.post(
         "/auth/register",
         json={
-            "email": "global@test.example",
+            "username": "global",
             "password": "password123",
             "name": "Tester",
             "organization_name": "Test Org",

@@ -51,7 +51,7 @@ def client():
     app.dependency_overrides.clear()
 
 
-def _auth_headers(client: TestClient, email: str, org_name: str) -> tuple[dict[str, str], int]:
+def _auth_headers(client: TestClient, username: str, org_name: str) -> tuple[dict[str, str], int]:
     res = client.post(
         "/auth/register",
         json={

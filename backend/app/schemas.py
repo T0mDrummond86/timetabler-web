@@ -3,20 +3,31 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=80)
+    password: str
+    organization_id: int | None = None
+
+    @field_validator("username")
+    @classmethod
+    def normalise_username(cls, v: str) -> str:
+        return v.strip().lower()
 
 
 class RegisterRequest(BaseModel):
-    email: EmailStr
+    """Legacy self-registration — disabled by default; admin creates accounts instead."""
+    username: str = Field(min_length=3, max_length=80)
     password: str = Field(min_length=8, max_length=128)
     name: str = Field(default="", max_length=200)
     organization_name: str = Field(min_length=1, max_length=200)
 
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
-    organization_id: int | None = None
+    @field_validator("username")
+    @classmethod
+    def normalise_username(cls, v: str) -> str:
+        return v.strip().lower()
 
 
 class TokenResponse(BaseModel):
@@ -26,10 +37,60 @@ class TokenResponse(BaseModel):
 
 class UserOut(BaseModel):
     id: int
-    email: str
+    username: str
     name: str
+    is_admin: bool
+    is_active: bool
+    must_change_password: bool
 
     model_config = {"from_attributes": True}
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class AdminUserCreate(BaseModel):
+    username: str = Field(min_length=3, max_length=80)
+    password: str = Field(min_length=8, max_length=128, description="Initial password; user must change on first sign-in")
+    name: str = Field(default="", max_length=200)
+    role: str = Field(default="editor", pattern="^(editor|viewer)$")
+
+    @field_validator("username")
+    @classmethod
+    def normalise_username(cls, v: str) -> str:
+        return v.strip().lower()
+
+
+class AdminUserPatch(BaseModel):
+    name: str | None = Field(default=None, max_length=200)
+    is_active: bool | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+    role: str | None = Field(default=None, pattern="^(editor|viewer)$")
+
+
+class AdminUserOut(BaseModel):
+    id: int
+    username: str
+    name: str
+    is_admin: bool
+    is_active: bool
+    must_change_password: bool
+    role: str
+
+    model_config = {"from_attributes": True}
+
+
+class GlobalSessionAccessOut(BaseModel):
+    user_id: int
+    username: str
+    name: str
+    granted_at: datetime
+
+
+class GlobalSessionAccessPatch(BaseModel):
+    user_ids: list[int] = Field(default_factory=list)
 
 
 class OrganizationOut(BaseModel):

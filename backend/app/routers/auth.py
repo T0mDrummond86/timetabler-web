@@ -11,12 +11,13 @@ from timetable.core.tenancy_models import (
     User,
 )
 
-from ..auth.deps import get_current_user
+from ..auth.deps import ensure_password_changed, get_current_user
 from ..auth.rate_limit import auth_rate_limiter, client_ip
 from ..auth.security import create_access_token, hash_password, verify_password
 from ..config import settings
 from ..database import get_db
 from ..schemas import (
+    ChangePasswordRequest,
     LoginRequest,
     OrganizationOut,
     RegisterRequest,
@@ -24,6 +25,7 @@ from ..schemas import (
     UserOut,
 )
 from ..services.session_seed import seed_timetable_session_data
+from ..services.users import create_org_user, normalise_username
 from ..util import unique_org_slug
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -63,21 +65,25 @@ def _token_for_user(db: Session, user: User, org_id: int | None) -> TokenRespons
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(body: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     if not settings.allow_registration:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Registration is disabled")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Registration is disabled; contact an administrator",
+        )
     auth_rate_limiter.check(client_ip(request))
-    if db.query(User).filter(User.email == body.email.lower()).first() is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
     org = Organization(name=body.organization_name.strip(), slug=unique_org_slug(db, body.organization_name))
-    user = User(
-        email=body.email.lower(),
-        password_hash=hash_password(body.password),
-        name=body.name.strip(),
-    )
-    db.add_all([org, user])
+    db.add(org)
     db.flush()
 
-    db.add(Membership(user_id=user.id, organization_id=org.id, role="owner"))
+    user = create_org_user(
+        db,
+        organization_id=org.id,
+        username=body.username,
+        password=body.password,
+        name=body.name,
+        role="owner",
+    )
+    user.is_admin = True
 
     tt_session = TimetableSession(
         organization_id=org.id,
@@ -95,11 +101,17 @@ def register(body: RegisterRequest, request: Request, db: Session = Depends(get_
 @router.post("/login", response_model=TokenResponse)
 def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
     auth_rate_limiter.check(client_ip(request))
-    user = db.query(User).filter(User.email == body.email.lower()).first()
+    username = normalise_username(body.username)
+    user = db.query(User).filter(User.username == username).first()
     if user is None or not verify_password(body.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
+            detail="Invalid username or password",
+        )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is disabled",
         )
     return _token_for_user(db, user, body.organization_id)
 
@@ -109,11 +121,35 @@ def me(user: User = Depends(get_current_user)):
     return user
 
 
+@router.post("/change-password", response_model=UserOut)
+def change_password(
+    body: ChangePasswordRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(body.current_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect",
+        )
+    if body.current_password == body.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="New password must be different from the current password",
+        )
+    user.password_hash = hash_password(body.new_password)
+    user.must_change_password = False
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 @router.get("/orgs", response_model=list[OrganizationOut])
 def my_organizations(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    ensure_password_changed(user)
     rows = (
         db.query(Membership, Organization)
         .join(Organization, Organization.id == Membership.organization_id)

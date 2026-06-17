@@ -12,8 +12,10 @@ from timetable.branding import APP_NAME
 from timetable.constants import NUM_DAYS, NUM_SLOTS
 
 from .config import settings
-from .database import check_database, create_all_tables
+from .database import check_database, create_all_tables, get_session_factory
+from .services.bootstrap import ensure_bootstrap_admin
 from .routers import (
+    admin,
     auth,
     bookings,
     changelog,
@@ -32,6 +34,11 @@ from .routers import (
 async def lifespan(app: FastAPI):
     if settings.auto_create_tables:
         create_all_tables()
+    db = get_session_factory()()
+    try:
+        ensure_bootstrap_admin(db)
+    finally:
+        db.close()
     yield
 
 
@@ -78,6 +85,7 @@ async def limit_request_body_size(request: Request, call_next):
 
 
 app.include_router(auth.router)
+app.include_router(admin.router)
 app.include_router(orgs.router)
 app.include_router(sessions.router)
 app.include_router(global_sessions.router)
