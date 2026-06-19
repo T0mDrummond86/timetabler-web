@@ -299,6 +299,7 @@ def export_admin(
     ctx: AuthContext = Depends(require_editor),
     db: Session = Depends(get_db),
     co_teach_only: bool = Query(default=False),
+    changed_only: bool = Query(default=False),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
     try:
@@ -306,6 +307,7 @@ def export_admin(
             db,
             timetable_session_id=session_id,
             co_teach_only=co_teach_only,
+            changed_only=changed_only,
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc

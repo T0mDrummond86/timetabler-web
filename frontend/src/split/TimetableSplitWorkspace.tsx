@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Course, Room, Staff, TimetableGlobalLink } from "../api";
-import type { BookingCard, TimetableEntity, TimetableGrid } from "../types";
+import type { BookingCard, BookingChange, TimetableEntity, TimetableGrid } from "../types";
 import { BlockDeliveryPanel } from "../components/BlockDeliveryPanel";
 import { BookingEditDialog } from "../components/BookingEditDialog";
 import { TimetableSidebar } from "../components/TimetableSidebar";
@@ -56,6 +56,8 @@ type Props = {
   layout: SplitLayoutKind;
 };
 
+type UndoEntry = { change: BookingChange; courseId: number };
+
 export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
   const count = paneCount(layout);
   const labels = SPLIT_PANE_LABELS[layout];
@@ -86,6 +88,8 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [mutating, setMutating] = useState(false);
+  const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
+  const [redoStack, setRedoStack] = useState<UndoEntry[]>([]);
   const [days, setDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri"]);
   const [globalLink, setGlobalLink] = useState<TimetableGlobalLink | null>(null);
   const globalLinkRef = useRef(globalLink);
@@ -214,6 +218,8 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
       );
       setSlots(enriched);
       setRefreshTokens(Array(count).fill(1));
+      setUndoStack([]);
+      setRedoStack([]);
       const [staffList, roomList] = await Promise.all([api.staff(sessionId), api.rooms(sessionId)]);
       setStaff(staffList);
       setRooms(roomList);
@@ -255,6 +261,7 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
     if (index === activeIndex) return;
     const slot = slotsRef.current[index];
     if (!slot) return;
+    setSidebarFilter("");
     void syncSidebarFromSlot(slot, index);
   }
 
@@ -269,6 +276,7 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
 
   async function onModeChange(nextMode: TimetableMode) {
     if (syncingRef.current) return;
+    setSidebarFilter("");
     setMode(nextMode);
     const kind = defaultViewKindForMode(nextMode);
     syncingRef.current = true;
@@ -287,6 +295,7 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
 
   async function onViewKindChange(kind: ViewKind) {
     if (syncingRef.current) return;
+    setSidebarFilter("");
     setMode(viewKindMode(kind));
     syncingRef.current = true;
     const rows = await loadSidebarEntities(kind);
@@ -366,6 +375,73 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
     notifyLinked();
   }
 
+  const pushUndo = useCallback((change: BookingChange, courseId: number) => {
+    setUndoStack((prev) => [...prev, { change, courseId }]);
+    setRedoStack([]);
+  }, []);
+
+  async function undo() {
+    if (!undoStack.length || mutating) return;
+    const entry = undoStack[undoStack.length - 1];
+    setMutating(true);
+    setError(null);
+    try {
+      await api.restoreBookings(sessionId, {
+        course_id: entry.courseId,
+        action: "undo",
+        label: entry.change.description,
+        snapshots: entry.change.before,
+      });
+      setUndoStack((prev) => prev.slice(0, -1));
+      setRedoStack((prev) => [...prev, entry]);
+      bumpRefresh();
+      notifyLinked();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Undo failed");
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function redo() {
+    if (!redoStack.length || mutating) return;
+    const entry = redoStack[redoStack.length - 1];
+    setMutating(true);
+    setError(null);
+    try {
+      await api.restoreBookings(sessionId, {
+        course_id: entry.courseId,
+        action: "redo",
+        label: entry.change.description,
+        snapshots: entry.change.after,
+      });
+      setRedoStack((prev) => prev.slice(0, -1));
+      setUndoStack((prev) => [...prev, entry]);
+      bumpRefresh();
+      notifyLinked();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Redo failed");
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        void undo();
+      }
+      if (e.key === "z" && e.shiftKey) {
+        e.preventDefault();
+        void redo();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
   async function onMove(bookingId: number, column: number, startSlot: number) {
     const grid = gridsRef.current[activeIndex];
     const booking = grid?.bookings.find((b) => b.id === bookingId);
@@ -375,18 +451,20 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
       if (grid.column_kind === "room") {
         const room = rooms[column];
         if (!room) return;
-        await api.moveBooking(sessionId, bookingId, {
+        const result = await api.moveBooking(sessionId, bookingId, {
           course_id: cid,
           day: grid.focus_day ?? activeSlot.roomDay,
           start_slot: startSlot,
           room_id: room.id,
         });
+        pushUndo(result.change, cid);
       } else {
-        await api.moveBooking(sessionId, bookingId, {
+        const result = await api.moveBooking(sessionId, bookingId, {
           course_id: cid,
           day: column,
           start_slot: startSlot,
         });
+        pushUndo(result.change, cid);
       }
       await afterMutation();
     } catch (err) {
@@ -496,6 +574,7 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
         roomDay={activeSlot.roomDay}
         days={days}
         onRoomDayChange={(d) => updateActiveSlot({ roomDay: d })}
+        showRoomDaySelector={false}
       />
 
       <div className="split-main">
@@ -527,6 +606,25 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
           </button>
           <button type="button" className="btn-secondary btn-xs" onClick={() => bumpRefresh()}>
             Reload all
+          </button>
+          <span className="tt-toolbar-sep" aria-hidden />
+          <button
+            type="button"
+            className="btn-secondary btn-xs"
+            onClick={() => void undo()}
+            disabled={!undoStack.length || mutating}
+            title="Undo placecard change (⌘Z)"
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            className="btn-secondary btn-xs"
+            onClick={() => void redo()}
+            disabled={!redoStack.length || mutating}
+            title="Redo placecard change (⌘⇧Z)"
+          >
+            Redo
           </button>
         </div>
 
@@ -572,7 +670,11 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
             if (!cid) return;
             setMutating(true);
             try {
-              await api.patchBooking(sessionId, editBooking.id, { course_id: cid, ...patch });
+              const result = await api.patchBooking(sessionId, editBooking.id, {
+                course_id: cid,
+                ...patch,
+              });
+              pushUndo(result.change, cid);
               setEditBooking(null);
               await afterMutation();
             } catch (err) {

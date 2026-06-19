@@ -727,6 +727,7 @@ export function TimetablePage() {
   }
 
   async function onModeChange(mode: TimetableMode) {
+    setSidebarFilter("");
     setTimetableMode(mode);
     const kind = defaultViewKindForMode(mode);
     await applyViewChange({
@@ -736,6 +737,7 @@ export function TimetablePage() {
   }
 
   async function onViewKindChange(kind: ViewKind) {
+    setSidebarFilter("");
     setTimetableMode(viewKindMode(kind));
     const partial: Partial<ViewState> = { viewKind: kind };
     if (kind === "block_delivery" && !qualificationId && sidebarEntities.length) {

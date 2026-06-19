@@ -693,6 +693,7 @@ class ChangeLogNotePatch(BaseModel):
 
 class ChangeLogRollbackRequest(BaseModel):
     booking_id: int
+    course_id: int
 
 
 class AlternatePlacementOptionOut(BaseModel):

@@ -97,6 +97,7 @@ def export_admin_xlsx(
     *,
     timetable_session_id: int,
     co_teach_only: bool = False,
+    changed_only: bool = False,
 ) -> tuple[bytes, str]:
     kw = _export_kwargs(db, timetable_session_id)
     tpl = resolve_admin_template_path()
@@ -108,8 +109,8 @@ def export_admin_xlsx(
             write_co_teach_admin_export(db, out, tpl, **kw)
             filename = "co_teach_export.xlsx"
         else:
-            write_admin_export(db, out, tpl, **kw)
-            filename = "admin_export.xlsx"
+            write_admin_export(db, out, tpl, changed_only=changed_only, **kw)
+            filename = "admin_export_changes.xlsx" if changed_only else "admin_export.xlsx"
         return _read_bytes(out), filename
     finally:
         out.unlink(missing_ok=True)

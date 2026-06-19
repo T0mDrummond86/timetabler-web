@@ -98,6 +98,78 @@ def affected_course_ids_from_resolved_changelog(
     return course_ids
 
 
+@dataclass(frozen=True)
+class AdminExportChangeHighlight:
+    """Which admin-export label cells to tint red for a class-card event id."""
+
+    time: bool = False
+    lecturer: bool = False
+    room: bool = False
+    day_header_days: frozenset[int] = frozenset()
+
+
+def _card_id_from_state(state: dict | None) -> str:
+    if not state:
+        return ""
+    raw = state.get("external_id")
+    if raw is None:
+        return ""
+    return str(raw).strip()
+
+
+def _highlight_from_net_states(
+    b_state: dict | None, a_state: dict
+) -> AdminExportChangeHighlight:
+    """Derive highlight flags from resolved before/after booking snapshots."""
+    if b_state is None:
+        return AdminExportChangeHighlight(
+            time=True,
+            lecturer=bool(a_state.get("staff_id") or a_state.get("sfs_co_teacher_staff_id")),
+            room=bool(a_state.get("room_id")),
+            day_header_days=frozenset({int(a_state["day"])}),
+        )
+    days: set[int] = set()
+    if int(b_state["day"]) != int(a_state["day"]):
+        days.add(int(b_state["day"]))
+        days.add(int(a_state["day"]))
+    return AdminExportChangeHighlight(
+        time=(int(b_state["start_slot"]), int(b_state["end_slot"]))
+        != (int(a_state["start_slot"]), int(a_state["end_slot"])),
+        lecturer=int(b_state.get("staff_id") or 0) != int(a_state.get("staff_id") or 0)
+        or int(b_state.get("sfs_co_teacher_staff_id") or 0)
+        != int(a_state.get("sfs_co_teacher_staff_id") or 0),
+        room=int(b_state.get("room_id") or 0) != int(a_state.get("room_id") or 0),
+        day_header_days=frozenset(days),
+    )
+
+
+def admin_export_highlights_by_external_id(
+    session: Session,
+    *,
+    timetable_session_id: int,
+) -> dict[str, AdminExportChangeHighlight]:
+    """Resolved net timetabling changes keyed by class-card id (``Booking.external_id``).
+
+    Entries without an event id are omitted. Deleted classes are omitted (not on export).
+    """
+    before_map, after_map = resolve_session_booking_net_maps(
+        session, timetable_session_id=timetable_session_id
+    )
+    out: dict[str, AdminExportChangeHighlight] = {}
+    for bid in set(before_map) | set(after_map):
+        b_state = before_map.get(bid)
+        a_state = after_map.get(bid)
+        if a_state is None:
+            continue
+        eid = _card_id_from_state(a_state) or _card_id_from_state(b_state)
+        if not eid:
+            continue
+        flags = _highlight_from_net_states(b_state, a_state)
+        if flags.time or flags.lecturer or flags.room or flags.day_header_days:
+            out[eid] = flags
+    return out
+
+
 def gather_timetabling_change_log_display_rows(
     session: Session,
     *,

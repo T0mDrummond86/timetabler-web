@@ -225,6 +225,21 @@ export function DataToolbar({
               role="menuitem"
               onClick={() =>
                 void exportPath(
+                  `/sessions/${sessionId}/export/admin?changed_only=true`,
+                  "admin_export_changes.xlsx",
+                  "Admin export (changes only)",
+                )
+              }
+            >
+              <span className="ctx-item-title">Admin export (changes only)</span>
+              <span className="ctx-item-hint">Only courses with logged changes</span>
+            </button>
+            <button
+              type="button"
+              className="ctx-item ctx-item-desc"
+              role="menuitem"
+              onClick={() =>
+                void exportPath(
                   `/sessions/${sessionId}/export/admin?co_teach_only=true`,
                   "co_teach_export.xlsx",
                   "SFS co-teach export",

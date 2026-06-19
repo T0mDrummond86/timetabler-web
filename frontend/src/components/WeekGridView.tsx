@@ -41,7 +41,7 @@ function cardTitle(b: BookingCard): string {
   return parts.join(" ") || `Booking #${b.id}`;
 }
 
-function cardMeta(b: BookingCard, grid: TimetableGrid): string {
+function cardMeta(b: BookingCard, grid: TimetableGrid, includeRoom = true): string {
   const bits: string[] = [];
   const courseViews = ["staff", "room", "day", "unassigned_lecturer"];
   if (courseViews.includes(grid.view) && b.course_code) bits.push(b.course_code);
@@ -49,8 +49,33 @@ function cardMeta(b: BookingCard, grid: TimetableGrid): string {
     bits.push(b.staff_name);
   }
   if (grid.view === "co_teach" && b.staff_name) bits.push(b.staff_name);
-  if (grid.view !== "room" && b.room_code) bits.push(b.room_code);
+  if (includeRoom && grid.view !== "room" && b.room_code) bits.push(b.room_code);
   return bits.join(" · ");
+}
+
+function cardRoom(b: BookingCard, grid: TimetableGrid): string | null {
+  return grid.view !== "room" && b.room_code ? b.room_code : null;
+}
+
+// Approximate rendered line heights (px) used to decide whether a card is tall
+// enough to give the room its own line rather than truncating it inline.
+const CARD_PAD = 8;
+const CARD_GAP = 1;
+const CARD_H_TIME = 13;
+const CARD_H_TITLE = 16;
+const CARD_H_LINE = 15;
+const CARD_H_NOTES = 13;
+
+function roomFitsOwnLine(
+  cardHeightPx: number,
+  hasMetaWithoutRoom: boolean,
+  hasNotes: boolean,
+): boolean {
+  let base = CARD_PAD + CARD_H_TIME + CARD_H_TITLE;
+  if (hasMetaWithoutRoom) base += CARD_GAP + CARD_H_LINE;
+  if (hasNotes) base += CARD_GAP + CARD_H_NOTES;
+  // Require the extra room line to fully fit (+2px safety margin) so it is never clipped.
+  return cardHeightPx >= base + CARD_GAP + CARD_H_LINE + 2;
 }
 
 function termBadges(b: BookingCard): string {
@@ -302,6 +327,12 @@ export function WeekGridView({
                 const widthPct = b.layout_width_pct ?? 100 / b.lane_depth;
                 const leftPct = b.layout_left_pct ?? b.lane * (100 / b.lane_depth);
                 const meta = cardMeta(b, grid);
+                const cardHeightPx = Math.max(height, 24);
+                const room = cardRoom(b, grid);
+                const metaNoRoom = cardMeta(b, grid, false);
+                const roomOnOwnLine =
+                  room != null && roomFitsOwnLine(cardHeightPx, Boolean(metaNoRoom), Boolean(b.notes));
+                const metaDisplay = roomOnOwnLine ? metaNoRoom : meta;
                 const terms = termBadges(b);
                 const locked = b.lock_time || b.lock_staff;
                 const showViolation = showAlerts && (b.is_hard || b.is_soft);
@@ -373,7 +404,10 @@ export function WeekGridView({
                       {locked && <span className="booking-lock-badge">🔒</span>}
                     </span>
                     <span className="booking-card-title">{cardTitle(b)}</span>
-                    {meta && <span className="booking-card-meta">{meta}</span>}
+                    {metaDisplay && <span className="booking-card-meta">{metaDisplay}</span>}
+                    {roomOnOwnLine && room && (
+                      <span className="booking-card-room">{room}</span>
+                    )}
                     {b.notes && <span className="booking-card-notes">{b.notes}</span>}
                   </div>
                 );

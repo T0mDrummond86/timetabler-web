@@ -18,6 +18,7 @@ export function TimetableSplitPage() {
   return (
     <AppShell
       wide
+      fillViewport
       title="Split screen"
       subtitle="Shared controls · click a pane to make it active"
       breadcrumb={

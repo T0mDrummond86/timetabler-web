@@ -16,6 +16,7 @@ type Props = {
   roomDay?: number;
   days?: string[];
   onRoomDayChange?: (day: number) => void;
+  showRoomDaySelector?: boolean;
   reorderable?: boolean;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -114,6 +115,7 @@ export function TimetableSidebar({
   roomDay = 0,
   days = [],
   onRoomDayChange,
+  showRoomDaySelector = true,
   reorderable = false,
   onMoveUp,
   onMoveDown,
@@ -157,7 +159,7 @@ export function TimetableSidebar({
 
       {viewExtras}
 
-      {viewKind === "room" && days.length > 0 && onRoomDayChange && (
+      {showRoomDaySelector && viewKind === "room" && days.length > 0 && onRoomDayChange && (
         <div className="tt-sidebar-section">
           <span className="tt-sidebar-label">Day</span>
           <PickList

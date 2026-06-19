@@ -194,7 +194,10 @@ class TimetableSession(Base):
 
     organization: Mapped[Organization] = relationship(back_populates="timetable_sessions")
     global_membership: Mapped[GlobalSessionMember | None] = relationship(
-        back_populates="timetable_session", uselist=False
+        back_populates="timetable_session",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     __table_args__ = (

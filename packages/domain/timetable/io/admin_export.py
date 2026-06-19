@@ -560,6 +560,7 @@ def _write_admin_workbook(
     co_teach_only: bool = False,
     week_id: int | None = None,
     timetable_session_id: int | None = None,
+    changed_only: bool = False,
 ) -> AdminExportReport:
     layout = _layout()
     probe = load_workbook(template_path, read_only=True)
@@ -581,14 +582,26 @@ def _write_admin_workbook(
         week = session.query(Week).order_by(Week.id).first()
     if week is None:
         raise RuntimeError("No week exists in session.")
-    # Full highlight logic lives in desktop UI; web export uses no highlights for now.
     change_highlights: dict = {}
+    if timetable_session_id is not None:
+        from ..core.change_log_data import admin_export_highlights_by_external_id
+
+        change_highlights = admin_export_highlights_by_external_id(
+            session, timetable_session_id=timetable_session_id
+        )
     courses = _courses_for_admin_export(
         session,
         week,
         co_teach_only=co_teach_only,
         timetable_session_id=timetable_session_id,
     )
+    if changed_only and timetable_session_id is not None:
+        from ..core.change_log_data import affected_course_ids_from_resolved_changelog
+
+        changed_ids = affected_course_ids_from_resolved_changelog(
+            session, timetable_session_id=timetable_session_id
+        )
+        courses = [c for c in courses if c.id in changed_ids]
     used_titles: set[str] = set()
     warnings: list[str] = []
     bookings_written = 0
@@ -615,7 +628,12 @@ def _write_admin_workbook(
 
     wb.remove(wb[template_sheet])
     if not new_sheets:
-        label = "No SFS co-teach classes" if co_teach_only else "No courses"
+        if co_teach_only:
+            label = "No SFS co-teach classes"
+        elif changed_only:
+            label = "No changed courses"
+        else:
+            label = "No courses"
         ws = wb.create_sheet(label[:31])
         ws["A1"] = f"{label} in session."
     write_backup_sheet(wb, session, timetable_session_id=timetable_session_id)
@@ -636,8 +654,12 @@ def write_admin_export(
     *,
     week_id: int | None = None,
     timetable_session_id: int | None = None,
+    changed_only: bool = False,
 ) -> AdminExportReport:
-    """Export one sheet per course; template supplies all formatting."""
+    """Export one sheet per course; template supplies all formatting.
+
+    When ``changed_only`` is set, only courses with net change-log changes are written.
+    """
     template_path = resolve_admin_template_path(template_path)
     return _write_admin_workbook(
         session,
@@ -646,6 +668,7 @@ def write_admin_export(
         co_teach_only=False,
         week_id=week_id,
         timetable_session_id=timetable_session_id,
+        changed_only=changed_only,
     )
 
 
