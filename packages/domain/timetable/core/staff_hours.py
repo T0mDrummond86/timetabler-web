@@ -8,6 +8,11 @@ from typing import Iterable
 from sqlalchemy.orm import Session, joinedload
 
 from ..constants import SLOT_MINUTES
+from .combined_class import (
+    combined_class_hours_representative_ids,
+    counts_toward_staff_hours,
+    filter_bookings_for_staff_hours,
+)
 from .booking_sessions import (
     TERM1_WEEK_RANGE,
     TERM2_WEEK_RANGE,
@@ -108,7 +113,7 @@ def booking_duration_hours(booking: Booking) -> float:
 
 def total_scheduled_hours(bookings: Iterable[Booking]) -> float:
     """Sum of raw scheduled slot durations (for week-grid views; no online weighting)."""
-    return sum(booking_duration_hours(b) for b in bookings)
+    return sum(booking_duration_hours(b) for b in filter_bookings_for_staff_hours(bookings))
 
 
 def scheduled_hours_by_staff_for_week(
@@ -118,7 +123,11 @@ def scheduled_hours_by_staff_for_week(
     from .booking_staff import staff_booking_hours_by_term
 
     acc: defaultdict[int, float] = defaultdict(float)
-    for b in session.query(Booking).filter(Booking.week_id == week_id).all():
+    week_bookings = session.query(Booking).filter(Booking.week_id == week_id).all()
+    rep_ids = combined_class_hours_representative_ids(week_bookings)
+    for b in week_bookings:
+        if not counts_toward_staff_hours(b, rep_ids):
+            continue
         hrs = booking_duration_hours(b)
         staff_ids: set[int] = set()
         if b.staff_id is not None:
@@ -323,7 +332,7 @@ def _booking_term_week_factor(booking: Booking, term: int) -> float:
 def _weekly_regular_hours(bookings_term: list[Booking], term: int) -> float:
     """Scheduled contact hours in non-online rooms, session-adjusted for one term."""
     total = 0.0
-    for b in bookings_term:
+    for b in filter_bookings_for_staff_hours(bookings_term):
         if room_is_online(b.room):
             continue
         total += booking_duration_hours(b) * _booking_term_week_factor(b, term)
@@ -331,6 +340,9 @@ def _weekly_regular_hours(bookings_term: list[Booking], term: int) -> float:
 
 
 def _online_group_key(b: Booking) -> int | tuple[str, int]:
+    gid = getattr(b, "combined_class_group_id", None)
+    if gid is not None:
+        return ("combined", int(gid))
     if b.unit_id is not None:
         return b.unit_id
     return ("solo", b.id)
@@ -681,7 +693,9 @@ def _term_class_hours_by_unit(
     from .booking_staff import staff_active_in_term
 
     tkey = "t1" if term == 1 else "t2"
-    bt = [b for b in bookings if staff_active_in_term(b, staff_id, tkey)]
+    bt = filter_bookings_for_staff_hours(
+        b for b in bookings if staff_active_in_term(b, staff_id, tkey)
+    )
     by_unit: dict[int | None, list[Booking]] = defaultdict(list)
     for b in bt:
         by_unit[b.unit_id].append(b)

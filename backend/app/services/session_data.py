@@ -5,6 +5,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from timetable.core.combined_class import apply_combined_class_detection
 from timetable.core.models import (
     Booking,
     ChangeLogEntry,
@@ -376,6 +377,7 @@ def serialize_session(db: Session, timetable_session_id: int) -> dict[str, Any]:
                 "session_part": getattr(b, "session_part", 1) or 1,
                 "session_weeks": getattr(b, "session_weeks", None),
                 "block_week_index": getattr(b, "block_week_index", None),
+                "combined_class_group_id": getattr(b, "combined_class_group_id", None),
             }
             for b in db.query(Booking)
             .filter(Booking.week_id.in_(week_ids or [-1]))
@@ -608,9 +610,11 @@ def restore_session(db: Session, timetable_session_id: int, payload: dict[str, A
                 session_part=b.get("session_part", 1) or 1,
                 session_weeks=b.get("session_weeks"),
                 block_week_index=b.get("block_week_index"),
+                combined_class_group_id=b.get("combined_class_group_id"),
             )
         )
     apply_unit_bracket_fields_from_names(db)
+    apply_combined_class_detection(db, timetable_session_id)
     db.flush()
     return {
         "qualifications": len(payload.get("qualifications", [])),

@@ -24,6 +24,11 @@ from .models import (
     UnitQualification,
 )
 from .scheduling_constraints import iter_scheduling_violations
+from .combined_class import (
+    combined_class_hours_representative_ids,
+    counts_toward_staff_hours,
+    same_combined_class,
+)
 from .booking_staff import (
     staff_booking_hours_by_term,
     staff_ids_with_term_overlap,
@@ -125,6 +130,8 @@ def permitted_parallel_online_cohort_overlap(
 
 def bookings_need_separate_lanes(a: Booking, b: Booking, session: Session | None = None) -> bool:
     """True when two bookings overlap in clock time and share a term (real clash)."""
+    if same_combined_class(a, b):
+        return False
     if not _overlap(a.start_slot, a.end_slot, b.start_slot, b.end_slot):
         return False
     if session is not None:
@@ -149,6 +156,8 @@ def _check_pairwise_clashes(session: Session, bookings: list[Booking]) -> Iterab
                 from .block_delivery import same_schedule_lane
 
                 if a.course_id == b.course_id and not same_schedule_lane(a, b):
+                    continue
+                if same_combined_class(a, b):
                     continue
                 if (
                     a.room_id
@@ -308,7 +317,10 @@ def _check_staff_hour_caps(bookings: list[Booking]) -> Iterable[Violation]:
     just works the cap each week."""
     t1: dict[int, float] = defaultdict(float)
     t2: dict[int, float] = defaultdict(float)
+    rep_ids = combined_class_hours_representative_ids(bookings)
     for b in bookings:
+        if not counts_toward_staff_hours(b, rep_ids):
+            continue
         for sid in timetable_staff_ids(b):
             t1_h, t2_h = staff_booking_hours_by_term(b, sid)
             t1[sid] += t1_h

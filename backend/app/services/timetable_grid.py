@@ -260,6 +260,7 @@ def _booking_card(
         "sfs_co_teacher_in_term_2": bool(getattr(b, "sfs_co_teacher_in_term_2", 0)),
         "online_student_count": getattr(b, "online_student_count", None),
         "room_is_online": room_is_online(b.room),
+        "combined_class_group_id": getattr(b, "combined_class_group_id", None),
         "violations": [
             {
                 "severity": v.severity.value,

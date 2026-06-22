@@ -19,6 +19,7 @@ from .models import (
     StaffCompetency,
     UnitAllowedRoom,
 )
+from .combined_class import same_combined_class
 from .validation import (
     _overlap,
     permitted_parallel_online_cohort_overlap,
@@ -529,6 +530,8 @@ def _probe_clashes_staff(
     if permitted_parallel_online_cohort_overlap(
         adapter, other, a_room=probe_room, b_room=other_room
     ):
+        return False
+    if same_combined_class(adapter, other):
         return False
     return True
 

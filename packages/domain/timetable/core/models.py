@@ -111,6 +111,7 @@ class Staff(Base):
     )
     name: Mapped[str] = mapped_column(String)
     cost_centre: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    staff_identifier: Mapped[str | None] = mapped_column(String(80), nullable=True)
     max_hours_per_week: Mapped[float | None] = mapped_column(nullable=True)
     non_teaching_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Full-time equivalent (input); lecturing load = fte × 21 hours per FTE.
@@ -398,6 +399,8 @@ class Booking(Base):
     session_weeks: Mapped[str | None] = mapped_column(String, nullable=True)
     # Block delivery: which week within the block (1–3); null = regular repeating booking.
     block_week_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Set on import when multiple cohorts share one lecturer/room/timeslot/unit set.
+    combined_class_group_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     week: Mapped[Week] = relationship(back_populates="bookings")
     course: Mapped[Course] = relationship()

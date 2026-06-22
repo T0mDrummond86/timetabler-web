@@ -253,6 +253,7 @@ class BookingCardOut(BaseModel):
     sfs_co_teacher_in_term_2: bool = False
     online_student_count: int | None = None
     room_is_online: bool = False
+    combined_class_group_id: int | None = None
     violations: list[ViolationOut]
 
 
@@ -389,6 +390,7 @@ class StaffOut(BaseModel):
     id: int
     name: str
     cost_centre: str | None = None
+    staff_identifier: str | None = None
     max_hours_per_week: float | None = None
     fte: float | None = None
     non_teaching_day: int | None = None
@@ -406,6 +408,7 @@ class StaffOut(BaseModel):
 class StaffPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     cost_centre: str | None = Field(default=None, max_length=80)
+    staff_identifier: str | None = Field(default=None, max_length=80)
     max_hours_per_week: float | None = None
     fte: float | None = None
     non_teaching_day: int | None = Field(default=None, ge=0, le=4)
@@ -783,6 +786,7 @@ class ResourceUsageOut(BaseModel):
 class StaffHoursRowOut(BaseModel):
     id: int
     name: str
+    staff_identifier: str | None = None
     cost_centre: str | None = None
     fte: float | None = None
     lecturing_hours: float | None = None
@@ -822,6 +826,7 @@ class StaffDetailOut(BaseModel):
     id: int
     name: str
     cost_centre: str | None = None
+    staff_identifier: str | None = None
     fte: float | None = None
     max_hours_per_week: float | None = None
     non_teaching_day: int | None = None
@@ -878,6 +883,11 @@ class ClashCheckSettingOut(BaseModel):
 
 class ClashCheckSettingsPatch(BaseModel):
     settings: dict[str, bool] = Field(default_factory=dict)
+
+
+class CombinedClassReapplyOut(BaseModel):
+    combined_class_groups: int
+    bookings_tagged: int
 
 
 class RoomTypeChoicesOut(BaseModel):

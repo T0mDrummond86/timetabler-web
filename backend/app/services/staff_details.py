@@ -57,6 +57,7 @@ def staff_detail(db: Session, *, timetable_session_id: int, staff_id: int) -> di
         "id": row.id,
         "name": row.name,
         "cost_centre": getattr(row, "cost_centre", None),
+        "staff_identifier": getattr(row, "staff_identifier", None),
         "fte": row.fte,
         "max_hours_per_week": row.max_hours_per_week,
         "non_teaching_day": row.non_teaching_day,

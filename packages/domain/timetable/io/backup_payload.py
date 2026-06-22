@@ -209,6 +209,8 @@ def serialize(session: Session, *, timetable_session_id: int | None = None) -> d
         "staff": [
             {
                 "id": s.id, "name": s.name,
+                "cost_centre": getattr(s, "cost_centre", None),
+                "staff_identifier": getattr(s, "staff_identifier", None),
                 "max_hours_per_week": s.max_hours_per_week,
                 "non_teaching_day": s.non_teaching_day,
                 "fte": getattr(s, "fte", None),
@@ -297,6 +299,7 @@ def serialize(session: Session, *, timetable_session_id: int | None = None) -> d
                 "session_part": getattr(b, "session_part", 1) or 1,
                 "session_weeks": getattr(b, "session_weeks", None),
                 "block_week_index": getattr(b, "block_week_index", None),
+                "combined_class_group_id": getattr(b, "combined_class_group_id", None),
             }
             for b in booking_q.all()
         ],
@@ -379,6 +382,8 @@ def deserialize(session: Session, payload: dict[str, Any]) -> None:
     for s in payload.get("staff", []):
         session.add(Staff(
             id=s["id"], name=s["name"],
+            cost_centre=s.get("cost_centre"),
+            staff_identifier=s.get("staff_identifier"),
             max_hours_per_week=s.get("max_hours_per_week"),
             non_teaching_day=s.get("non_teaching_day"),
             fte=s.get("fte"),
@@ -476,6 +481,7 @@ def deserialize(session: Session, payload: dict[str, Any]) -> None:
             session_part=b.get("session_part", 1) or 1,
             session_weeks=b.get("session_weeks"),
             block_week_index=b.get("block_week_index"),
+            combined_class_group_id=b.get("combined_class_group_id"),
         ))
     apply_unit_bracket_fields_from_names(session)
     session.commit()

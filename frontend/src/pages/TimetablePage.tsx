@@ -1951,8 +1951,22 @@ export function TimetablePage() {
       {sessionTab === "clash_settings" && courses.length > 0 && (
         <ClashSettingsPanel
           sessionId={sessionId}
-          onUpdated={() => {
-            void reloadView();
+          onUpdated={(opts) => {
+            void loadCurrentView(sessionId, viewState(), {
+              colourByClass: colourByClassRef.current,
+              clashDetect:
+                opts?.clashDetect ??
+                clashDetectForPrefs({ autoClashDetect: autoClashDetectRef.current }),
+            });
+            setChangeLogKey((k) => k + 1);
+          }}
+          onCombinedClassesReapplied={async () => {
+            await loadCurrentView(sessionId, viewState(), {
+              colourByClass: colourByClassRef.current,
+              clashDetect: "once",
+            });
+            notifyPeers();
+            setSessionTab("timetable");
             setChangeLogKey((k) => k + 1);
           }}
         />

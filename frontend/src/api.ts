@@ -102,6 +102,7 @@ export type Staff = {
   id: number;
   name: string;
   cost_centre?: string | null;
+  staff_identifier?: string | null;
   max_hours_per_week?: number | null;
   fte?: number | null;
   non_teaching_day?: number | null;
@@ -770,6 +771,12 @@ export const api = {
     apiFetch<ClashCheckSetting[]>(`/sessions/${sessionId}/clash-settings/reset`, {
       method: "POST",
     }),
+
+  reapplyCombinedClasses: (sessionId: number) =>
+    apiFetch<{ combined_class_groups: number; bookings_tagged: number }>(
+      `/sessions/${sessionId}/combined-classes/reapply`,
+      { method: "POST" },
+    ),
 
   sidebarOrder: (sessionId: number, body: { view: "course" | "staff"; entity_ids: number[] }) =>
     apiFetch<{ ok: boolean }>(`/sessions/${sessionId}/sidebar-order`, {

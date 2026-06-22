@@ -9,12 +9,15 @@ from sqlalchemy.orm import Session
 
 from timetable.io.backup_payload import read_backup_payload
 
+from timetable.core.combined_class import apply_combined_class_detection
+
 from .session_data import restore_session, serialize_session
 from .violation_cache import invalidate_session_violations
 from .violation_dismissals import clear_all_dismissals
 
 
 def _commit_booking_changes(db: Session, timetable_session_id: int) -> None:
+    apply_combined_class_detection(db, timetable_session_id)
     db.commit()
     invalidate_session_violations(db, timetable_session_id)
 

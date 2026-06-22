@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
+import type { ClashDetectMode } from "../lib/displayPrefs";
 import type { ClashCheckSetting } from "../types";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -14,13 +15,20 @@ const CATEGORY_ORDER = ["clashes", "staff", "rooms", "qualification", "schedulin
 
 type Props = {
   sessionId: number;
-  onUpdated?: () => void;
+  onUpdated?: (opts?: { clashDetect?: ClashDetectMode }) => void;
+  onCombinedClassesReapplied?: () => void | Promise<void>;
 };
 
-export function ClashSettingsPanel({ sessionId, onUpdated }: Props) {
+export function ClashSettingsPanel({
+  sessionId,
+  onUpdated,
+  onCombinedClassesReapplied,
+}: Props) {
   const [rows, setRows] = useState<ClashCheckSetting[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [reapplyingCombined, setReapplyingCombined] = useState(false);
+  const [combinedMessage, setCombinedMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -68,6 +76,34 @@ export function ClashSettingsPanel({ sessionId, onUpdated }: Props) {
       void load();
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onReapplyCombinedClasses() {
+    setReapplyingCombined(true);
+    setError(null);
+    setCombinedMessage(null);
+    try {
+      const result = await api.reapplyCombinedClasses(sessionId);
+      const { combined_class_groups: n, bookings_tagged: tagged } = result;
+      if (n === 0) {
+        setCombinedMessage(
+          "No combined classes matched. Need 2+ groups with the same lecturer, room, timeslot, and subset-matching units.",
+        );
+      } else {
+        setCombinedMessage(
+          `Tagged ${tagged} booking${tagged === 1 ? "" : "s"} in ${n} combined class group${n === 1 ? "" : "s"}. Switching to the Timetable tab…`,
+        );
+      }
+      if (onCombinedClassesReapplied) {
+        await onCombinedClassesReapplied();
+      } else {
+        onUpdated?.({ clashDetect: "once" });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to re-detect combined classes");
+    } finally {
+      setReapplyingCombined(false);
     }
   }
 
@@ -135,6 +171,26 @@ export function ClashSettingsPanel({ sessionId, onUpdated }: Props) {
       </div>
 
       {error && <p className="error-banner">{error}</p>}
+      {combinedMessage && !error && (
+        <p className="success-banner clash-settings-combined-msg">{combinedMessage}</p>
+      )}
+
+      <div className="clash-settings-combined">
+        <h3>Combined classes</h3>
+        <p className="muted clash-settings-combined-desc">
+          Joint delivery sessions — same lecturer, room, and timeslot, where one group&apos;s units
+          are a subset of another&apos;s — are not clashes. Re-run detection on existing bookings
+          after timetable changes or if combined classes were not picked up on import.
+        </p>
+        <button
+          type="button"
+          className="btn-secondary btn-sm"
+          disabled={saving || reapplyingCombined}
+          onClick={() => void onReapplyCombinedClasses()}
+        >
+          {reapplyingCombined ? "Detecting…" : "Re-detect combined classes"}
+        </button>
+      </div>
 
       <div className="clash-settings-groups">
         {grouped.map((group) => (

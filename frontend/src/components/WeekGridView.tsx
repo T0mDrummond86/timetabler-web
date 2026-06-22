@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGridFitMetrics } from "../hooks/useGridFitMetrics";
 import { slotRangeLabel, slotToTimeLabel } from "../lib/timeUtils";
 import { BookingCard, HoldingClass, TimetableGrid } from "../types";
@@ -139,6 +139,16 @@ export function WeekGridView({
     className: string | null;
     currentFill: string | null;
   } | null>(null);
+  const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (
+      selectedBookingId != null &&
+      !grid.bookings.some((b) => b.id === selectedBookingId)
+    ) {
+      setSelectedBookingId(null);
+    }
+  }, [grid.bookings, selectedBookingId]);
   const zoomScale = zoom / DEFAULT_GRID_ZOOM;
   const slotHeight =
     fit != null
@@ -161,6 +171,14 @@ export function WeekGridView({
   function bookingDuration(bookingId: number): number {
     const b = grid.bookings.find((x) => x.id === bookingId);
     return b ? b.end_slot - b.start_slot : 1;
+  }
+
+  function tryMoveBookingBySlot(b: BookingCard, delta: -1 | 1) {
+    if (!editable || !onMove || b.lock_time) return;
+    const duration = b.end_slot - b.start_slot;
+    const newStart = b.start_slot + delta;
+    if (newStart < 0 || newStart + duration > grid.num_slots) return;
+    onMove(b.id, columnIndex(b, grid), newStart);
   }
 
   function onColumnDragOver(e: React.DragEvent) {
@@ -287,6 +305,11 @@ export function WeekGridView({
               onDragOver={onColumnDragOver}
               onDrop={(e) => onColumnDrop(e, colIdx)}
               onDoubleClick={(e) => onEmptyDoubleClick(e, colIdx)}
+              onMouseDown={(e) => {
+                if (!(e.target as HTMLElement).closest(".booking-card")) {
+                  setSelectedBookingId(null);
+                }
+              }}
             >
               {Array.from({ length: grid.num_slots }, (_, s) => (
                 <div
@@ -336,7 +359,9 @@ export function WeekGridView({
                 const terms = termBadges(b);
                 const locked = b.lock_time || b.lock_staff;
                 const showViolation = showAlerts && (b.is_hard || b.is_soft);
+                const isCombined = b.combined_class_group_id != null;
                 const coTeach = b.sfs_co_teacher_name;
+                const selected = selectedBookingId === b.id;
                 const fullTitle = cardTitle(b);
                 const cardTooltip = [
                   fullTitle,
@@ -360,6 +385,7 @@ export function WeekGridView({
                       showViolation && b.is_soft ? "violation-soft" : "",
                       editable ? "editable" : "",
                       locked ? "locked" : "",
+                      selected ? "booking-card--selected" : "",
                     ]
                       .filter(Boolean)
                       .join(" ")}
@@ -378,6 +404,8 @@ export function WeekGridView({
                       e.dataTransfer.setData(MIME_BOOKING, String(b.id));
                       e.dataTransfer.effectAllowed = "move";
                     }}
+                    onClick={() => setSelectedBookingId(b.id)}
+                    onFocus={() => setSelectedBookingId(b.id)}
                     onDoubleClick={() => editable && onEdit?.(b)}
                     onContextMenu={(e) => {
                       if (!editable) return;
@@ -386,6 +414,16 @@ export function WeekGridView({
                       setContextMenu({ booking: b, x: e.clientX, y: e.clientY });
                     }}
                     onKeyDown={(e) => {
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        tryMoveBookingBySlot(b, -1);
+                        return;
+                      }
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        tryMoveBookingBySlot(b, 1);
+                        return;
+                      }
                       if (editable && (e.key === "Enter" || e.key === " ")) {
                         e.preventDefault();
                         onEdit?.(b);
@@ -396,6 +434,11 @@ export function WeekGridView({
                       {slotRangeLabel(b.start_slot, b.end_slot)}
                       {terms && <span className="booking-term-badge">{terms}</span>}
                       {coTeach && <span className="booking-co-badge">+co</span>}
+                      {isCombined && (
+                        <span className="booking-combined-badge" title="Combined class (joint cohort delivery)">
+                          combined
+                        </span>
+                      )}
                       {showViolation && b.violations.length > 0 && (
                         <span className="booking-violation-badge" title={b.violations.map((v) => v.message).join("\n")}>
                           !

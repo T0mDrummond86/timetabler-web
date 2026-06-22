@@ -1368,9 +1368,14 @@ body:has(.app-shell--fill) #root {
   cursor: grab;
 }
 
-.booking-card.editable:focus-visible {
+.booking-card.editable:focus-visible,
+.booking-card--selected {
   outline: 2px solid var(--primary);
   outline-offset: 1px;
+}
+
+.booking-card--selected {
+  z-index: 2;
 }
 
 .booking-card.editable:active,
@@ -3028,7 +3033,8 @@ body:has(.app-shell--fill) #root {
 }
 
 .booking-co-badge,
-.booking-violation-badge {
+.booking-violation-badge,
+.booking-combined-badge {
   margin-left: 4px;
   font-size: 0.65rem;
   font-weight: 700;
@@ -3044,6 +3050,12 @@ body:has(.app-shell--fill) #root {
 .booking-co-badge {
   background: var(--primary-soft);
   color: var(--primary);
+}
+
+.booking-combined-badge {
+  background: color-mix(in srgb, var(--success) 18%, transparent);
+  color: var(--success);
+  text-transform: lowercase;
 }
 
 .staff-editor-layout {
@@ -3216,8 +3228,7 @@ body.staff-editor-resizing {
   top: 0;
   z-index: 3;
   padding: 0.65rem 0.75rem;
-  background: color-mix(in srgb, var(--bg-subtle) 92%, transparent);
-  backdrop-filter: blur(8px);
+  background: var(--bg-subtle);
   color: var(--text-secondary);
   font-size: 0.68rem;
   font-weight: 600;
@@ -3257,18 +3268,39 @@ body.staff-editor-resizing {
   position: sticky;
   left: 0;
   z-index: 2;
-  background: inherit;
-  box-shadow: 1px 0 0 color-mix(in srgb, var(--border) 70%, transparent);
+  background: var(--bg-elevated);
+  box-shadow: 1px 0 0 var(--border);
+}
+
+.staff-hours-table tbody tr.staff-hours-row:hover .staff-col-sticky {
+  background: color-mix(in srgb, var(--primary-soft) 55%, var(--bg-elevated));
+}
+
+.staff-hours-table tbody tr.staff-hours-row--selected .staff-col-sticky {
+  background: color-mix(in srgb, var(--primary-soft) 85%, var(--bg-elevated));
+}
+
+.staff-hours-table tbody tr.staff-hours-row--selected:hover .staff-col-sticky {
+  background: color-mix(in srgb, var(--primary-soft) 95%, var(--bg-elevated));
 }
 
 .staff-hours-table thead .staff-col-sticky {
   z-index: 4;
-  background: color-mix(in srgb, var(--bg-subtle) 96%, transparent);
+  background: var(--bg-subtle);
 }
 
 .staff-col-primary {
   min-width: 11rem;
   max-width: 14rem;
+}
+
+.staff-col-staff-id {
+  min-width: 5.5rem;
+  max-width: 8rem;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
 }
 
 .staff-lecturer-cell {
@@ -3482,6 +3514,22 @@ body.staff-editor-resizing {
 
 [data-theme="dark"] .staff-hours-table-scroll {
   background: var(--surface);
+}
+
+[data-theme="dark"] .staff-col-sticky {
+  background: var(--surface);
+}
+
+[data-theme="dark"] .staff-hours-table tbody tr.staff-hours-row:hover .staff-col-sticky {
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+}
+
+[data-theme="dark"] .staff-hours-table tbody tr.staff-hours-row--selected .staff-col-sticky {
+  background: color-mix(in srgb, var(--primary) 18%, var(--surface));
+}
+
+[data-theme="dark"] .staff-hours-table thead .staff-col-sticky {
+  background: var(--bg-subtle);
 }
 
 [data-theme="dark"] .staff-hours-summary-card {
@@ -4350,4 +4398,28 @@ body.staff-editor-resizing {
 .clash-settings-desc {
   margin: 0.25rem 0 0 1.45rem;
   font-size: 0.82rem;
+}
+
+.clash-settings-combined {
+  margin: 1rem 0 1.25rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--primary-soft));
+}
+
+.clash-settings-combined h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+
+.clash-settings-combined-desc {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  max-width: 52rem;
+}
+
+.clash-settings-combined-msg {
+  margin-bottom: 0.75rem;
 }

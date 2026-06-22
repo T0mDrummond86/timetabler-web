@@ -48,6 +48,7 @@ export type BookingCard = {
   sfs_co_teacher_in_term_2?: boolean;
   online_student_count?: number | null;
   room_is_online?: boolean;
+  combined_class_group_id?: number | null;
   violations: Violation[];
 };
 
@@ -297,6 +298,7 @@ export type ResourceUsage = {
 export type StaffHoursRow = {
   id: number;
   name: string;
+  staff_identifier: string | null;
   cost_centre: string | null;
   fte: number | null;
   lecturing_hours: number | null;
@@ -321,6 +323,7 @@ export type StaffDetail = {
   id: number;
   name: string;
   cost_centre: string | null;
+  staff_identifier: string | null;
   fte: number | null;
   max_hours_per_week: number | null;
   non_teaching_day: number | null;

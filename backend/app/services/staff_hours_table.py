@@ -59,6 +59,7 @@ def staff_hours_table_rows(db: Session, *, timetable_session_id: int) -> list[di
             {
                 "id": s.id,
                 "name": s.name,
+                "staff_identifier": getattr(s, "staff_identifier", None),
                 "cost_centre": getattr(s, "cost_centre", None),
                 "fte": s.fte,
                 "lecturing_hours": lh,

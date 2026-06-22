@@ -6,14 +6,21 @@ from sqlalchemy.orm import Session
 
 from ..auth.deps import AuthContext, require_editor
 from ..database import get_db
-from ..schemas import ClashCheckSettingsPatch, ClashCheckSettingOut, ViolationDismissRequest
+from ..schemas import (
+    ClashCheckSettingsPatch,
+    ClashCheckSettingOut,
+    CombinedClassReapplyOut,
+    ViolationDismissRequest,
+)
 from ..services.clash_check_settings import (
     list_clash_settings_for_api,
     patch_clash_settings,
     reset_clash_settings,
 )
 from ..services.timetable_grid import assert_session_in_org
+from ..services.violation_cache import invalidate_session_violations
 from ..services.violation_dismissals import clear_all_dismissals, dismiss_violation
+from timetable.core.combined_class import apply_combined_class_detection
 
 router = APIRouter(tags=["violations"])
 
@@ -57,6 +64,26 @@ def reset_session_clash_settings(
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return rows
+
+
+@router.post(
+    "/sessions/{session_id}/combined-classes/reapply",
+    response_model=CombinedClassReapplyOut,
+)
+def reapply_combined_classes(
+    session_id: int,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    """Re-scan existing bookings and assign combined-class groups (no re-import)."""
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    group_count, bookings_tagged = apply_combined_class_detection(db, session_id)
+    db.commit()
+    invalidate_session_violations(db, session_id)
+    return CombinedClassReapplyOut(
+        combined_class_groups=group_count,
+        bookings_tagged=bookings_tagged,
+    )
 
 
 @router.post("/sessions/{session_id}/violation-dismissals")

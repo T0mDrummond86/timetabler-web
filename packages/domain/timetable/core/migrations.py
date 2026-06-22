@@ -367,6 +367,13 @@ def _m28(conn: Connection) -> None:
     )
 
 
+@_migration(29, "Add staff.staff_identifier for user-entered Staff ID")
+def _m29(conn: Connection) -> None:
+    staff_cols = _columns_of(conn, "staff")
+    if "staff_identifier" not in staff_cols:
+        conn.exec_driver_sql("ALTER TABLE staff ADD COLUMN staff_identifier TEXT")
+
+
 @_migration(23, "Normalize room.room_type to on-campus / off-campus / online")
 def _m23(conn: Connection) -> None:
     if not _table_exists(conn, "room"):

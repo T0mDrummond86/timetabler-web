@@ -331,6 +331,7 @@ export function EntityEditorsPanel({
         await api.patchStaff(sessionId, selectedId, {
           name: String(form.get("name") || selectedStaff.name),
           cost_centre: String(form.get("cost_centre") || "") || null,
+          staff_identifier: String(form.get("staff_identifier") || "") || null,
           fte: form.get("fte") ? Number(form.get("fte")) : null,
           non_teaching_day: form.get("non_teaching_day")
             ? Number(form.get("non_teaching_day"))
@@ -368,6 +369,7 @@ export function EntityEditorsPanel({
         const refreshed = await api.staffDetail(sessionId, selectedId);
         setStaffDetail(refreshed);
         await reloadStaffHours();
+        onUpdated();
       } else if (activeTab === "rooms" && selectedRoom) {
         await api.patchRoom(sessionId, selectedId, {
           code: String(form.get("code") || selectedRoom.code),
@@ -710,6 +712,13 @@ export function EntityEditorsPanel({
                 <input
                   name="development_project_description"
                   defaultValue={selectedStaff.development_project_description ?? ""}
+                />
+              </label>
+              <label>
+                Staff ID
+                <input
+                  name="staff_identifier"
+                  defaultValue={selectedStaff.staff_identifier ?? ""}
                 />
               </label>
               <label>
