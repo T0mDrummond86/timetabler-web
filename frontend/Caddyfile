@@ -1,0 +1,19 @@
+# Caddy fronts the whole app: terminates TLS (auto Let's Encrypt for
+# $DOMAIN), serves the built SPA, and reverse-proxies /api to the API.
+{$DOMAIN} {
+	encode gzip
+
+	# /api/* -> API container, with the /api prefix stripped.
+	# handle_path strips the matched prefix automatically, so
+	# /api/auth/login becomes /auth/login at http://api:8000.
+	handle_path /api/* {
+		reverse_proxy api:8000
+	}
+
+	# Everything else is the SPA; unknown paths fall back to index.html.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -1,0 +1,15 @@
+# Keep host-specific and bulky paths out of the build context.
+# Important: host node_modules are arm64 (Mac) and must not leak into
+# the x86_64 VM build — npm ci reinstalls them inside the image.
+**/node_modules
+frontend/dist
+.git
+.venv
+**/__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.DS_Store
+.env
+.env.prod
