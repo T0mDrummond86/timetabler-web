@@ -766,10 +766,6 @@ export function TimetablePage() {
     if (viewKind === "day" || viewKind === "room") await applyViewChange({ roomDay: id });
   }
 
-  async function onRoomDayChange(day: number) {
-    await applyViewChange({ roomDay: day });
-  }
-
   function openAdditionalTab() {
     window.open(window.location.href, "_blank", "noopener,noreferrer");
   }
@@ -1760,9 +1756,6 @@ export function TimetablePage() {
             onSelect={(id) => void onSidebarSelect(id)}
             filter={sidebarFilter}
             onFilterChange={setSidebarFilter}
-            roomDay={roomDay}
-            days={grid?.days ?? ["Mon", "Tue", "Wed", "Thu", "Fri"]}
-            onRoomDayChange={(d) => void onRoomDayChange(d)}
             reorderable={sidebarReorderable}
             onMoveUp={sidebarReorderable ? () => void onSidebarReorder(-1) : undefined}
             onMoveDown={sidebarReorderable ? () => void onSidebarReorder(1) : undefined}

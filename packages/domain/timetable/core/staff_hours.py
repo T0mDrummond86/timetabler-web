@@ -301,16 +301,64 @@ def _bookings_for_term(bookings: list[Booking], term: int) -> list[Booking]:
     return [b for b in bookings if bool(getattr(b, "in_term_2", 1))]
 
 
-def _bookings_for_staff_term(
-    bookings: list[Booking], staff_id: int | None, term: int
-) -> list[Booking]:
-    """Bookings that count toward ``staff_id``'s hours in the given term."""
-    if staff_id is None:
-        return _bookings_for_term(bookings, term)
+def _staff_ids_for_hours(
+    staff_id: int | None, staff_peer_ids: Iterable[int] | None
+) -> list[int]:
+    ids: list[int] = []
+    if staff_peer_ids:
+        ids.extend(staff_peer_ids)
+    if staff_id is not None and staff_id not in ids:
+        ids.append(staff_id)
+    return ids
+
+
+def _staff_active_in_booking_term(
+    booking: Booking,
+    term: int,
+    *,
+    staff_id: int | None,
+    staff_peer_ids: Iterable[int] | None = None,
+) -> bool:
+    """Whether any of the staff rows teach or co-teach this booking in ``term``."""
+    staff_ids = _staff_ids_for_hours(staff_id, staff_peer_ids)
+    if not staff_ids:
+        return bool(getattr(booking, "in_term_1" if term == 1 else "in_term_2", 1))
     from .booking_staff import staff_active_in_term
 
     tkey = "t1" if term == 1 else "t2"
-    return [b for b in bookings if staff_active_in_term(b, staff_id, tkey)]
+    return any(staff_active_in_term(booking, sid, tkey) for sid in staff_ids)
+
+
+def _booking_counts_for_staff(
+    booking: Booking,
+    *,
+    staff_id: int | None,
+    staff_peer_ids: Iterable[int] | None = None,
+) -> bool:
+    from .booking_staff import timetable_staff_ids
+
+    staff_ids = _staff_ids_for_hours(staff_id, staff_peer_ids)
+    if not staff_ids:
+        return True
+    return bool(set(timetable_staff_ids(booking)).intersection(staff_ids))
+
+
+def _bookings_for_staff_term(
+    bookings: list[Booking],
+    staff_id: int | None,
+    term: int,
+    staff_peer_ids: Iterable[int] | None = None,
+) -> list[Booking]:
+    """Bookings that count toward staff hours in the given term."""
+    if staff_id is None and not staff_peer_ids:
+        return _bookings_for_term(bookings, term)
+    return [
+        b
+        for b in bookings
+        if _staff_active_in_booking_term(
+            b, term, staff_id=staff_id, staff_peer_ids=staff_peer_ids
+        )
+    ]
 
 
 def _booking_term_week_factor(booking: Booking, term: int) -> float:
@@ -421,6 +469,7 @@ def format_online_breakdown(
     bookings: list[Booking],
     *,
     staff_id: int | None = None,
+    staff_peer_ids: Iterable[int] | None = None,
     unit_qual_ids: dict[int, list[int]],
     qual_student_totals: dict[int, int | None],
     unit_student_totals: dict[int, int | None],
@@ -429,7 +478,9 @@ def format_online_breakdown(
     """Multiline summary for spreadsheet column G."""
     lines: list[str] = []
     for term in (1, 2):
-        bt = _bookings_for_staff_term(bookings, staff_id, term)
+        bt = _bookings_for_staff_term(
+            bookings, staff_id, term, staff_peer_ids=staff_peer_ids
+        )
         _, groups = _weekly_online_hours_and_groups(
             bt,
             term,
@@ -457,16 +508,17 @@ def format_session_schedule_breakdown(
     bookings: list[Booking],
     *,
     staff_id: int | None = None,
+    staff_peer_ids: Iterable[int] | None = None,
 ) -> str:
     """Multiline summary of semester session averages for partial schedules."""
-    from .booking_staff import timetable_staff_ids
-
     lines: list[str] = []
     for b in sorted(
         bookings,
         key=lambda x: (((x.unit.name or "") if x.unit else ""), x.id),
     ):
-        if staff_id is not None and staff_id not in timetable_staff_ids(b):
+        if not _booking_counts_for_staff(
+            b, staff_id=staff_id, staff_peer_ids=staff_peer_ids
+        ):
             continue
         if is_full_session_schedule(b):
             continue
@@ -480,6 +532,7 @@ def staff_hours_snapshot_for_bookings(
     bookings: list[Booking],
     *,
     staff_id: int | None = None,
+    staff_peer_ids: Iterable[int] | None = None,
     unit_qual_ids: dict[int, list[int]] | None = None,
     qual_student_totals: dict[int, int | None] | None = None,
     unit_student_totals: dict[int, int | None] | None = None,
@@ -488,10 +541,16 @@ def staff_hours_snapshot_for_bookings(
     unit_qual_ids = unit_qual_ids or {}
     qual_student_totals = qual_student_totals or {}
     unit_student_totals = unit_student_totals or {}
-    r1 = _weekly_regular_hours(_bookings_for_staff_term(bookings, staff_id, 1), 1)
-    r2 = _weekly_regular_hours(_bookings_for_staff_term(bookings, staff_id, 2), 2)
+    r1 = _weekly_regular_hours(
+        _bookings_for_staff_term(bookings, staff_id, 1, staff_peer_ids=staff_peer_ids),
+        1,
+    )
+    r2 = _weekly_regular_hours(
+        _bookings_for_staff_term(bookings, staff_id, 2, staff_peer_ids=staff_peer_ids),
+        2,
+    )
     o1 = _weekly_online_hours(
-        _bookings_for_staff_term(bookings, staff_id, 1),
+        _bookings_for_staff_term(bookings, staff_id, 1, staff_peer_ids=staff_peer_ids),
         1,
         unit_qual_ids=unit_qual_ids,
         qual_student_totals=qual_student_totals,
@@ -499,7 +558,7 @@ def staff_hours_snapshot_for_bookings(
         legacy_default_per_class=legacy_default_per_class,
     )
     o2 = _weekly_online_hours(
-        _bookings_for_staff_term(bookings, staff_id, 2),
+        _bookings_for_staff_term(bookings, staff_id, 2, staff_peer_ids=staff_peer_ids),
         2,
         unit_qual_ids=unit_qual_ids,
         qual_student_totals=qual_student_totals,
@@ -512,6 +571,7 @@ def staff_hours_snapshot_for_bookings(
         online_breakdown=format_online_breakdown(
             bookings,
             staff_id=staff_id,
+            staff_peer_ids=staff_peer_ids,
             unit_qual_ids=unit_qual_ids,
             qual_student_totals=qual_student_totals,
             unit_student_totals=unit_student_totals,
@@ -520,6 +580,7 @@ def staff_hours_snapshot_for_bookings(
         session_schedule_breakdown=format_session_schedule_breakdown(
             bookings,
             staff_id=staff_id,
+            staff_peer_ids=staff_peer_ids,
         ),
     )
 

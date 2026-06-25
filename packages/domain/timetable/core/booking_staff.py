@@ -264,7 +264,8 @@ def timetable_staff_ids(booking: Booking) -> list[int]:
         ids.append(booking.staff_id)
     co = getattr(booking, "sfs_co_teacher_staff_id", None)
     if co is not None and co not in ids:
-        if sfs_co_teacher_in_term_1(booking) or sfs_co_teacher_in_term_2(booking):
+        co_t1, co_t2 = _effective_sfs_co_teacher_terms(booking)
+        if co_t1 or co_t2:
             ids.append(co)
     return ids
 

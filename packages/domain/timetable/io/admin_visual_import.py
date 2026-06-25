@@ -148,6 +148,24 @@ def _class_text_from_band(text: str) -> str | None:
     return s
 
 
+def _band_label(ws: Worksheet, row: int, label_index: int) -> str:
+    """Read a TIME / Lecturer / Room label from term 1, then term 2 if blank."""
+    for cols in (TERM1_LABEL_COLS, TERM2_LABEL_COLS):
+        raw = _strip_cell(ws.cell(row, cols[label_index]).value)
+        if raw:
+            return raw
+    return ""
+
+
+def _band_lecturer(ws: Worksheet, row: int) -> str:
+    """Lecturer label from term 1 or term 2 (term-2-only rows leave term 1 blank)."""
+    for cols in (TERM1_LABEL_COLS, TERM2_LABEL_COLS):
+        raw = _strip_cell(ws.cell(row, cols[1]).value)
+        if raw and not _lecturer_placeholder(raw):
+            return raw
+    return ""
+
+
 def _merged_row_text_by_col(ws: Worksheet, row: int) -> dict[int, str]:
     out: dict[int, str] = {}
     week_cols = set(TERM1_WEEK_COLS) | set(TERM2_WEEK_COLS)
@@ -308,26 +326,20 @@ def _parse_course_tab(
         if day is None or day >= NUM_DAYS:
             continue
 
-        time_text = _strip_cell(ws.cell(row, TERM1_LABEL_COLS[0]).value)
-        if not time_text:
-            time_text = _strip_cell(ws.cell(row, TERM2_LABEL_COLS[0]).value)
+        time_text = _band_label(ws, row, 0)
         slots = _parse_time_range(time_text)
         if slots is None:
             continue
         start_slot, end_slot = slots
         span = end_slot - start_slot
 
-        lec_raw = _strip_cell(ws.cell(row, TERM1_LABEL_COLS[1]).value)
-        if _lecturer_placeholder(lec_raw):
-            lec_raw = _strip_cell(ws.cell(row, TERM2_LABEL_COLS[1]).value)
+        lec_raw = _band_lecturer(ws, row)
         primary, co_name, co_t1, co_t2 = parse_import_lecturer_label(lec_raw)
         primary_norm = _normalize_lecturer_name(primary or "")
         if not primary_norm or _lecturer_placeholder(primary or ""):
             continue
 
-        room_raw = _strip_cell(ws.cell(row, TERM1_LABEL_COLS[2]).value)
-        if not room_raw:
-            room_raw = _strip_cell(ws.cell(row, TERM2_LABEL_COLS[2]).value)
+        room_raw = _band_label(ws, row, 2)
 
         text_by_col = _merged_row_text_by_col(ws, row)
         if not text_by_col:

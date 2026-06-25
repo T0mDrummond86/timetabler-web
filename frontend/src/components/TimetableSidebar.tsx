@@ -13,10 +13,6 @@ type Props = {
   onSelect: (id: number) => void;
   filter: string;
   onFilterChange: (value: string) => void;
-  roomDay?: number;
-  days?: string[];
-  onRoomDayChange?: (day: number) => void;
-  showRoomDaySelector?: boolean;
   reorderable?: boolean;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -39,36 +35,6 @@ const MODES: { value: TimetableMode; label: string }[] = [
   { value: "regular", label: "Regular" },
   { value: "block", label: "Block" },
 ];
-
-function PickList<T extends string>({
-  options,
-  value,
-  onChange,
-  ariaLabel,
-}: {
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (value: T) => void;
-  ariaLabel: string;
-}) {
-  return (
-    <ul className="tt-sidebar-pick-list" role="listbox" aria-label={ariaLabel}>
-      {options.map((opt) => (
-        <li key={opt.value}>
-          <button
-            type="button"
-            role="option"
-            aria-selected={value === opt.value}
-            className={`tt-entity-item${value === opt.value ? " active" : ""}`}
-            onClick={() => onChange(opt.value)}
-          >
-            {opt.label}
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}
 
 function SidebarSelect<T extends string>({
   id,
@@ -112,10 +78,6 @@ export function TimetableSidebar({
   onSelect,
   filter,
   onFilterChange,
-  roomDay = 0,
-  days = [],
-  onRoomDayChange,
-  showRoomDaySelector = true,
   reorderable = false,
   onMoveUp,
   onMoveDown,
@@ -158,18 +120,6 @@ export function TimetableSidebar({
       </div>
 
       {viewExtras}
-
-      {showRoomDaySelector && viewKind === "room" && days.length > 0 && onRoomDayChange && (
-        <div className="tt-sidebar-section">
-          <span className="tt-sidebar-label">Day</span>
-          <PickList
-            options={days.map((name, idx) => ({ value: String(idx), label: name }))}
-            value={String(roomDay)}
-            onChange={(v) => onRoomDayChange(Number(v))}
-            ariaLabel="Day"
-          />
-        </div>
-      )}
 
       {courseAdmin && (
         <div className="tt-sidebar-section tt-sidebar-course-admin">

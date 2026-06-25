@@ -25,6 +25,8 @@ from timetable.core.models import Base  # noqa: E402
 from timetable.io.admin_export import (  # noqa: E402
     TERM1_LABEL_COLS,
     TERM1_WEEK_COLS,
+    TERM2_LABEL_COLS,
+    TERM2_WEEK_COLS,
     _COURSE_TITLE_COL,
     _COURSE_TITLE_ROW,
     write_admin_export,
@@ -290,6 +292,51 @@ def test_admin_visual_import_splits_sfs_co_teacher(client: TestClient, tmp_path:
     assert booking["staff_name"] == "Alice Teacher"
     assert booking["sfs_co_teacher_staff_id"] == staff_by_name["Bob Co-Teacher"]
     assert booking["sfs_co_teacher_name"] == "Bob Co-Teacher"
+
+
+def test_admin_visual_import_term2_only_row(client: TestClient, tmp_path: Path):
+    """Term-2-only classes use term-2 TIME/Lecturer/Room columns (term 1 blank)."""
+    token, session_id = _auth(client)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "T2ONLY"
+    ws.cell(_COURSE_TITLE_ROW, _COURSE_TITLE_COL, value="Course: T2ONLY")
+    row = 10
+    ws.cell(row, TERM2_LABEL_COLS[0], value="09:30-12:00")
+    ws.cell(row, TERM2_LABEL_COLS[1], value="Jeff Hoyle")
+    ws.cell(row, TERM2_LABEL_COLS[2], value="A114")
+    label = "Cyber lab (VU23220) ID: 4401542"
+    ws.merge_cells(
+        start_row=row,
+        end_row=row,
+        start_column=TERM2_WEEK_COLS[0],
+        end_column=TERM2_WEEK_COLS[-1],
+    )
+    ws.cell(row, TERM2_WEEK_COLS[0], value=label)
+    path = tmp_path / "admin_term2_only.xlsx"
+    wb.save(path)
+
+    with path.open("rb") as fh:
+        res = client.post(
+            f"/sessions/{session_id}/import/admin-visual",
+            headers=_headers(token),
+            files={"file": ("admin.xlsx", fh, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        )
+    assert res.status_code == 200, res.text
+    assert res.json()["bookings_written"] == 1
+
+    courses = client.get(f"/sessions/{session_id}/courses", headers=_headers(token)).json()
+    course_id = next(c["id"] for c in courses if c["code"] == "T2ONLY")
+    grid = client.get(
+        f"/sessions/{session_id}/timetable",
+        params={"course_id": course_id, "term": "t2"},
+        headers=_headers(token),
+    ).json()
+    assert len(grid["bookings"]) == 1
+    booking = grid["bookings"][0]
+    assert booking["in_term_1"] is False
+    assert booking["in_term_2"] is True
+    assert booking["external_id"] == "4401542"
 
 
 def test_admin_visual_import_rejects_non_admin_workbook(client: TestClient, tmp_path: Path):

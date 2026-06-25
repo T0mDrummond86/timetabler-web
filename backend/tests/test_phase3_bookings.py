@@ -91,6 +91,39 @@ def test_move_booking(client: TestClient):
     assert data["change"]["description"] == "Move booking"
 
 
+def test_move_booking_with_room_preserves_duration(client: TestClient):
+    """Room-view drags send room_id; duration must not change (move_only path)."""
+    _token, session_id, course_id, booking_id, headers = _seed_session(client)
+
+    from app.database import get_db as gdb
+
+    gen = client.app.dependency_overrides[gdb]()
+    db = next(gen)
+    booking = db.get(Booking, booking_id)
+    duration = booking.end_slot - booking.start_slot
+    rooms = client.get(f"/sessions/{session_id}/rooms", headers=headers).json()
+    assert len(rooms) >= 2
+    target_room = next(r for r in rooms if r["id"] != booking.room_id)
+
+    res = client.patch(
+        f"/sessions/{session_id}/bookings/{booking_id}",
+        headers=headers,
+        json={
+            "course_id": course_id,
+            "day": booking.day,
+            "start_slot": booking.start_slot + 2,
+            "room_id": target_room["id"],
+        },
+    )
+    assert res.status_code == 200, res.text
+    data = res.json()
+    moved = next(b for b in data["grid"]["bookings"] if b["id"] == booking_id)
+    assert moved["start_slot"] == booking.start_slot + 2
+    assert moved["end_slot"] - moved["start_slot"] == duration
+    assert moved["room_id"] == target_room["id"]
+    assert data["change"]["description"] == "Move booking"
+
+
 def test_patch_notes(client: TestClient):
     _token, session_id, course_id, booking_id, headers = _seed_session(client)
 
@@ -173,6 +206,55 @@ def test_undo_redo_round_trip(client: TestClient):
     assert redo.status_code == 200
     redone = next(b for b in redo.json()["grid"]["bookings"] if b["id"] == booking_id)
     assert redone["day"] == 3
+
+
+def test_clear_sfs_co_teacher(client: TestClient):
+    """Explicit null must clear co-teacher (null previously meant 'leave unchanged')."""
+    _token, session_id, course_id, booking_id, headers = _seed_session(client)
+
+    from app.database import get_db as gdb
+
+    gen = client.app.dependency_overrides[gdb]()
+    db = next(gen)
+    booking = db.get(Booking, booking_id)
+    staff_rows = client.get(f"/sessions/{session_id}/staff", headers=headers).json()
+    co = next(s for s in staff_rows if s["id"] != booking.staff_id)
+
+    booking.sfs_co_teacher_staff_id = co["id"]
+    booking.sfs_co_teacher_in_term_1 = 1
+    booking.sfs_co_teacher_in_term_2 = 0
+    db.commit()
+
+    res = client.patch(
+        f"/sessions/{session_id}/bookings/{booking_id}",
+        headers=headers,
+        json={
+            "course_id": course_id,
+            "day": booking.day,
+            "start_slot": booking.start_slot,
+            "end_slot": booking.end_slot,
+            "staff_id": booking.staff_id,
+            "room_id": booking.room_id,
+            "in_term_1": booking.in_term_1,
+            "in_term_2": booking.in_term_2,
+            "sfs_co_teacher_staff_id": None,
+            "sfs_co_teacher_in_term_1": 0,
+            "sfs_co_teacher_in_term_2": 0,
+        },
+    )
+    assert res.status_code == 200, res.text
+
+    db.refresh(booking)
+    assert booking.sfs_co_teacher_staff_id is None
+    assert booking.sfs_co_teacher_in_term_1 == 0
+    assert booking.sfs_co_teacher_in_term_2 == 0
+
+    staff_grid = client.get(
+        f"/sessions/{session_id}/timetable",
+        params={"view": "staff", "staff_id": co["id"]},
+        headers=headers,
+    ).json()
+    assert booking_id not in {b["id"] for b in staff_grid["bookings"]}
 
 
 def test_staff_and_rooms_lists(client: TestClient):

@@ -34,6 +34,40 @@ class NoChangeError(ValueError):
     pass
 
 
+# Distinct from ``None``: omitted patch fields keep their current value; explicit ``None`` clears.
+UNSET = object()
+
+
+def _resolve_patch_value(current, patch):
+    return current if patch is UNSET else patch
+
+
+def patch_kwargs_from_body(body) -> dict:
+    """Map a booking patch request to ``patch_booking`` keyword args."""
+    field_names = (
+        "day",
+        "start_slot",
+        "end_slot",
+        "notes",
+        "staff_id",
+        "room_id",
+        "lock_time",
+        "lock_staff",
+        "unit_id",
+        "external_id",
+        "in_term_1",
+        "in_term_2",
+        "sfs_co_teacher_staff_id",
+        "sfs_co_teacher_in_term_1",
+        "sfs_co_teacher_in_term_2",
+        "online_student_count",
+    )
+    return {
+        name: getattr(body, name) if name in body.model_fields_set else UNSET
+        for name in field_names
+    }
+
+
 def _booking_in_session(db: Session, booking_id: int, timetable_session_id: int) -> Booking:
     booking = (
         db.query(Booking)
@@ -136,22 +170,22 @@ def patch_booking(
     timetable_session_id: int,
     booking_id: int,
     course_id: int,
-    day: int | None = None,
-    start_slot: int | None = None,
-    end_slot: int | None = None,
-    notes: str | None = None,
-    staff_id: int | None = None,
-    room_id: int | None = None,
-    lock_time: int | None = None,
-    lock_staff: int | None = None,
-    unit_id: int | None = None,
-    external_id: str | None = None,
-    in_term_1: int | None = None,
-    in_term_2: int | None = None,
-    sfs_co_teacher_staff_id: int | None = None,
-    sfs_co_teacher_in_term_1: int | None = None,
-    sfs_co_teacher_in_term_2: int | None = None,
-    online_student_count: int | None = None,
+    day=UNSET,
+    start_slot=UNSET,
+    end_slot=UNSET,
+    notes=UNSET,
+    staff_id=UNSET,
+    room_id=UNSET,
+    lock_time=UNSET,
+    lock_staff=UNSET,
+    unit_id=UNSET,
+    external_id=UNSET,
+    in_term_1=UNSET,
+    in_term_2=UNSET,
+    sfs_co_teacher_staff_id=UNSET,
+    sfs_co_teacher_in_term_1=UNSET,
+    sfs_co_teacher_in_term_2=UNSET,
+    online_student_count=UNSET,
     header: str = "Edit booking",
 ) -> dict:
     booking = _booking_in_session(db, booking_id, timetable_session_id)
@@ -161,34 +195,26 @@ def patch_booking(
     time_locked = effective_lock_time(booking, staff=staff, course=course)
     staff_locked = effective_lock_staff(booking, staff=staff, course=course)
 
-    new_day = booking.day if day is None else day
-    new_start = booking.start_slot if start_slot is None else start_slot
-    new_end = booking.end_slot if end_slot is None else end_slot
-    new_notes = booking.notes if notes is None else notes
-    new_staff_id = booking.staff_id if staff_id is None else staff_id
-    new_room_id = booking.room_id if room_id is None else room_id
-    new_lock_time = booking.lock_time if lock_time is None else lock_time
-    new_lock_staff = booking.lock_staff if lock_staff is None else lock_staff
-    new_unit_id = booking.unit_id if unit_id is None else unit_id
-    new_external_id = booking.external_id if external_id is None else external_id
-    new_in_term_1 = booking.in_term_1 if in_term_1 is None else in_term_1
-    new_in_term_2 = booking.in_term_2 if in_term_2 is None else in_term_2
-    new_co_id = (
-        booking.sfs_co_teacher_staff_id if sfs_co_teacher_staff_id is None else sfs_co_teacher_staff_id
-    )
-    new_co_t1 = (
-        booking.sfs_co_teacher_in_term_1
-        if sfs_co_teacher_in_term_1 is None
-        else sfs_co_teacher_in_term_1
-    )
-    new_co_t2 = (
-        booking.sfs_co_teacher_in_term_2
-        if sfs_co_teacher_in_term_2 is None
-        else sfs_co_teacher_in_term_2
-    )
-    new_online = (
-        booking.online_student_count if online_student_count is None else online_student_count
-    )
+    new_day = _resolve_patch_value(booking.day, day)
+    new_start = _resolve_patch_value(booking.start_slot, start_slot)
+    new_end = _resolve_patch_value(booking.end_slot, end_slot)
+    new_notes = _resolve_patch_value(booking.notes, notes)
+    new_staff_id = _resolve_patch_value(booking.staff_id, staff_id)
+    new_room_id = _resolve_patch_value(booking.room_id, room_id)
+    new_lock_time = _resolve_patch_value(booking.lock_time, lock_time)
+    new_lock_staff = _resolve_patch_value(booking.lock_staff, lock_staff)
+    new_unit_id = _resolve_patch_value(booking.unit_id, unit_id)
+    new_external_id = _resolve_patch_value(booking.external_id, external_id)
+    new_in_term_1 = _resolve_patch_value(booking.in_term_1, in_term_1)
+    new_in_term_2 = _resolve_patch_value(booking.in_term_2, in_term_2)
+    new_co_id = _resolve_patch_value(booking.sfs_co_teacher_staff_id, sfs_co_teacher_staff_id)
+    new_co_t1 = _resolve_patch_value(booking.sfs_co_teacher_in_term_1, sfs_co_teacher_in_term_1)
+    new_co_t2 = _resolve_patch_value(booking.sfs_co_teacher_in_term_2, sfs_co_teacher_in_term_2)
+    new_online = _resolve_patch_value(booking.online_student_count, online_student_count)
+
+    if sfs_co_teacher_staff_id is not UNSET and new_co_id is None:
+        new_co_t1 = 0
+        new_co_t2 = 0
 
     if new_day < 0 or new_day >= NUM_DAYS:
         raise ValueError(f"day must be 0–{NUM_DAYS - 1}")
@@ -265,6 +291,7 @@ def move_booking(
     course_id: int,
     day: int,
     start_slot: int,
+    room_id=UNSET,
 ) -> dict:
     booking = _booking_in_session(db, booking_id, timetable_session_id)
     if effective_lock_time(booking, staff=booking.staff, course=booking.course):
@@ -272,18 +299,29 @@ def move_booking(
 
     duration = booking.end_slot - booking.start_slot
     new_start = max(0, min(start_slot, NUM_SLOTS - duration))
-    if booking.day == day and booking.start_slot == new_start:
+    new_room_id = _resolve_patch_value(booking.room_id, room_id)
+    if (
+        booking.day == day
+        and booking.start_slot == new_start
+        and new_room_id == booking.room_id
+    ):
         raise NoChangeError("No changes")
+
+    patch_kwargs: dict = dict(
+        day=day,
+        start_slot=new_start,
+        end_slot=new_start + duration,
+    )
+    if room_id is not UNSET:
+        patch_kwargs["room_id"] = room_id
 
     return patch_booking(
         db,
         timetable_session_id=timetable_session_id,
         booking_id=booking_id,
         course_id=course_id,
-        day=day,
-        start_slot=new_start,
-        end_slot=new_start + duration,
         header="Move booking",
+        **patch_kwargs,
     )
 
 

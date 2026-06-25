@@ -90,7 +90,6 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
   const [mutating, setMutating] = useState(false);
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
   const [redoStack, setRedoStack] = useState<UndoEntry[]>([]);
-  const [days, setDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri"]);
   const [globalLink, setGlobalLink] = useState<TimetableGlobalLink | null>(null);
   const globalLinkRef = useRef(globalLink);
   globalLinkRef.current = globalLink;
@@ -342,13 +341,6 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
 
   const handleGridLoaded = useCallback((index: number, grid: TimetableGrid | null) => {
     gridsRef.current[index] = grid;
-    if (grid?.days?.length) {
-      setDays((prev) => {
-        const next = grid.days;
-        if (prev.length === next.length && prev.every((d, i) => d === next[i])) return prev;
-        return next;
-      });
-    }
   }, []);
 
   const gridLoadedHandlers = useMemo(
@@ -571,10 +563,6 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
         onSelect={onSidebarSelect}
         filter={sidebarFilter}
         onFilterChange={setSidebarFilter}
-        roomDay={activeSlot.roomDay}
-        days={days}
-        onRoomDayChange={(d) => updateActiveSlot({ roomDay: d })}
-        showRoomDaySelector={false}
       />
 
       <div className="split-main">

@@ -215,7 +215,14 @@ export function BookingEditDialog({
             SFS co-teacher
             <select
               value={coStaffId}
-              onChange={(e) => setCoStaffId(e.target.value === "" ? "" : Number(e.target.value))}
+              onChange={(e) => {
+                const next = e.target.value === "" ? "" : Number(e.target.value);
+                setCoStaffId(next);
+                if (next === "") {
+                  setCoTerm1(false);
+                  setCoTerm2(false);
+                }
+              }}
             >
               <option value="">None</option>
               {staff.map((s) => (

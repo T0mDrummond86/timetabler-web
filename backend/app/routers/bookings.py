@@ -28,6 +28,7 @@ from ..services.booking_mutations import (
     delete_booking,
     move_booking,
     patch_booking,
+    patch_kwargs_from_body,
     restore_booking_snapshots,
 )
 from ..services.holding_area import list_holding_area
@@ -191,35 +192,23 @@ def update_booking(
     assert_session_in_org(db, session_id, ctx.organization.id)
     try:
         if body.move_only:
-            return move_booking(
-                db,
+            move_kwargs = dict(
+                db=db,
                 timetable_session_id=session_id,
                 booking_id=booking_id,
                 course_id=body.course_id,
                 day=body.day,
                 start_slot=body.start_slot,
             )
+            if "room_id" in body.model_fields_set:
+                move_kwargs["room_id"] = body.room_id
+            return move_booking(**move_kwargs)
         return patch_booking(
             db,
             timetable_session_id=session_id,
             booking_id=booking_id,
             course_id=body.course_id,
-            day=body.day,
-            start_slot=body.start_slot,
-            end_slot=body.end_slot,
-            notes=body.notes,
-            staff_id=body.staff_id,
-            room_id=body.room_id,
-            lock_time=body.lock_time,
-            lock_staff=body.lock_staff,
-            unit_id=body.unit_id,
-            external_id=body.external_id,
-            in_term_1=body.in_term_1,
-            in_term_2=body.in_term_2,
-            sfs_co_teacher_staff_id=body.sfs_co_teacher_staff_id,
-            sfs_co_teacher_in_term_1=body.sfs_co_teacher_in_term_1,
-            sfs_co_teacher_in_term_2=body.sfs_co_teacher_in_term_2,
-            online_student_count=body.online_student_count,
+            **patch_kwargs_from_body(body),
         )
     except BookingNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

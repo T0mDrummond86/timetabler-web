@@ -459,13 +459,13 @@ class BookingPatchRequest(BaseModel):
 
     @property
     def move_only(self) -> bool:
+        """Drag-move: day/time (and optionally room); duration unchanged."""
         return (
             self.day is not None
             and self.start_slot is not None
             and self.end_slot is None
             and self.notes is None
             and self.staff_id is None
-            and self.room_id is None
             and self.lock_time is None
             and self.lock_staff is None
             and self.unit_id is None

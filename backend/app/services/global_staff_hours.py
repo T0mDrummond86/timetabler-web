@@ -302,9 +302,11 @@ def _hours_snapshot_for_staff_with_bookings(
         bookings=bookings,
     )
     legacy_default = resolve_default_online_students_per_class(staff)
+    peer_ids = [p.id for p in peers]
     return staff_hours_snapshot_for_bookings(
         bookings,
-        staff_id=None,
+        staff_id=staff.id,
+        staff_peer_ids=peer_ids,
         unit_qual_ids=unit_qual_ids,
         qual_student_totals=qual_student_totals,
         unit_student_totals=unit_student_totals,
