@@ -332,7 +332,13 @@ export function EntityEditorsPanel({
           name: String(form.get("name") || selectedStaff.name),
           cost_centre: String(form.get("cost_centre") || "") || null,
           staff_identifier: String(form.get("staff_identifier") || "") || null,
-          fte: form.get("fte") ? Number(form.get("fte")) : null,
+          fte: (() => {
+            const raw = form.get("fte");
+            if (!raw) return null;
+            const n = Number(raw);
+            if (Number.isNaN(n)) return null;
+            return Math.round(n * 1000) / 1000;
+          })(),
           non_teaching_day: form.get("non_teaching_day")
             ? Number(form.get("non_teaching_day"))
             : null,
@@ -685,7 +691,13 @@ export function EntityEditorsPanel({
               </label>
               <label>
                 FTE
-                <input name="fte" type="number" step="0.1" defaultValue={selectedStaff.fte ?? ""} />
+                <input
+                  name="fte"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  defaultValue={selectedStaff.fte ?? ""}
+                />
               </label>
               <label>
                 Non-teaching day

@@ -63,3 +63,9 @@ export function formatOptionalNum(v: number | null | undefined): string {
   if (v == null || Number.isNaN(v)) return "";
   return String(v);
 }
+
+/** FTE values: up to 3 decimal places, trailing zeros trimmed. */
+export function formatFte(v: number | null | undefined): string {
+  if (v == null || Number.isNaN(v)) return "";
+  return v.toFixed(3).replace(/\.?0+$/, "");
+}

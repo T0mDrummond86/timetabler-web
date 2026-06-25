@@ -2,6 +2,7 @@ import { useMemo, useState, type MouseEvent } from "react";
 import type { StaffHoursRow } from "../types";
 import {
   formatHours,
+  formatFte,
   formatOptionalNum,
   VARIANCE_FILTER_OPTIONS,
   varianceTooltip,
@@ -315,7 +316,7 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
                 </td>
                 <td className="staff-col-meta staff-hours-wrap">{row.cost_centre ?? ""}</td>
                 <td className="staff-col-metric staff-col-metric-group">
-                  {formatOptionalNum(row.fte)}
+                  {formatFte(row.fte)}
                 </td>
                 <td className="staff-col-metric">{formatHours(row.lecturing_hours)}</td>
                 <td className="staff-col-metric staff-col-metric-highlight">
