@@ -14,6 +14,12 @@ from ..schemas import (
     BookingMutationOut,
     BookingPatchRequest,
     BookingRestoreRequest,
+    CoverAssignRequest,
+    CoverCandidatesOut,
+    CoverRequestCreate,
+    CoverRequestOut,
+    CoverRequestsOut,
+    CoverRequestUpdate,
     HoldingClassOut,
     QualificationOut,
     RoomOut,
@@ -30,6 +36,14 @@ from ..services.booking_mutations import (
     patch_booking,
     patch_kwargs_from_body,
     restore_booking_snapshots,
+)
+from ..services.cover_lecturers import assign_cover_staff, list_cover_candidates
+from ..services.cover_requests import (
+    create_cover_request,
+    delete_cover_request,
+    list_cover_requests,
+    promote_cover_request,
+    update_cover_request,
 )
 from ..services.holding_area import list_holding_area
 from ..services.alternate_placements import alternate_slots_for_booking
@@ -270,3 +284,151 @@ def booking_alternate_slots(
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get(
+    "/sessions/{session_id}/bookings/{booking_id}/cover-candidates",
+    response_model=CoverCandidatesOut,
+)
+def booking_cover_candidates(
+    session_id: int,
+    booking_id: int,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        rows = list_cover_candidates(
+            db,
+            timetable_session_id=session_id,
+            booking_id=booking_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return {"candidates": rows}
+
+
+@router.get("/sessions/{session_id}/cover-requests", response_model=CoverRequestsOut)
+def get_cover_requests(
+    session_id: int,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    return {"requests": list_cover_requests(db, timetable_session_id=session_id)}
+
+
+@router.post("/sessions/{session_id}/cover-requests", response_model=CoverRequestOut)
+def add_cover_request(
+    session_id: int,
+    body: CoverRequestCreate,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        return create_cover_request(
+            db,
+            timetable_session_id=session_id,
+            booking_id=body.booking_id,
+            cover_date=body.cover_date,
+            semester=body.semester,
+            week_number=body.week_number,
+            day_label=body.day_label,
+            time_label=body.time_label,
+            qualification_name=body.qualification_name,
+            unit_name=body.unit_name,
+            room_code=body.room_code,
+            away_staff_name=body.away_staff_name,
+            cover_staff_id=body.cover_staff_id,
+            cover_staff_name=body.cover_staff_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+
+@router.patch("/sessions/{session_id}/cover-requests/{request_id}", response_model=CoverRequestOut)
+def patch_cover_request(
+    session_id: int,
+    request_id: int,
+    body: CoverRequestUpdate,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        return update_cover_request(
+            db,
+            timetable_session_id=session_id,
+            request_id=request_id,
+            cover_staff_id=body.cover_staff_id,
+            cover_staff_name=body.cover_staff_name,
+            cover_date=body.cover_date,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+
+@router.delete(
+    "/sessions/{session_id}/cover-requests/{request_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def remove_cover_request(
+    session_id: int,
+    request_id: int,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        delete_cover_request(db, timetable_session_id=session_id, request_id=request_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/sessions/{session_id}/cover-requests/{request_id}/promote")
+def push_cover_request_to_log(
+    session_id: int,
+    request_id: int,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        return promote_cover_request(
+            db, timetable_session_id=session_id, request_id=request_id
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+
+@router.post(
+    "/sessions/{session_id}/bookings/{booking_id}/assign-cover",
+    response_model=BookingMutationOut,
+)
+def booking_assign_cover(
+    session_id: int,
+    booking_id: int,
+    body: CoverAssignRequest,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        return assign_cover_staff(
+            db,
+            timetable_session_id=session_id,
+            booking_id=booking_id,
+            course_id=body.course_id,
+            cover_staff_id=body.cover_staff_id,
+        )
+    except BookingNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except NoChangeError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc

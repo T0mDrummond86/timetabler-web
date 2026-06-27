@@ -1,14 +1,20 @@
 """Global session CRUD and aggregated entity views."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session, joinedload
 
 from timetable.core.tenancy_models import GlobalSession, GlobalSessionMember, User
 
 from ..auth.deps import AuthContext, get_auth_context, require_admin, require_editor
 from ..database import get_db
+from ..config import settings
 from ..schemas import (
+    CalendarImportOut,
+    CalendarOut,
+    CoverLogEntryCreate,
+    CoverLogEntryOut,
+    CoverLogOut,
     GlobalSessionCreate,
     GlobalSessionMembersPatch,
     GlobalSessionOut,
@@ -19,6 +25,12 @@ from ..schemas import (
     LinkedImportResultOut,
     TimetableSessionLinkOut,
 )
+from ..services.cover_log import (
+    create_cover_log_entry,
+    delete_cover_log_entry,
+    list_cover_log_entries,
+)
+from ..services.calendar import import_calendar, list_calendar_weeks
 from ..services.global_session_import import (
     import_from_linked_session,
     import_options,
@@ -264,6 +276,100 @@ def global_class_custodians(
         db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
     )
     return aggregated_class_custodians(db, global_session_id)
+
+
+@router.get("/global-sessions/{global_session_id}/cover-log", response_model=CoverLogOut)
+def get_cover_log(
+    global_session_id: int,
+    ctx: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    assert_global_user_access(
+        db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
+    )
+    return {"entries": list_cover_log_entries(db, global_session_id=global_session_id)}
+
+
+@router.post("/global-sessions/{global_session_id}/cover-log", response_model=CoverLogEntryOut)
+def add_cover_log_entry(
+    global_session_id: int,
+    body: CoverLogEntryCreate,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_global_user_access(
+        db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
+    )
+    try:
+        return create_cover_log_entry(
+            db,
+            global_session_id=global_session_id,
+            cover_date=body.cover_date,
+            day_label=body.day_label,
+            time_label=body.time_label,
+            qualification_name=body.qualification_name,
+            unit_name=body.unit_name,
+            room_code=body.room_code,
+            away_staff_name=body.away_staff_name,
+            cover_staff_name=body.cover_staff_name,
+            source_session_name=body.source_session_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+
+@router.delete(
+    "/global-sessions/{global_session_id}/cover-log/{entry_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def remove_cover_log_entry(
+    global_session_id: int,
+    entry_id: int,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_global_user_access(
+        db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
+    )
+    try:
+        delete_cover_log_entry(db, global_session_id=global_session_id, entry_id=entry_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/global-sessions/{global_session_id}/calendar", response_model=CalendarOut)
+def get_calendar(
+    global_session_id: int,
+    ctx: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    assert_global_user_access(
+        db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
+    )
+    return {"weeks": list_calendar_weeks(db, global_session_id=global_session_id)}
+
+
+@router.post("/global-sessions/{global_session_id}/calendar", response_model=CalendarImportOut)
+async def upload_calendar(
+    global_session_id: int,
+    file: UploadFile = File(...),
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_global_user_access(
+        db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
+    )
+    data = await file.read()
+    if len(data) > settings.max_upload_bytes:
+        max_mb = settings.max_upload_bytes // (1024 * 1024)
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File too large (max {max_mb} MB)",
+        )
+    try:
+        return import_calendar(db, global_session_id=global_session_id, content=data)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
 
 @router.get("/sessions/{session_id}/linked-sessions")

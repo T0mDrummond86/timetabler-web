@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useGridFitMetrics } from "../hooks/useGridFitMetrics";
 import { slotRangeLabel, slotToTimeLabel } from "../lib/timeUtils";
 import { BookingCard, HoldingClass, TimetableGrid } from "../types";
@@ -32,6 +32,12 @@ type Props = {
   colourByClass?: boolean;
   /** Stretch rows to fill the grid area (full day visible, no dead space). */
   fitToViewport?: boolean;
+  /** Controlled selection (e.g. lecturer cover left pane). */
+  selectedBookingId?: number | null;
+  onSelectedBookingChange?: (bookingId: number | null) => void;
+  /** Double-click assigns cover instead of opening the edit dialog. */
+  coverAssignMode?: boolean;
+  onAssignCover?: (booking: BookingCard) => void;
 };
 
 function cardTitle(b: BookingCard): string {
@@ -98,6 +104,23 @@ function slotFromClientY(
   return Math.max(0, Math.min(numSlots - duration, raw));
 }
 
+function slotIndexFromClientY(
+  clientY: number,
+  areaTop: number,
+  numSlots: number,
+  slotHeight: number,
+): number {
+  const raw = Math.floor((clientY - areaTop) / slotHeight);
+  return Math.max(0, Math.min(numSlots - 1, raw));
+}
+
+function slotInHighlight(
+  slot: number,
+  highlight: { start: number; end: number } | null,
+): boolean {
+  return highlight != null && slot >= highlight.start && slot < highlight.end;
+}
+
 function columnIndex(b: BookingCard, grid: TimetableGrid): number {
   if (grid.column_kind === "room" || grid.column_kind === "staff") return b.column ?? 0;
   return b.day;
@@ -126,8 +149,14 @@ export function WeekGridView({
   onSetClassColour,
   colourByClass = true,
   fitToViewport = false,
+  selectedBookingId: selectedBookingIdProp,
+  onSelectedBookingChange,
+  coverAssignMode = false,
+  onAssignCover,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const gutterRef = useRef<HTMLDivElement>(null);
+  const gutterDragRef = useRef<{ anchor: number; active: boolean } | null>(null);
   const fit = useGridFitMetrics(scrollRef, grid.num_slots, HEADER_HEIGHT, fitToViewport);
   const [contextMenu, setContextMenu] = useState<{
     booking: BookingCard;
@@ -139,22 +168,84 @@ export function WeekGridView({
     className: string | null;
     currentFill: string | null;
   } | null>(null);
-  const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null);
+  const [selectedBookingIdInternal, setSelectedBookingIdInternal] = useState<number | null>(null);
+  const selectedBookingId = selectedBookingIdProp ?? selectedBookingIdInternal;
+  const [slotHighlight, setSlotHighlight] = useState<{ start: number; end: number } | null>(
+    null,
+  );
+
+  function selectBooking(id: number | null) {
+    if (selectedBookingIdProp === undefined) {
+      setSelectedBookingIdInternal(id);
+    }
+    onSelectedBookingChange?.(id);
+  }
 
   useEffect(() => {
     if (
       selectedBookingId != null &&
       !grid.bookings.some((b) => b.id === selectedBookingId)
     ) {
-      setSelectedBookingId(null);
+      selectBooking(null);
     }
   }, [grid.bookings, selectedBookingId]);
+
+  useEffect(() => {
+    setSlotHighlight((hl) => {
+      if (!hl) return null;
+      if (hl.start >= grid.num_slots) return null;
+      return { start: hl.start, end: Math.min(hl.end, grid.num_slots) };
+    });
+  }, [grid.num_slots]);
+
   const zoomScale = zoom / DEFAULT_GRID_ZOOM;
   const slotHeight =
     fit != null
       ? Math.max(6, Math.round(fit.fitSlotHeight * zoomScale))
       : Math.round(BASE_SLOT_HEIGHT * zoom);
   const gridHeight = grid.num_slots * slotHeight;
+
+  const slotIndexFromGutterY = useCallback(
+    (clientY: number) => {
+      const el = gutterRef.current;
+      if (!el) return 0;
+      const rect = el.getBoundingClientRect();
+      return slotIndexFromClientY(clientY, rect.top, grid.num_slots, slotHeight);
+    },
+    [grid.num_slots, slotHeight],
+  );
+
+  const setHighlightRange = useCallback((anchor: number, current: number) => {
+    const start = Math.min(anchor, current);
+    const end = Math.max(anchor, current) + 1;
+    setSlotHighlight({ start, end });
+  }, []);
+
+  useEffect(() => {
+    function onWindowMouseMove(e: MouseEvent) {
+      const drag = gutterDragRef.current;
+      if (!drag?.active) return;
+      setHighlightRange(drag.anchor, slotIndexFromGutterY(e.clientY));
+    }
+    function onWindowMouseUp() {
+      if (gutterDragRef.current?.active) {
+        gutterDragRef.current.active = false;
+      }
+    }
+    window.addEventListener("mousemove", onWindowMouseMove);
+    window.addEventListener("mouseup", onWindowMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onWindowMouseMove);
+      window.removeEventListener("mouseup", onWindowMouseUp);
+    };
+  }, [setHighlightRange, slotIndexFromGutterY]);
+
+  function onGutterSlotMouseDown(e: React.MouseEvent, slot: number) {
+    e.preventDefault();
+    gutterDragRef.current = { anchor: slot, active: true };
+    setSlotHighlight({ start: slot, end: slot + 1 });
+  }
+
   const needsScroll =
     fit != null
       ? HEADER_HEIGHT + gridHeight > fit.containerHeight + 1
@@ -282,12 +373,28 @@ export function WeekGridView({
           ))}
 
           <div
+            ref={gutterRef}
             className="grid-time-gutter"
             style={{ gridRow: 2, gridColumn: 1, height: gridHeight }}
           >
             {Array.from({ length: grid.num_slots }, (_, s) => (
-              <div
+              <button
                 key={s}
+                type="button"
+                className={[
+                  "grid-time-slot-hit",
+                  slotInHighlight(s, slotHighlight) ? "grid-time-slot-hit--active" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                style={{ top: s * slotHeight, height: slotHeight }}
+                aria-label={slotToTimeLabel(s)}
+                onMouseDown={(e) => onGutterSlotMouseDown(e, s)}
+              />
+            ))}
+            {Array.from({ length: grid.num_slots }, (_, s) => (
+              <div
+                key={`label-${s}`}
                 className={`grid-time-label${s % 2 === 0 ? " hour" : ""}`}
                 style={{ top: s * slotHeight }}
               >
@@ -307,7 +414,7 @@ export function WeekGridView({
               onDoubleClick={(e) => onEmptyDoubleClick(e, colIdx)}
               onMouseDown={(e) => {
                 if (!(e.target as HTMLElement).closest(".booking-card")) {
-                  setSelectedBookingId(null);
+                  selectBooking(null);
                 }
               }}
             >
@@ -318,6 +425,16 @@ export function WeekGridView({
                   style={{ top: s * slotHeight }}
                 />
               ))}
+
+              {slotHighlight && (
+                <div
+                  className="grid-slot-highlight"
+                  style={{
+                    top: slotHighlight.start * slotHeight,
+                    height: (slotHighlight.end - slotHighlight.start) * slotHeight,
+                  }}
+                />
+              )}
 
               {unavailableForColumn(colIdx).map((s) => (
                 <div
@@ -361,6 +478,7 @@ export function WeekGridView({
                 const showViolation = showAlerts && (b.is_hard || b.is_soft);
                 const isCombined = b.combined_class_group_id != null;
                 const coTeach = b.sfs_co_teacher_name;
+                const hasCover = Boolean(b.cover_staff_name);
                 const selected = selectedBookingId === b.id;
                 const fullTitle = cardTitle(b);
                 const cardTooltip = [
@@ -386,6 +504,7 @@ export function WeekGridView({
                       editable ? "editable" : "",
                       locked ? "locked" : "",
                       selected ? "booking-card--selected" : "",
+                      hasCover ? "booking-card--cover" : "",
                     ]
                       .filter(Boolean)
                       .join(" ")}
@@ -404,9 +523,15 @@ export function WeekGridView({
                       e.dataTransfer.setData(MIME_BOOKING, String(b.id));
                       e.dataTransfer.effectAllowed = "move";
                     }}
-                    onClick={() => setSelectedBookingId(b.id)}
-                    onFocus={() => setSelectedBookingId(b.id)}
-                    onDoubleClick={() => editable && onEdit?.(b)}
+                    onClick={() => selectBooking(b.id)}
+                    onFocus={() => selectBooking(b.id)}
+                    onDoubleClick={() => {
+                      if (coverAssignMode && onAssignCover) {
+                        onAssignCover(b);
+                        return;
+                      }
+                      if (editable) onEdit?.(b);
+                    }}
                     onContextMenu={(e) => {
                       if (!editable) return;
                       e.preventDefault();
@@ -434,6 +559,11 @@ export function WeekGridView({
                       {slotRangeLabel(b.start_slot, b.end_slot)}
                       {terms && <span className="booking-term-badge">{terms}</span>}
                       {coTeach && <span className="booking-co-badge">+co</span>}
+                      {hasCover && (
+                        <span className="booking-cover-badge" title={`Cover: ${b.cover_staff_name}`}>
+                          cover
+                        </span>
+                      )}
                       {isCombined && (
                         <span className="booking-combined-badge" title="Combined class (joint cohort delivery)">
                           combined

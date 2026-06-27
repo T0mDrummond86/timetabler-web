@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import datetime as _dt
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .models import Base
@@ -150,6 +150,94 @@ class GlobalSessionUserAccess(Base):
 
     __table_args__ = (
         UniqueConstraint("global_session_id", "user_id", name="global_session_user_access_uk"),
+    )
+
+
+class CoverLogEntry(Base):
+    """A one-off lecturer-cover job logged against a global session.
+
+    Stores a self-contained snapshot of the cover at the time it was logged,
+    so the record is stable even if the underlying timetable later changes.
+    """
+
+    __tablename__ = "cover_log_entry"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    global_session_id: Mapped[int] = mapped_column(
+        ForeignKey("global_session.id", ondelete="CASCADE"), index=True
+    )
+    cover_date: Mapped[_dt.date] = mapped_column(Date)
+    day_label: Mapped[str] = mapped_column(String(20), default="")
+    time_label: Mapped[str] = mapped_column(String(40), default="")
+    qualification_name: Mapped[str] = mapped_column(String(300), default="")
+    unit_name: Mapped[str] = mapped_column(String(300), default="")
+    room_code: Mapped[str] = mapped_column(String(80), default="")
+    away_staff_name: Mapped[str] = mapped_column(String(200), default="")
+    cover_staff_name: Mapped[str] = mapped_column(String(200), default="")
+    source_session_name: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[_dt.datetime] = mapped_column(
+        DateTime,
+        default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
+    )
+
+
+class CalendarWeek(Base):
+    """One teaching week of an academic calendar, scoped to a global session.
+
+    Maps (semester, week_number) to the Monday of that week so downstream
+    features (e.g. lecturer cover) can resolve a semester week to real dates.
+    """
+
+    __tablename__ = "calendar_week"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    global_session_id: Mapped[int] = mapped_column(
+        ForeignKey("global_session.id", ondelete="CASCADE"), index=True
+    )
+    semester: Mapped[int] = mapped_column(Integer)
+    week_number: Mapped[int] = mapped_column(Integer)
+    monday_date: Mapped[_dt.date] = mapped_column(Date)
+    label: Mapped[str] = mapped_column(String(40), default="")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "global_session_id", "semester", "week_number", name="calendar_week_uk"
+        ),
+    )
+
+
+class CoverRequest(Base):
+    """A pending lecturer-cover request staged in a session's cover tab.
+
+    Persists the in-progress cover (created, emailed out, awaiting a reply) so
+    it survives reloads and stays editable — change the cover lecturer if asked
+    again, or push it to the global cover log once accepted (which deletes it).
+    Stores a snapshot so the row is stable if the timetable changes.
+    """
+
+    __tablename__ = "cover_request"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    timetable_session_id: Mapped[int] = mapped_column(
+        ForeignKey("timetable_session.id", ondelete="CASCADE"), index=True
+    )
+    booking_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cover_date: Mapped[_dt.date | None] = mapped_column(Date, nullable=True)
+    semester: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    week_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    day_label: Mapped[str] = mapped_column(String(20), default="")
+    time_label: Mapped[str] = mapped_column(String(40), default="")
+    qualification_name: Mapped[str] = mapped_column(String(300), default="")
+    unit_name: Mapped[str] = mapped_column(String(300), default="")
+    room_code: Mapped[str] = mapped_column(String(80), default="")
+    away_staff_name: Mapped[str] = mapped_column(String(200), default="")
+    cover_staff_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cover_staff_name: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[_dt.datetime] = mapped_column(
+        DateTime,
+        default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
+    )
+    updated_at: Mapped[_dt.datetime] = mapped_column(
+        DateTime,
+        default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
+        onupdate=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
     )
 
 

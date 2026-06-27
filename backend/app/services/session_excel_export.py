@@ -6,17 +6,16 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from timetable.io.admin_export import resolve_admin_template_path, write_admin_export, write_co_teach_admin_export
+from timetable.io.admin_export import resolve_admin_template_path, write_admin_export
 from timetable.io.changelog_export import write_change_log_xlsx
 from timetable.io.lecturer_preferences_template import write_lecturer_preferences_template
 from timetable.io.staff_export import write_staff_tab_xlsx
-from timetable.io.violations_export import write_violations_report_xlsx
 from timetable.io.xlsm_export import write_fresh, write_into_template
 from timetable.io.xlsm_export_v2 import V2_TEMPLATE_PATH, write_v2
 
 from timetable.core.change_log_data import gather_timetabling_change_log_display_rows
 
-from .violations_report import violations_report
+from .export_filenames import session_export_filename, timetable_session_name
 from .timetable_grid import get_repeating_week
 
 
@@ -42,6 +41,7 @@ def export_timetable_xlsx(
     colour_by_class: bool = True,
 ) -> tuple[bytes, str, str]:
     """Return (bytes, filename, media_type)."""
+    session_name = timetable_session_name(db, timetable_session_id)
     kw = _export_kwargs(db, timetable_session_id)
 
     suffix = ".xlsx"
@@ -81,7 +81,7 @@ def export_timetable_xlsx(
                 write_fresh(db, out, **kw)
         else:
             write_fresh(db, out, **kw)
-        filename = f"timetable_export{suffix}"
+        filename = session_export_filename(session_name, suffix)
         media = (
             "application/vnd.ms-excel.sheet.macroEnabled.12"
             if suffix == ".xlsm"
@@ -96,52 +96,36 @@ def export_admin_xlsx(
     db: Session,
     *,
     timetable_session_id: int,
-    co_teach_only: bool = False,
     changed_only: bool = False,
 ) -> tuple[bytes, str]:
+    session_name = timetable_session_name(db, timetable_session_id)
     kw = _export_kwargs(db, timetable_session_id)
     tpl = resolve_admin_template_path()
     suffix = ".xlsx"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         out = Path(tmp.name)
     try:
-        if co_teach_only:
-            write_co_teach_admin_export(db, out, tpl, **kw)
-            filename = "co_teach_export.xlsx"
-        else:
-            write_admin_export(db, out, tpl, changed_only=changed_only, **kw)
-            filename = "admin_export_changes.xlsx" if changed_only else "admin_export.xlsx"
+        write_admin_export(db, out, tpl, changed_only=changed_only, **kw)
+        label = "admin export changes" if changed_only else "admin export"
+        filename = session_export_filename(session_name, suffix, label=label)
         return _read_bytes(out), filename
     finally:
         out.unlink(missing_ok=True)
 
 
-def export_staff_tab(db: Session) -> tuple[bytes, str]:
+def export_staff_tab(db: Session, *, timetable_session_id: int) -> tuple[bytes, str]:
+    session_name = timetable_session_name(db, timetable_session_id)
     with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
         out = Path(tmp.name)
     try:
         write_staff_tab_xlsx(db, out)
-        return _read_bytes(out), "staff_tab.xlsx"
-    finally:
-        out.unlink(missing_ok=True)
-
-
-def export_warnings_xlsx(db: Session, *, timetable_session_id: int) -> tuple[bytes, str]:
-    week = get_repeating_week(db, timetable_session_id)
-    if week is None:
-        raise RuntimeError("No repeating week for session")
-    report = violations_report(db, timetable_session_id=timetable_session_id)
-    rows = report["rows"]
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
-        out = Path(tmp.name)
-    try:
-        write_violations_report_xlsx(out, rows)
-        return _read_bytes(out), "warnings_report.xlsx"
+        return _read_bytes(out), session_export_filename(session_name, ".xlsx", label="staff tab")
     finally:
         out.unlink(missing_ok=True)
 
 
 def export_change_log_xlsx_bytes(db: Session, *, timetable_session_id: int) -> tuple[bytes, str]:
+    session_name = timetable_session_name(db, timetable_session_id)
     rows = gather_timetabling_change_log_display_rows(
         db,
         timetable_session_id=timetable_session_id,
@@ -151,16 +135,21 @@ def export_change_log_xlsx_bytes(db: Session, *, timetable_session_id: int) -> t
         out = Path(tmp.name)
     try:
         write_change_log_xlsx(out, rows)
-        return _read_bytes(out), "change_log_resolved.xlsx"
+        return _read_bytes(out), session_export_filename(session_name, ".xlsx", label="change log")
     finally:
         out.unlink(missing_ok=True)
 
 
-def export_lecturer_preferences_template(db: Session) -> tuple[bytes, str]:
+def export_lecturer_preferences_template(db: Session, *, timetable_session_id: int) -> tuple[bytes, str]:
+    session_name = timetable_session_name(db, timetable_session_id)
     with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
         out = Path(tmp.name)
     try:
         write_lecturer_preferences_template(db, out)
-        return _read_bytes(out), "lecturer_preferences.xlsx"
+        return _read_bytes(out), session_export_filename(
+            session_name,
+            ".xlsx",
+            label="lecturer preferences",
+        )
     finally:
         out.unlink(missing_ok=True)

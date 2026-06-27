@@ -363,6 +363,7 @@ def serialize_session(db: Session, timetable_session_id: int) -> dict[str, Any]:
                 "sfs_co_teacher_staff_id": getattr(b, "sfs_co_teacher_staff_id", None),
                 "sfs_co_teacher_in_term_1": int(getattr(b, "sfs_co_teacher_in_term_1", 0)),
                 "sfs_co_teacher_in_term_2": int(getattr(b, "sfs_co_teacher_in_term_2", 0)),
+                "cover_staff_id": getattr(b, "cover_staff_id", None),
                 "room_id": b.room_id,
                 "day": b.day,
                 "start_slot": b.start_slot,
@@ -596,6 +597,7 @@ def restore_session(db: Session, timetable_session_id: int, payload: dict[str, A
                     if co_teacher
                     else 0
                 ),
+                cover_staff_id=_map_id(staff_map, b.get("cover_staff_id")),
                 room_id=_map_id(room_map, b.get("room_id")),
                 day=b["day"],
                 start_slot=b["start_slot"],

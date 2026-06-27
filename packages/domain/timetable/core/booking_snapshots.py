@@ -30,6 +30,7 @@ BOOKING_SNAPSHOT_FIELDS = (
     "sfs_co_teacher_in_term_2",
     "session_weeks",
     "block_week_index",
+    "cover_staff_id",
 )
 COURSE_SNAPSHOT_FIELDS = (
     "code",

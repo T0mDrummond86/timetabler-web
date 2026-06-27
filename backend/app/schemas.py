@@ -254,6 +254,8 @@ class BookingCardOut(BaseModel):
     online_student_count: int | None = None
     room_is_online: bool = False
     combined_class_group_id: int | None = None
+    cover_staff_id: int | None = None
+    cover_staff_name: str | None = None
     violations: list[ViolationOut]
 
 
@@ -732,6 +734,108 @@ class AvailableRoomOut(BaseModel):
 class AlternateSlotsOut(BaseModel):
     days: list[AlternateDayOut]
     available_rooms: list[AvailableRoomOut]
+
+
+class CoverCandidateOut(BaseModel):
+    id: int
+    label: str
+    busy: bool = False
+
+
+class CoverCandidatesOut(BaseModel):
+    candidates: list[CoverCandidateOut]
+
+
+class CoverAssignRequest(BaseModel):
+    course_id: int
+    cover_staff_id: int | None = None
+
+
+class CoverRequestCreate(BaseModel):
+    booking_id: int | None = None
+    cover_date: str | None = None
+    semester: int | None = None
+    week_number: int | None = None
+    day_label: str = ""
+    time_label: str = ""
+    qualification_name: str = ""
+    unit_name: str = ""
+    room_code: str = ""
+    away_staff_name: str = ""
+    cover_staff_id: int | None = None
+    cover_staff_name: str = ""
+
+
+class CoverRequestUpdate(BaseModel):
+    cover_staff_id: int | None = None
+    cover_staff_name: str | None = None
+    cover_date: str | None = None
+
+
+class CoverRequestOut(BaseModel):
+    id: int
+    booking_id: int | None = None
+    cover_date: str | None = None
+    semester: int | None = None
+    week_number: int | None = None
+    day_label: str = ""
+    time_label: str = ""
+    qualification_name: str = ""
+    unit_name: str = ""
+    room_code: str = ""
+    away_staff_name: str = ""
+    cover_staff_id: int | None = None
+    cover_staff_name: str = ""
+
+
+class CoverRequestsOut(BaseModel):
+    requests: list[CoverRequestOut]
+
+
+class CoverLogEntryCreate(BaseModel):
+    cover_date: str
+    day_label: str = ""
+    time_label: str = ""
+    qualification_name: str = ""
+    unit_name: str = ""
+    room_code: str = ""
+    away_staff_name: str = ""
+    cover_staff_name: str = ""
+    source_session_name: str = ""
+
+
+class CoverLogEntryOut(BaseModel):
+    id: int
+    cover_date: str | None = None
+    day_label: str = ""
+    time_label: str = ""
+    qualification_name: str = ""
+    unit_name: str = ""
+    room_code: str = ""
+    away_staff_name: str = ""
+    cover_staff_name: str = ""
+    source_session_name: str = ""
+    created_at: str | None = None
+
+
+class CoverLogOut(BaseModel):
+    entries: list[CoverLogEntryOut]
+
+
+class CalendarWeekOut(BaseModel):
+    semester: int
+    week_number: int
+    monday_date: str | None = None
+    label: str = ""
+
+
+class CalendarOut(BaseModel):
+    weeks: list[CalendarWeekOut]
+
+
+class CalendarImportOut(BaseModel):
+    imported: int
+    weeks: list[CalendarWeekOut]
 
 
 class ClassCustodianRowOut(BaseModel):

@@ -26,7 +26,7 @@ export const FOUR_WAY_PANE_ORDER = [0, 1, 3, 2] as const;
 export const DEFAULT_SLOT_VIEWS: Record<SplitLayoutKind, ViewKind[]> = {
   "2h": ["course", "course_semester"],
   "2v": ["course", "course_semester"],
-  "4": ["course", "staff", "course_semester", "block_delivery"],
+  "4": ["course", "staff", "course_semester", "room"],
 };
 
 export function paneCount(layout: SplitLayoutKind): number {

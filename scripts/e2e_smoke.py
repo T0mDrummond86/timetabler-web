@@ -343,7 +343,6 @@ def main() -> int:
             {"variant": "v2"},
         ),
         ("export/admin", f"/sessions/{session_id}/export/admin", None),
-        ("export/warnings", f"/sessions/{session_id}/export/warnings", None),
         ("export/change-log", f"/sessions/{session_id}/export/change-log", None),
     ]
     for name, path, params in exports:

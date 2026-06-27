@@ -11,6 +11,7 @@ from ..auth.deps import AuthContext, require_editor
 from ..config import settings
 from ..database import get_db
 from ..schemas import ImportReportOut, TimetablePrintInfoOut, TimetablePrintRequest
+from ..services.export_filenames import session_export_filename
 from ..services.session_import_export import (
     cleanup_temp,
     export_json,
@@ -25,13 +26,13 @@ from ..services.session_import_export import (
     import_workbook,
     save_upload_to_temp,
 )
+from ..services.cover_lecturers import export_cover_timetable_pdf_bytes
 from ..services.session_excel_export import (
     export_admin_xlsx,
     export_change_log_xlsx_bytes,
     export_lecturer_preferences_template,
     export_staff_tab,
     export_timetable_xlsx,
-    export_warnings_xlsx,
 )
 from ..services.timetable_grid import assert_session_in_org
 from ..services.timetable_print import (
@@ -262,13 +263,14 @@ def export_session_json(
     ctx: AuthContext = Depends(require_editor),
     db: Session = Depends(get_db),
 ):
-    assert_session_in_org(db, session_id, ctx.organization.id)
+    ts = assert_session_in_org(db, session_id, ctx.organization.id)
     payload = export_json(db, session_id)
     body = json.dumps(payload, indent=2)
+    filename = session_export_filename(ts.name, ".json", label="backup")
     return Response(
         content=body,
         media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="session-{session_id}-backup.json"'},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -298,7 +300,6 @@ def export_admin(
     session_id: int,
     ctx: AuthContext = Depends(require_editor),
     db: Session = Depends(get_db),
-    co_teach_only: bool = Query(default=False),
     changed_only: bool = Query(default=False),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -306,7 +307,6 @@ def export_admin(
         content, filename = export_admin_xlsx(
             db,
             timetable_session_id=session_id,
-            co_teach_only=co_teach_only,
             changed_only=changed_only,
         )
     except FileNotFoundError as exc:
@@ -327,7 +327,7 @@ def export_staff_tab_route(
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
-    content, filename = export_staff_tab(db)
+    content, filename = export_staff_tab(db, timetable_session_id=session_id)
     return _file_response(
         content,
         filename,
@@ -335,22 +335,23 @@ def export_staff_tab_route(
     )
 
 
-@router.get("/sessions/{session_id}/export/warnings")
-def export_warnings(
+@router.get("/sessions/{session_id}/export/cover-timetable")
+def export_cover_timetable(
     session_id: int,
     ctx: AuthContext = Depends(require_editor),
     db: Session = Depends(get_db),
+    staff_id: int | None = Query(default=None),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
     try:
-        content, filename = export_warnings_xlsx(db, timetable_session_id=session_id)
+        content, filename = export_cover_timetable_pdf_bytes(
+            db,
+            timetable_session_id=session_id,
+            staff_id=staff_id,
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
-    return _file_response(
-        content,
-        filename,
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+    return _file_response(content, filename, "application/pdf")
 
 
 @router.get("/sessions/{session_id}/export/change-log")
@@ -375,7 +376,7 @@ def export_lecturer_prefs_template(
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
-    content, filename = export_lecturer_preferences_template(db)
+    content, filename = export_lecturer_preferences_template(db, timetable_session_id=session_id)
     return _file_response(
         content,
         filename,
@@ -409,7 +410,7 @@ def print_timetables_pdf(
     db: Session = Depends(get_db),
 ):
     """Render selected course/staff/room timetables as a multi-page PDF (A4 landscape)."""
-    assert_session_in_org(db, session_id, ctx.organization.id)
+    ts = assert_session_in_org(db, session_id, ctx.organization.id)
     from timetable.io.timetable_print_layout import PrintJobKind
 
     pk: PrintJobKind = body.kind  # type: ignore[assignment]
@@ -434,4 +435,5 @@ def print_timetables_pdf(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
-    return _file_response(content, "timetables_print.pdf", "application/pdf")
+    filename = session_export_filename(ts.name, ".pdf", label="timetables")
+    return _file_response(content, filename, "application/pdf")

@@ -47,6 +47,7 @@ import { HoldingAreaPanel } from "../components/HoldingAreaPanel";
 import { TimetableSidebar } from "../components/TimetableSidebar";
 import { UsageDashboard } from "../components/UsageDashboard";
 import { LapCreationPanel } from "../components/LapCreationPanel";
+import { LecturerCoverPanel } from "../components/LecturerCoverPanel";
 import { LoadingMark } from "../components/LoadingMark";
 import { WeekGridView } from "../components/WeekGridView";
 import { recordSessionOpen } from "../lib/recentSessions";
@@ -90,7 +91,8 @@ type SessionTab =
   | "clash_settings"
   | "custodians"
   | "usage"
-  | "lap";
+  | "lap"
+  | "lecturer_cover";
 
 type ViewState = {
   viewKind: ViewKind;
@@ -110,6 +112,7 @@ const SESSION_TABS: { id: SessionTab; label: string; secondary?: boolean }[] = [
   { id: "clash_settings", label: "Clash settings" },
   { id: "changelog", label: "Change log" },
   { id: "staff", label: "Staff", secondary: true },
+  { id: "lecturer_cover", label: "Lecturer cover", secondary: true },
   { id: "rooms", label: "Rooms", secondary: true },
   { id: "units", label: "Classes", secondary: true },
   { id: "qualifications", label: "Qualifications", secondary: true },
@@ -1870,6 +1873,19 @@ export function TimetablePage() {
             fixedTab="staff"
             showLinkedImport={globalLink?.linked === true}
             syncToken={entitySyncToken}
+          />
+        </div>
+      )}
+      {sessionTab === "lecturer_cover" && (
+        <div className="tt-page tt-page--cover">
+          <LecturerCoverPanel
+            sessionId={sessionId}
+            staff={staff}
+            onError={setError}
+            syncToken={entitySyncToken}
+            globalSessionId={
+              globalLink?.linked ? globalLink.global_session_id ?? null : null
+            }
           />
         </div>
       )}

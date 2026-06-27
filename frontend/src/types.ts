@@ -25,6 +25,7 @@ export type BookingCard = {
   layout_width_pct?: number;
   unit_name: string | null;
   course_code: string | null;
+  qualification_name: string | null;
   staff_name: string | null;
   room_code: string | null;
   room_id: number | null;
@@ -49,6 +50,8 @@ export type BookingCard = {
   online_student_count?: number | null;
   room_is_online?: boolean;
   combined_class_group_id?: number | null;
+  cover_staff_id?: number | null;
+  cover_staff_name?: string | null;
   violations: Violation[];
 };
 

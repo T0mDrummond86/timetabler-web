@@ -2,6 +2,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
+  CalendarWeek,
+  CoverLogEntry,
   GlobalSession,
   GlobalAggregatedQualRow,
   GlobalAggregatedRoomRow,
@@ -28,7 +30,15 @@ import {
   isGlobalSessionDirty,
 } from "../lib/globalSessionRefresh";
 
-type Tab = "staff" | "rooms" | "units" | "qualifications" | "custodians" | "members";
+type Tab =
+  | "staff"
+  | "rooms"
+  | "units"
+  | "qualifications"
+  | "custodians"
+  | "members"
+  | "cover_log"
+  | "calendar";
 
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 
@@ -68,6 +78,8 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "units", label: "Classes" },
   { id: "qualifications", label: "Qualifications" },
   { id: "custodians", label: "Class custodians" },
+  { id: "cover_log", label: "Cover log" },
+  { id: "calendar", label: "Calendar" },
 ];
 
 export function GlobalSessionPage() {
@@ -83,6 +95,10 @@ export function GlobalSessionPage() {
   const [units, setUnits] = useState<GlobalAggregatedUnitRow[]>([]);
   const [quals, setQuals] = useState<GlobalAggregatedQualRow[]>([]);
   const [custodians, setCustodians] = useState<GlobalClassCustodians | null>(null);
+  const [coverLog, setCoverLog] = useState<CoverLogEntry[] | null>(null);
+  const [calendar, setCalendar] = useState<CalendarWeek[] | null>(null);
+  const [importingCalendar, setImportingCalendar] = useState(false);
+  const calendarInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -132,6 +148,12 @@ export function GlobalSessionPage() {
       } else if (tab === "custodians") {
         const data = await api.globalSessionClassCustodians(globalSessionId);
         setCustodians(data);
+      } else if (tab === "cover_log") {
+        const data = await api.coverLog(globalSessionId);
+        setCoverLog(data.entries);
+      } else if (tab === "calendar") {
+        const data = await api.calendar(globalSessionId);
+        setCalendar(data.weeks);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load tab");
@@ -206,6 +228,12 @@ export function GlobalSessionPage() {
         } else if (tab === "custodians") {
           const data = await api.globalSessionClassCustodians(globalSessionId);
           if (!cancelled) setCustodians(data);
+        } else if (tab === "cover_log") {
+          const data = await api.coverLog(globalSessionId);
+          if (!cancelled) setCoverLog(data.entries);
+        } else if (tab === "calendar") {
+          const data = await api.calendar(globalSessionId);
+          if (!cancelled) setCalendar(data.weeks);
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load tab");
@@ -215,6 +243,29 @@ export function GlobalSessionPage() {
       cancelled = true;
     };
   }, [tab, globalSessionId, loading, tabSyncToken]);
+
+  async function deleteCoverLogEntry(entryId: number) {
+    try {
+      await api.deleteCoverLogEntry(globalSessionId, entryId);
+      setCoverLog((prev) => (prev ? prev.filter((e) => e.id !== entryId) : prev));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete entry");
+    }
+  }
+
+  async function importCalendarFile(file: File) {
+    setImportingCalendar(true);
+    setError(null);
+    try {
+      const result = await api.importCalendar(globalSessionId, file);
+      setCalendar(result.weeks);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Calendar import failed");
+    } finally {
+      setImportingCalendar(false);
+      if (calendarInputRef.current) calendarInputRef.current.value = "";
+    }
+  }
 
   async function saveMembers() {
     setSaving(true);
@@ -477,6 +528,121 @@ export function GlobalSessionPage() {
                 session_names: r.session_names,
               }))}
             />
+          )}
+        </section>
+      )}
+
+      {tab === "cover_log" && (
+        <section className="card">
+          {loading && coverLog == null ? (
+            <LoadingMark label="Loading…" />
+          ) : !coverLog || coverLog.length === 0 ? (
+            <p className="muted panel-empty">
+              No cover entries yet. Send cover jobs here from the Lecturer cover tab of a linked session.
+            </p>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Day / Time</th>
+                    <th>Qualification</th>
+                    <th>Class</th>
+                    <th>Room</th>
+                    <th>Away lecturer</th>
+                    <th>Cover lecturer</th>
+                    <th>Source session</th>
+                    <th aria-label="Actions" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {coverLog.map((e) => (
+                    <tr key={e.id}>
+                      <td>{e.cover_date ?? "—"}</td>
+                      <td>{[e.day_label, e.time_label].filter(Boolean).join(" ")}</td>
+                      <td>{e.qualification_name}</td>
+                      <td>{e.unit_name}</td>
+                      <td>{e.room_code}</td>
+                      <td>{e.away_staff_name}</td>
+                      <td>{e.cover_staff_name}</td>
+                      <td>{e.source_session_name}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-xs"
+                          onClick={() => void deleteCoverLogEntry(e.id)}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {tab === "calendar" && (
+        <section className="card">
+          <div className="row gap" style={{ alignItems: "center", marginBottom: "1rem" }}>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={importingCalendar}
+              onClick={() => calendarInputRef.current?.click()}
+            >
+              {importingCalendar ? "Importing…" : "Import calendar CSV"}
+            </button>
+            <input
+              ref={calendarInputRef}
+              type="file"
+              accept=".csv"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void importCalendarFile(f);
+              }}
+            />
+            <span className="muted">
+              Upload the yearly academic calendar (CSV) to map semester weeks to dates.
+            </span>
+          </div>
+
+          {!calendar || calendar.length === 0 ? (
+            <p className="muted panel-empty">No calendar imported yet.</p>
+          ) : (
+            [1, 2].map((sem) => {
+              const weeks = calendar.filter((w) => w.semester === sem);
+              if (weeks.length === 0) return null;
+              return (
+                <div key={sem} style={{ marginBottom: "1.5rem" }}>
+                  <h3 style={{ margin: "0 0 0.5rem" }}>Semester {sem}</h3>
+                  <div className="table-wrap">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Week</th>
+                          <th>Monday</th>
+                          <th>Note</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {weeks.map((w) => (
+                          <tr key={w.week_number}>
+                            <td>{w.week_number}</td>
+                            <td>{w.monday_date ?? "—"}</td>
+                            <td>{w.label}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })
           )}
         </section>
       )}

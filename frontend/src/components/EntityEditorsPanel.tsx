@@ -111,6 +111,7 @@ export function EntityEditorsPanel({
   const [competentStaffIds, setCompetentStaffIds] = useState<number[]>([]);
   const [lecturerSearch, setLecturerSearch] = useState("");
   const [unitSearch, setUnitSearch] = useState("");
+  const [qualSearch, setQualSearch] = useState("");
   const [unitQualFilter, setUnitQualFilter] = useState<number | "">("");
   const [roomTypeChoices, setRoomTypeChoices] = useState<[string, string][]>([]);
   const [staffHoursRows, setStaffHoursRows] = useState<StaffHoursRow[]>([]);
@@ -284,18 +285,25 @@ export function EntityEditorsPanel({
             : qualifications.map((q) => ({ id: q.id, label: q.name }));
 
   const rows = useMemo(() => {
-    if (activeTab !== "units") return baseRows;
-    const q = unitSearch.trim().toLowerCase();
-    return baseRows.filter((row) => {
-      const unit = units.find((u) => u.id === row.id);
-      if (!unit) return false;
-      if (unitQualFilter !== "" && !(unit.qualification_ids ?? []).includes(unitQualFilter)) {
-        return false;
-      }
-      if (q && !unit.name.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [activeTab, baseRows, units, unitSearch, unitQualFilter]);
+    if (activeTab === "units") {
+      const q = unitSearch.trim().toLowerCase();
+      return baseRows.filter((row) => {
+        const unit = units.find((u) => u.id === row.id);
+        if (!unit) return false;
+        if (unitQualFilter !== "" && !(unit.qualification_ids ?? []).includes(unitQualFilter)) {
+          return false;
+        }
+        if (q && !unit.name.toLowerCase().includes(q)) return false;
+        return true;
+      });
+    }
+    if (activeTab === "qualifications") {
+      const q = qualSearch.trim().toLowerCase();
+      if (!q) return baseRows;
+      return baseRows.filter((row) => row.label.toLowerCase().includes(q));
+    }
+    return baseRows;
+  }, [activeTab, baseRows, units, unitSearch, unitQualFilter, qualSearch]);
 
   const onCampusRoomIds = useMemo(
     () => rooms.filter(isOnCampusRoom).map((r) => r.id),
@@ -601,6 +609,18 @@ export function EntityEditorsPanel({
               </select>
             </div>
           )}
+          {activeTab === "qualifications" && (
+            <div className="entity-list-filters">
+              <input
+                type="search"
+                className="field-input"
+                placeholder="Search qualifications…"
+                value={qualSearch}
+                onChange={(e) => setQualSearch(e.target.value)}
+                aria-label="Search qualifications"
+              />
+            </div>
+          )}
           {fixedTab && fixedTab !== "courses" && (
             <div className="entity-list-toolbar">
               <button type="button" className="btn-secondary btn-xs" onClick={() => void addEntity()} disabled={saving}>
@@ -644,7 +664,13 @@ export function EntityEditorsPanel({
                   </button>
                 </li>
               ))}
-              {!rows.length && <li className="tt-entity-empty">No {activeTab} in this session.</li>}
+              {!rows.length && (
+                <li className="tt-entity-empty">
+                  {activeTab === "qualifications" && qualSearch.trim() && qualifications.length
+                    ? "No qualifications match your search."
+                    : `No ${activeTab} in this session.`}
+                </li>
+              )}
             </ul>
           )}
         </div>

@@ -16,6 +16,20 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
+function filenameFromContentDisposition(header: string | null, fallback: string): string {
+  const match = header?.match(/filename="([^"]+)"/);
+  return match?.[1] ?? fallback;
+}
+
+function triggerBlobDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export type TokenResponse = { access_token: string; token_type: string };
 export type User = {
   id: number;
@@ -78,6 +92,70 @@ export type TimetableGlobalLink = {
   member_session_ids?: number[];
 };
 
+export type CoverLogEntry = {
+  id: number;
+  cover_date: string | null;
+  day_label: string;
+  time_label: string;
+  qualification_name: string;
+  unit_name: string;
+  room_code: string;
+  away_staff_name: string;
+  cover_staff_name: string;
+  source_session_name: string;
+  created_at: string | null;
+};
+
+export type CoverLogEntryCreate = {
+  cover_date: string;
+  day_label: string;
+  time_label: string;
+  qualification_name: string;
+  unit_name: string;
+  room_code: string;
+  away_staff_name: string;
+  cover_staff_name: string;
+  source_session_name: string;
+};
+
+export type CalendarWeek = {
+  semester: number;
+  week_number: number;
+  monday_date: string | null;
+  label: string;
+};
+
+export type CoverRequest = {
+  id: number;
+  booking_id: number | null;
+  cover_date: string | null;
+  semester: number | null;
+  week_number: number | null;
+  day_label: string;
+  time_label: string;
+  qualification_name: string;
+  unit_name: string;
+  room_code: string;
+  away_staff_name: string;
+  cover_staff_id: number | null;
+  cover_staff_name: string;
+};
+
+export type CoverRequestCreate = {
+  booking_id: number | null;
+  cover_date: string | null;
+  semester: number | null;
+  week_number: number | null;
+  day_label: string;
+  time_label: string;
+  qualification_name: string;
+  unit_name: string;
+  room_code: string;
+  away_staff_name: string;
+  cover_staff_id: number | null;
+  cover_staff_name: string;
+};
+
 export type TimetablePrintKind = "course" | "staff" | "room" | "course_staff" | "changed_courses";
 
 export type TimetablePrintEntity = {
@@ -113,6 +191,12 @@ export type Staff = {
   supervision_hours?: number | null;
   default_online_students_per_class?: number | null;
   timetable_locked?: number;
+};
+export type CoverCandidate = {
+  id: number;
+  label: string;
+  /** True when this lecturer is already teaching during the booking's slot. */
+  busy: boolean;
 };
 export type Room = {
   id: number;
@@ -697,12 +781,10 @@ export const api = {
     const res = await fetch(`${API_BASE}/sessions/${sessionId}/export/json`, { headers });
     if (!res.ok) throw new Error("Export failed");
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `session-${sessionId}-backup.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(
+      blob,
+      filenameFromContentDisposition(res.headers.get("Content-Disposition"), "session backup.json"),
+    );
   },
 
   health: () => apiFetch<{ status: string; database: string; phase: number }>("/health", {}, false),
@@ -741,12 +823,10 @@ export const api = {
     );
     if (!res.ok) throw new Error("Export failed");
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "change_log_resolved.xlsx";
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(
+      blob,
+      filenameFromContentDisposition(res.headers.get("Content-Disposition"), "change log.xlsx"),
+    );
   },
 
   violationsReport: (sessionId: number, severity?: "hard" | "soft") => {
@@ -829,6 +909,104 @@ export const api = {
     return apiFetch<import("./types").AlternateSlots>(
       `/sessions/${sessionId}/bookings/${bookingId}/alternate-slots${q ? `?${q}` : ""}`,
     );
+  },
+
+  coverCandidates: (sessionId: number, bookingId: number) =>
+    apiFetch<{ candidates: CoverCandidate[] }>(
+      `/sessions/${sessionId}/bookings/${bookingId}/cover-candidates`,
+    ),
+
+  assignCover: (
+    sessionId: number,
+    bookingId: number,
+    body: { course_id: number; cover_staff_id: number | null },
+  ) =>
+    apiFetch<import("./types").BookingMutation>(
+      `/sessions/${sessionId}/bookings/${bookingId}/assign-cover`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+
+  downloadCoverTimetable: (sessionId: number, staffId?: number) => {
+    const params = new URLSearchParams();
+    if (staffId != null) params.set("staff_id", String(staffId));
+    const q = params.toString();
+    return api.downloadExport(
+      `/sessions/${sessionId}/export/cover-timetable${q ? `?${q}` : ""}`,
+      "cover timetable.pdf",
+    );
+  },
+
+  coverRequests: (sessionId: number) =>
+    apiFetch<{ requests: CoverRequest[] }>(`/sessions/${sessionId}/cover-requests`),
+
+  createCoverRequest: (sessionId: number, body: CoverRequestCreate) =>
+    apiFetch<CoverRequest>(`/sessions/${sessionId}/cover-requests`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  updateCoverRequest: (
+    sessionId: number,
+    requestId: number,
+    body: { cover_staff_id?: number | null; cover_staff_name?: string | null; cover_date?: string | null },
+  ) =>
+    apiFetch<CoverRequest>(`/sessions/${sessionId}/cover-requests/${requestId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  deleteCoverRequest: (sessionId: number, requestId: number) =>
+    apiFetch<void>(`/sessions/${sessionId}/cover-requests/${requestId}`, { method: "DELETE" }),
+
+  promoteCoverRequest: (sessionId: number, requestId: number) =>
+    apiFetch<unknown>(`/sessions/${sessionId}/cover-requests/${requestId}/promote`, {
+      method: "POST",
+    }),
+
+  coverLog: (globalSessionId: number) =>
+    apiFetch<{ entries: CoverLogEntry[] }>(
+      `/global-sessions/${globalSessionId}/cover-log`,
+    ),
+
+  createCoverLogEntry: (globalSessionId: number, body: CoverLogEntryCreate) =>
+    apiFetch<CoverLogEntry>(`/global-sessions/${globalSessionId}/cover-log`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  deleteCoverLogEntry: (globalSessionId: number, entryId: number) =>
+    apiFetch<void>(`/global-sessions/${globalSessionId}/cover-log/${entryId}`, {
+      method: "DELETE",
+    }),
+
+  calendar: (globalSessionId: number) =>
+    apiFetch<{ weeks: CalendarWeek[] }>(`/global-sessions/${globalSessionId}/calendar`),
+
+  async importCalendar(
+    globalSessionId: number,
+    file: File,
+  ): Promise<{ imported: number; weeks: CalendarWeek[] }> {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${API_BASE}/global-sessions/${globalSessionId}/calendar`, {
+      method: "POST",
+      headers,
+      body: form,
+    });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        if (body.detail) detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      } catch {
+        /* ignore */
+      }
+      throw new Error(detail);
+    }
+    return res.json() as Promise<{ imported: number; weeks: CalendarWeek[] }>;
   },
 
   classCustodians: (sessionId: number) =>
@@ -1023,12 +1201,10 @@ export const api = {
       throw new Error(detail);
     }
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "timetables_print.pdf";
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(
+      blob,
+      filenameFromContentDisposition(res.headers.get("Content-Disposition"), "timetables.pdf"),
+    );
   },
 
   async downloadExport(path: string, fallbackFilename: string): Promise<void> {
@@ -1059,14 +1235,8 @@ export const api = {
     const blob = await res.blob();
     let filename = fallbackFilename;
     const cd = res.headers.get("Content-Disposition");
-    const match = cd?.match(/filename="([^"]+)"/);
-    if (match) filename = match[1];
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    filename = filenameFromContentDisposition(cd, fallbackFilename);
+    triggerBlobDownload(blob, filename);
   },
 
   async importFile(sessionId: number, kind: "session" | "qualifications" | "qualifications-csp" | "qualifications-ep-nb-csp" | "asc" | "lecturer-preferences" | "overall-visual" | "admin-visual", file: File) {

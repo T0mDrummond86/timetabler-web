@@ -257,6 +257,31 @@ def test_clear_sfs_co_teacher(client: TestClient):
     assert booking_id not in {b["id"] for b in staff_grid["bookings"]}
 
 
+def test_co_teacher_shown_on_staff_timetable_when_term_flags_unset(client: TestClient):
+    """Co-teach term flags 0 inherit class terms for hours and staff grid visibility."""
+    _token, session_id, course_id, booking_id, headers = _seed_session(client)
+
+    from app.database import get_db as gdb
+
+    gen = client.app.dependency_overrides[gdb]()
+    db = next(gen)
+    booking = db.get(Booking, booking_id)
+    staff_rows = client.get(f"/sessions/{session_id}/staff", headers=headers).json()
+    co = next(s for s in staff_rows if s["id"] != booking.staff_id)
+
+    booking.sfs_co_teacher_staff_id = co["id"]
+    booking.sfs_co_teacher_in_term_1 = 0
+    booking.sfs_co_teacher_in_term_2 = 0
+    db.commit()
+
+    staff_grid = client.get(
+        f"/sessions/{session_id}/timetable",
+        params={"view": "staff", "staff_id": co["id"]},
+        headers=headers,
+    ).json()
+    assert booking_id in {b["id"] for b in staff_grid["bookings"]}
+
+
 def test_staff_and_rooms_lists(client: TestClient):
     _token, session_id, _course_id, _booking_id, headers = _seed_session(client)
 

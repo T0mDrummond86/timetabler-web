@@ -283,24 +283,33 @@ def staff_booking_hours_by_term(booking: Booking, staff_id: int) -> tuple[float,
 def staff_booking_filter_sql(staff_id: int, term_filter: TermFilter):
     """SQLAlchemy filter for staff-view bookings including term-scoped co-teaching."""
     primary = Booking.staff_id == staff_id
-    co = Booking.sfs_co_teacher_staff_id == staff_id
+
+    def _co_teacher_active_in_term(term: Literal["t1", "t2"]):
+        co = Booking.sfs_co_teacher_staff_id == staff_id
+        class_in = Booking.in_term_1 == 1 if term == "t1" else Booking.in_term_2 == 1
+        explicit = (
+            Booking.sfs_co_teacher_in_term_1 == 1
+            if term == "t1"
+            else Booking.sfs_co_teacher_in_term_2 == 1
+        )
+        inherit_class_terms = and_(
+            Booking.sfs_co_teacher_in_term_1 == 0,
+            Booking.sfs_co_teacher_in_term_2 == 0,
+        )
+        return and_(co, class_in, or_(explicit, inherit_class_terms))
+
     if term_filter == "t1":
         return or_(
             and_(primary, Booking.in_term_1 == 1),
-            and_(co, Booking.in_term_1 == 1, Booking.sfs_co_teacher_in_term_1 == 1),
+            _co_teacher_active_in_term("t1"),
         )
     if term_filter == "t2":
         return or_(
             and_(primary, Booking.in_term_2 == 1),
-            and_(co, Booking.in_term_2 == 1, Booking.sfs_co_teacher_in_term_2 == 1),
+            _co_teacher_active_in_term("t2"),
         )
     return or_(
         primary,
-        and_(
-            co,
-            or_(
-                and_(Booking.in_term_1 == 1, Booking.sfs_co_teacher_in_term_1 == 1),
-                and_(Booking.in_term_2 == 1, Booking.sfs_co_teacher_in_term_2 == 1),
-            ),
-        ),
+        _co_teacher_active_in_term("t1"),
+        _co_teacher_active_in_term("t2"),
     )

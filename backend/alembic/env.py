@@ -14,6 +14,9 @@ sys.path.insert(0, str(DOMAIN))
 
 from timetable.core.models import Base  # noqa: E402
 from timetable.core.tenancy_models import (  # noqa: E402, F401
+    CalendarWeek,
+    CoverLogEntry,
+    CoverRequest,
     Membership,
     Organization,
     TimetableSession,

@@ -183,13 +183,34 @@ function BulkOnlineCell({
 }
 
 export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) {
+  const [search, setSearch] = useState("");
   const [varianceFilter, setVarianceFilter] = useState<"all" | StaffVarianceCategory>("all");
   const [expandedBulkIds, setExpandedBulkIds] = useState<Set<number>>(() => new Set());
 
+  const searchFiltered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) => {
+      const hay = [
+        r.name,
+        r.staff_identifier,
+        r.cost_centre,
+        r.preferences_first,
+        r.preferences_second,
+        r.preferences_third,
+        r.development_project_description,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [rows, search]);
+
   const filtered = useMemo(() => {
-    if (varianceFilter === "all") return rows;
-    return rows.filter((r) => r.variance_category === varianceFilter);
-  }, [rows, varianceFilter]);
+    if (varianceFilter === "all") return searchFiltered;
+    return searchFiltered.filter((r) => r.variance_category === varianceFilter);
+  }, [searchFiltered, varianceFilter]);
 
   const toggleBulkExpanded = (rowId: number, e: MouseEvent) => {
     e.stopPropagation();
@@ -210,20 +231,30 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
       <StaffSummaryCards rows={rows} />
 
       <div className="staff-hours-table-toolbar">
-        <label className="staff-variance-filter">
-          <span>Variance filter</span>
-          <select
-            value={varianceFilter}
-            onChange={(e) => setVarianceFilter(e.target.value as typeof varianceFilter)}
-            title="Show only lecturers whose variance cell matches the selected category."
-          >
-            {VARIANCE_FILTER_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="staff-hours-table-filters">
+          <input
+            type="search"
+            className="field-input staff-list-search"
+            placeholder="Search lecturers…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search lecturers"
+          />
+          <label className="staff-variance-filter">
+            <span>Variance filter</span>
+            <select
+              value={varianceFilter}
+              onChange={(e) => setVarianceFilter(e.target.value as typeof varianceFilter)}
+              title="Show only lecturers whose variance cell matches the selected category."
+            >
+              {VARIANCE_FILTER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         {loading ? (
           <LoadingMark size={40} label="Loading hours…" className="loading-mark--inline staff-hours-loading-mark" />
         ) : (
@@ -369,7 +400,9 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
               <tr>
                 <td colSpan={19} className="staff-hours-empty">
                   {rows.length
-                    ? "No lecturers match this variance filter."
+                    ? search.trim() || varianceFilter !== "all"
+                      ? "No lecturers match the current filters."
+                      : "No staff in this session."
                     : "No staff in this session."}
                 </td>
               </tr>

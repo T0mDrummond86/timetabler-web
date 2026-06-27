@@ -22,6 +22,7 @@ from ..services.change_log import (
     rollback_booking_from_resolved,
     update_change_log_note,
 )
+from ..services.export_filenames import session_export_filename
 from ..services.timetable_grid import assert_session_in_org
 
 router = APIRouter(tags=["change-log"])
@@ -95,15 +96,16 @@ def export_change_log(
     ctx: AuthContext = Depends(require_editor),
     db: Session = Depends(get_db),
 ):
-    assert_session_in_org(db, session_id, ctx.organization.id)
+    ts = assert_session_in_org(db, session_id, ctx.organization.id)
     if not resolved:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Export requires resolved=true",
         )
     path: Path = export_resolved_change_log_xlsx(db, timetable_session_id=session_id)
+    filename = session_export_filename(ts.name, ".xlsx", label="change log")
     return FileResponse(
         path,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        filename="change_log_resolved.xlsx",
+        filename=filename,
     )

@@ -238,21 +238,6 @@ export function DataToolbar({
               type="button"
               className="ctx-item ctx-item-desc"
               role="menuitem"
-              onClick={() =>
-                void exportPath(
-                  `/sessions/${sessionId}/export/admin?co_teach_only=true`,
-                  "co_teach_export.xlsx",
-                  "SFS co-teach export",
-                )
-              }
-            >
-              <span className="ctx-item-title">SFS co-teach export</span>
-              <span className="ctx-item-hint">Admin layout, co-teach classes only</span>
-            </button>
-            <button
-              type="button"
-              className="ctx-item ctx-item-desc"
-              role="menuitem"
               onClick={() => void exportPath(`/sessions/${sessionId}/export/staff-tab`, "staff_tab.xlsx", "Staff tab")}
             >
               <span className="ctx-item-title">Staff tab</span>
@@ -274,17 +259,6 @@ export function DataToolbar({
             </button>
             <div className="ctx-divider" />
             <span className="ctx-label">Reports</span>
-            <button
-              type="button"
-              className="ctx-item ctx-item-desc"
-              role="menuitem"
-              onClick={() =>
-                void exportPath(`/sessions/${sessionId}/export/warnings`, "warnings_report.xlsx", "Warnings report")
-              }
-            >
-              <span className="ctx-item-title">Warnings report</span>
-              <span className="ctx-item-hint">All validation warnings as Excel</span>
-            </button>
             <button
               type="button"
               className="ctx-item ctx-item-desc"

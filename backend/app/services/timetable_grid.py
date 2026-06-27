@@ -17,7 +17,7 @@ from timetable.core.booking_staff import (
 from timetable.core.staff_hours import room_is_online
 from timetable.core.class_colour import booking_colour_key
 from timetable.core.class_colour_overrides import build_screen_colour_map
-from timetable.core.models import Booking, Course, Room, Semester, Staff, StaffAvailability, Unit, Week
+from timetable.core.models import Booking, Course, Qualification, Room, Semester, Staff, StaffAvailability, Unit, Week
 from timetable.core.placecard_layout import PlacecardRect, layout_column_bookings
 from timetable.core.schedule_variants import apply_schedule_display_filter, variant_week_buttons
 from timetable.core.tenancy_models import TimetableSession
@@ -180,6 +180,7 @@ def _booking_query(db: Session, week_id: int):
             joinedload(Booking.course),
             joinedload(Booking.staff),
             joinedload(Booking.sfs_co_teacher),
+            joinedload(Booking.cover_staff),
             joinedload(Booking.room),
         )
         .filter(Booking.week_id == week_id)
@@ -213,6 +214,7 @@ def _booking_card(
     soft_ids: set[int],
     colour_by_class: bool = True,
     screen_colour_map: dict[str, tuple[str, str]] | None = None,
+    qual_by_course: dict[int, str | None] | None = None,
 ) -> dict:
     colour_key = booking_colour_key(b, by_class=colour_by_class)
     fill, border = class_colours(colour_key, screen_colour_map)
@@ -233,6 +235,7 @@ def _booking_card(
         "layout_width_pct": layout_width_pct,
         "unit_name": b.unit.name if b.unit else None,
         "course_code": b.course.code if b.course else None,
+        "qualification_name": (qual_by_course or {}).get(b.course_id),
         "staff_name": staff_name,
         "room_code": b.room.code if b.room else None,
         "room_id": b.room_id,
@@ -261,6 +264,10 @@ def _booking_card(
         "online_student_count": getattr(b, "online_student_count", None),
         "room_is_online": room_is_online(b.room),
         "combined_class_group_id": getattr(b, "combined_class_group_id", None),
+        "cover_staff_id": getattr(b, "cover_staff_id", None),
+        "cover_staff_name": (
+            b.cover_staff.name if getattr(b, "cover_staff", None) else None
+        ),
         "violations": [
             {
                 "severity": v.severity.value,
@@ -357,6 +364,20 @@ def _build_grid_payload(
         units=units,
     )
 
+    # course_id -> qualification name (one query each; avoids per-booking lookups)
+    qual_names = {
+        q.id: q.name
+        for q in db.query(Qualification)
+        .filter(Qualification.timetable_session_id == timetable_session_id)
+        .all()
+    }
+    qual_by_course = {
+        cid: qual_names.get(qid)
+        for cid, qid in db.query(Course.id, Course.qualification_id)
+        .filter(Course.timetable_session_id == timetable_session_id)
+        .all()
+    }
+
     cards: list[dict] = []
     for col_idx in range(len(columns)):
         col_bookings = by_column.get(col_idx, [])
@@ -379,6 +400,7 @@ def _build_grid_payload(
                     soft_ids=soft_ids,
                     colour_by_class=colour_by_class,
                     screen_colour_map=screen_colour_map,
+                    qual_by_course=qual_by_course,
                 )
             )
 

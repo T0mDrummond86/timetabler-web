@@ -287,6 +287,7 @@ def serialize(session: Session, *, timetable_session_id: int | None = None) -> d
                 "sfs_co_teacher_staff_id": getattr(b, "sfs_co_teacher_staff_id", None),
                 "sfs_co_teacher_in_term_1": int(getattr(b, "sfs_co_teacher_in_term_1", 0)),
                 "sfs_co_teacher_in_term_2": int(getattr(b, "sfs_co_teacher_in_term_2", 0)),
+                "cover_staff_id": getattr(b, "cover_staff_id", None),
                 "room_id": b.room_id,
                 "day": b.day, "start_slot": b.start_slot, "end_slot": b.end_slot,
                 "notes": b.notes,
@@ -469,6 +470,7 @@ def deserialize(session: Session, payload: dict[str, Any]) -> None:
                 if b.get("sfs_co_teacher_staff_id")
                 else 0
             ),
+            cover_staff_id=b.get("cover_staff_id"),
             room_id=b.get("room_id"),
             day=b["day"], start_slot=b["start_slot"], end_slot=b["end_slot"],
             notes=b.get("notes"),

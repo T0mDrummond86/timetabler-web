@@ -1083,7 +1083,8 @@ body:has(.app-shell--fill) #root {
 }
 
 .app-main--fill > .tt-page--timetable,
-.app-main--fill > .tt-page--entity {
+.app-main--fill > .tt-page--entity,
+.app-main--fill > .tt-page--cover {
   flex: 1;
   min-height: 0;
 }
@@ -1295,6 +1296,26 @@ body:has(.app-shell--fill) #root {
   border-right: 1px solid var(--border);
 }
 
+.grid-time-slot-hit {
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.grid-time-slot-hit:hover {
+  background: color-mix(in srgb, var(--primary-soft) 45%, transparent);
+}
+
+.grid-time-slot-hit--active {
+  background: color-mix(in srgb, var(--primary-soft) 70%, transparent);
+}
+
 .grid-time-label {
   position: absolute;
   left: 0;
@@ -1343,6 +1364,15 @@ body:has(.app-shell--fill) #root {
 
 .grid-slot-line.hour {
   border-top-color: var(--grid-slot-line-hour);
+}
+
+.grid-slot-highlight {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: color-mix(in srgb, var(--primary-soft) 55%, transparent);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .booking-card {
@@ -2369,12 +2399,217 @@ body:has(.app-shell--fill) #root {
 }
 
 /* Entity editor tabs — viewport split pane; left list scrolls, right pane stays in view */
-.tt-page--entity {
+.tt-page--entity,
+.tt-page--cover {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+.tt-page--cover .lecturer-cover-panel {
+  flex: 1;
+  min-height: 0;
+}
+
+.lecturer-cover-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 0.5rem;
+}
+
+.lecturer-cover-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem 1.25rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+}
+
+.lecturer-cover-toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  min-width: min(100%, 16rem);
+}
+
+.lecturer-cover-toolbar-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  width: 100%;
+}
+
+.lecturer-cover-search {
+  min-width: 10rem;
+  max-width: 14rem;
+  font-size: 0.85rem;
+}
+
+.lecturer-cover-select {
+  min-width: 12rem;
+  max-width: 20rem;
+  font-size: 0.85rem;
+}
+
+.lecturer-cover-hint {
+  width: 100%;
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.lecturer-cover-log-send {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Labels sit inline in this horizontal row (override the stacked 100% width). */
+.lecturer-cover-log-send .lecturer-cover-toolbar-label {
+  width: auto;
+}
+
+.lecturer-cover-log-send select.field-select {
+  width: auto;
+  min-width: 5rem;
+  font-size: 0.85rem;
+}
+
+.lecturer-cover-log-send input[type="date"] {
+  width: auto;
+  min-width: 9rem;
+  font-size: 0.85rem;
+}
+
+.lecturer-cover-log-send button {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* Generic data table (cover log, calendar, LAP). */
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.data-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  padding: 0.55rem 0.9rem;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.data-table td {
+  padding: 0.5rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tbody tr:hover td {
+  background: var(--bg-hover);
+}
+
+/* Keep short columns on one line; let Class/Qualification take the slack. */
+.data-table td:first-child,
+.data-table th:first-child {
+  white-space: nowrap;
+}
+
+.lecturer-cover-requests {
+  margin-top: 1rem;
+}
+
+.cover-request-date {
+  min-width: 9rem;
+  font-size: 0.85rem;
+}
+
+.cover-request-cover {
+  min-width: 11rem;
+  font-size: 0.85rem;
+}
+
+.cover-request-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.cover-request-actions .btn-xs + .btn-xs {
+  margin-left: 0.35rem;
+}
+
+.lecturer-cover-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.lecturer-cover-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.lecturer-cover-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  overflow: hidden;
+}
+
+.lecturer-cover-pane-title {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  background: var(--zone-grid-header, var(--bg-subtle));
+  flex-shrink: 0;
+}
+
+.lecturer-cover-pane .timetable-grid-panel {
+  flex: 1;
+  min-height: 0;
+}
+
+.lecturer-cover-empty {
+  padding: 1rem;
+  margin: 0;
 }
 
 .tt-page--entity .entity-editor-panel--fill {
@@ -3033,6 +3268,7 @@ body:has(.app-shell--fill) #root {
 }
 
 .booking-co-badge,
+.booking-cover-badge,
 .booking-violation-badge,
 .booking-combined-badge {
   margin-left: 4px;
@@ -3050,6 +3286,16 @@ body:has(.app-shell--fill) #root {
 .booking-co-badge {
   background: var(--primary-soft);
   color: var(--primary);
+}
+
+.booking-cover-badge {
+  background: color-mix(in srgb, #f59e0b 22%, transparent);
+  color: #b45309;
+}
+
+.booking-card--cover {
+  outline: 1px dashed color-mix(in srgb, #f59e0b 55%, transparent);
+  outline-offset: 0;
 }
 
 .booking-combined-badge {
@@ -3157,6 +3403,23 @@ body.staff-editor-resizing {
   justify-content: space-between;
   gap: 0.5rem 1rem;
   padding: 0 0.1rem;
+}
+
+.staff-hours-table-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  flex: 1;
+  min-width: min(100%, 14rem);
+}
+
+.staff-list-search {
+  flex: 1;
+  min-width: 10rem;
+  max-width: 18rem;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.5rem;
 }
 
 .staff-variance-filter {
