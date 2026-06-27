@@ -231,6 +231,7 @@ class BookingCardOut(BaseModel):
     layout_width_pct: float
     unit_name: str | None
     course_code: str | None
+    qualification_name: str | None = None
     staff_name: str | None
     room_code: str | None
     room_id: int | None = None
