@@ -923,6 +923,32 @@ export function TimetablePage() {
     }
   }
 
+  async function onMergeClasses(bookingIds: number[]) {
+    setMutating(true);
+    setError(null);
+    try {
+      await api.mergeClasses(sessionId, bookingIds);
+      await reloadView();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Merge failed");
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function onUnmergeClasses(bookingId: number) {
+    setMutating(true);
+    setError(null);
+    try {
+      await api.unmergeClasses(sessionId, bookingId);
+      await reloadView();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unmerge failed");
+    } finally {
+      setMutating(false);
+    }
+  }
+
   async function onAlternateMove(booking: BookingCard, option: AlternatePlacementOption) {
     const cid = mutationCourseId(booking);
     if (!cid) return;
@@ -1035,6 +1061,22 @@ export function TimetablePage() {
       await refreshHolding();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not return to holding area");
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function onDeletePlacecard(booking: BookingCard) {
+    const cid = mutationCourseId(booking);
+    if (!cid) return;
+    setMutating(true);
+    setError(null);
+    try {
+      const result = await api.deleteBooking(sessionId, booking.id, cid);
+      await applyMutation(result.change);
+      await refreshHolding();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete class");
     } finally {
       setMutating(false);
     }
@@ -1834,6 +1876,9 @@ export function TimetablePage() {
                   onAlternateMove={editable ? onAlternateMove : undefined}
                   onDismissViolation={showAlerts ? onDismissViolation : undefined}
                   onSetClassColour={editable ? onSetClassColour : undefined}
+                  onMergeClasses={editable ? onMergeClasses : undefined}
+                  onUnmergeClasses={editable ? onUnmergeClasses : undefined}
+                  onDeletePlacecard={editable ? onDeletePlacecard : undefined}
                   colourByClass={colourByClass}
                 />
               )

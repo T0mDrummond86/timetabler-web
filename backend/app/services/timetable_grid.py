@@ -17,6 +17,8 @@ from timetable.core.booking_staff import (
 from timetable.core.staff_hours import room_is_online
 from timetable.core.class_colour import booking_colour_key
 from timetable.core.class_colour_overrides import build_screen_colour_map
+from timetable.core.combined_class import combine_group_key
+from timetable.core.pending_classes import unit_ids_for_course
 from timetable.core.models import Booking, Course, Qualification, Room, Semester, Staff, StaffAvailability, Unit, Week
 from timetable.core.placecard_layout import PlacecardRect, layout_column_bookings
 from timetable.core.schedule_variants import apply_schedule_display_filter, variant_week_buttons
@@ -215,6 +217,7 @@ def _booking_card(
     colour_by_class: bool = True,
     screen_colour_map: dict[str, tuple[str, str]] | None = None,
     qual_by_course: dict[int, str | None] | None = None,
+    belonging_by_course: dict[int, set[int]] | None = None,
 ) -> dict:
     colour_key = booking_colour_key(b, by_class=colour_by_class)
     fill, border = class_colours(colour_key, screen_colour_map)
@@ -236,6 +239,10 @@ def _booking_card(
         "unit_name": b.unit.name if b.unit else None,
         "course_code": b.course.code if b.course else None,
         "qualification_name": (qual_by_course or {}).get(b.course_id),
+        "returns_to_holding": (
+            b.unit_id is not None
+            and b.unit_id in (belonging_by_course or {}).get(b.course_id, set())
+        ),
         "staff_name": staff_name,
         "room_code": b.room.code if b.room else None,
         "room_id": b.room_id,
@@ -264,6 +271,9 @@ def _booking_card(
         "online_student_count": getattr(b, "online_student_count", None),
         "room_is_online": room_is_online(b.room),
         "combined_class_group_id": getattr(b, "combined_class_group_id", None),
+        "manual_merge_group_id": getattr(b, "manual_merge_group_id", None),
+        "is_merged": False,
+        "merged_booking_ids": [],
         "cover_staff_id": getattr(b, "cover_staff_id", None),
         "cover_staff_name": (
             b.cover_staff.name if getattr(b, "cover_staff", None) else None
@@ -353,6 +363,26 @@ def _build_grid_payload(
             if b.room_id is not None and b.room_id in room_to_col:
                 by_column[room_to_col[b.room_id]].append(b)
 
+    # Collapse merged/combined classes into one card (lecturer view only).
+    # Manual merges and auto-detected combined classes share the merge rendering.
+    merged_members: dict[int, list[Booking]] = {}
+    if view == "staff":
+        for col_idx, col_bookings in list(by_column.items()):
+            groups: dict[tuple[str, int], list[Booking]] = defaultdict(list)
+            for b in col_bookings:
+                key = combine_group_key(b)
+                if key is not None:
+                    groups[key].append(b)
+            drop_ids: set[int] = set()
+            for members in groups.values():
+                if len(members) < 2:
+                    continue
+                rep = min(members, key=lambda x: x.id)
+                merged_members[rep.id] = members
+                drop_ids.update(m.id for m in members if m.id != rep.id)
+            if drop_ids:
+                by_column[col_idx] = [b for b in col_bookings if b.id not in drop_ids]
+
     units = (
         db.query(Unit)
         .filter(Unit.timetable_session_id == timetable_session_id)
@@ -378,6 +408,15 @@ def _build_grid_payload(
         .all()
     }
 
+    # Units that belong to each course's curriculum (qualification + course links).
+    # A deleted booking whose unit belongs here returns to the holding area; one
+    # that doesn't belong disappears entirely.
+    belonging_by_course: dict[int, set[int]] = {}
+    for cid in {b.course_id for b in bookings if b.course_id is not None}:
+        course = db.get(Course, cid)
+        if course is not None:
+            belonging_by_course[cid] = set(unit_ids_for_course(db, course))
+
     cards: list[dict] = []
     for col_idx in range(len(columns)):
         col_bookings = by_column.get(col_idx, [])
@@ -401,8 +440,36 @@ def _build_grid_payload(
                     colour_by_class=colour_by_class,
                     screen_colour_map=screen_colour_map,
                     qual_by_course=qual_by_course,
+                    belonging_by_course=belonging_by_course,
                 )
             )
+
+    # Apply merged-card overrides: join member fields into the representative card.
+    if merged_members:
+        def _join(values, sep=" + "):
+            seen: list[str] = []
+            for v in values:
+                v = (v or "").strip()
+                if v and v not in seen:
+                    seen.append(v)
+            return sep.join(seen)
+
+        for card in cards:
+            members = merged_members.get(card["id"])
+            if not members:
+                continue
+            card["unit_name"] = _join(m.unit.name if m.unit else None for m in members)
+            card["course_code"] = _join(m.course.code if m.course else None for m in members)
+            card["qualification_name"] = _join(
+                qual_by_course.get(m.course_id) for m in members
+            )
+            card["room_code"] = _join(
+                (m.room.code if m.room else None for m in members), sep=" / "
+            )
+            card["start_slot"] = min(m.start_slot for m in members)
+            card["end_slot"] = max(m.end_slot for m in members)
+            card["is_merged"] = True
+            card["merged_booking_ids"] = sorted(m.id for m in members)
 
     card_ids = {c["id"] for c in cards}
     relevant = [v for v in violations if any(bid in card_ids for bid in v.booking_ids)]

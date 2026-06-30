@@ -1682,6 +1682,11 @@ body:has(.app-shell--fill) #root {
   cursor: default;
 }
 
+.ctx-danger {
+  color: var(--danger);
+  font-weight: 600;
+}
+
 .ctx-colour-picker {
   display: flex;
   align-items: center;

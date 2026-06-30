@@ -35,20 +35,34 @@ def combined_class_slot_key(b: Booking) -> tuple:
     )
 
 
+def combine_group_key(b: Booking) -> tuple[str, int] | None:
+    """Effective combine-group key: a user merge takes priority over auto-detect.
+
+    Manual merges (``manual_merge_group_id``) and auto-detected combined classes
+    (``combined_class_group_id``) are namespaced so their ids never collide.
+    """
+    manual = getattr(b, "manual_merge_group_id", None)
+    if manual is not None:
+        return ("m", int(manual))
+    auto = getattr(b, "combined_class_group_id", None)
+    if auto is not None:
+        return ("c", int(auto))
+    return None
+
+
 def same_combined_class(a: Booking, b: Booking) -> bool:
-    """True when both bookings belong to the same detected combined-class group."""
-    gid_a = getattr(a, "combined_class_group_id", None)
-    gid_b = getattr(b, "combined_class_group_id", None)
-    return gid_a is not None and gid_a == gid_b
+    """True when both bookings belong to the same combined or merged group."""
+    key_a = combine_group_key(a)
+    return key_a is not None and key_a == combine_group_key(b)
 
 
 def combined_class_hours_representative_ids(bookings: Iterable[Booking]) -> frozenset[int]:
-    """Booking ids that count toward staff hours — one per combined-class group."""
-    by_group: dict[int, list[Booking]] = defaultdict(list)
+    """Booking ids that count toward staff hours — one per combined/merged group."""
+    by_group: dict[tuple[str, int], list[Booking]] = defaultdict(list)
     for b in bookings:
-        gid = getattr(b, "combined_class_group_id", None)
-        if gid is not None:
-            by_group[int(gid)].append(b)
+        key = combine_group_key(b)
+        if key is not None:
+            by_group[key].append(b)
     reps: set[int] = set()
     for group in by_group.values():
         reps.add(min(b.id for b in group))
@@ -59,8 +73,8 @@ def counts_toward_staff_hours(
     booking: Booking,
     representative_ids: frozenset[int],
 ) -> bool:
-    """False for duplicate cohort rows in the same combined-class group."""
-    if getattr(booking, "combined_class_group_id", None) is None:
+    """False for duplicate cohort rows in the same combined/merged group."""
+    if combine_group_key(booking) is None:
         return True
     return booking.id in representative_ids
 

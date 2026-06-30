@@ -232,6 +232,7 @@ class BookingCardOut(BaseModel):
     unit_name: str | None
     course_code: str | None
     qualification_name: str | None = None
+    returns_to_holding: bool = False
     staff_name: str | None
     room_code: str | None
     room_id: int | None = None
@@ -255,6 +256,9 @@ class BookingCardOut(BaseModel):
     online_student_count: int | None = None
     room_is_online: bool = False
     combined_class_group_id: int | None = None
+    manual_merge_group_id: int | None = None
+    is_merged: bool = False
+    merged_booking_ids: list[int] = []
     cover_staff_id: int | None = None
     cover_staff_name: str | None = None
     violations: list[ViolationOut]
@@ -750,6 +754,14 @@ class CoverCandidatesOut(BaseModel):
 class CoverAssignRequest(BaseModel):
     course_id: int
     cover_staff_id: int | None = None
+
+
+class MergeClassesRequest(BaseModel):
+    booking_ids: list[int]
+
+
+class UnmergeClassesRequest(BaseModel):
+    booking_id: int
 
 
 class CoverRequestCreate(BaseModel):

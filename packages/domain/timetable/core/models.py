@@ -401,6 +401,8 @@ class Booking(Base):
     block_week_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Set on import when multiple cohorts share one lecturer/room/timeslot/unit set.
     combined_class_group_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # User-merged clashing classes on the lecturer view (manual, survives re-scan).
+    manual_merge_group_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Lecturer covering this class while the regular staff member is absent.
     cover_staff_id: Mapped[int | None] = mapped_column(
         ForeignKey("staff.id", ondelete="SET NULL"), nullable=True

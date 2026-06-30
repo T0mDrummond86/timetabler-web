@@ -29,6 +29,9 @@ type Props = {
   onAlternateMove?: (booking: BookingCard, option: AlternatePlacementOption) => void;
   onDismissViolation?: (bookingId: number, code: string) => void;
   onSetClassColour?: (unitId: number, fill: string | null) => void;
+  onMergeClasses?: (bookingIds: number[]) => void;
+  onUnmergeClasses?: (bookingId: number) => void;
+  onDeletePlacecard?: (booking: BookingCard) => void;
   colourByClass?: boolean;
   /** Stretch rows to fill the grid area (full day visible, no dead space). */
   fitToViewport?: boolean;
@@ -147,6 +150,9 @@ export function WeekGridView({
   onAlternateMove,
   onDismissViolation,
   onSetClassColour,
+  onMergeClasses,
+  onUnmergeClasses,
+  onDeletePlacecard,
   colourByClass = true,
   fitToViewport = false,
   selectedBookingId: selectedBookingIdProp,
@@ -564,9 +570,14 @@ export function WeekGridView({
                           cover
                         </span>
                       )}
-                      {isCombined && (
+                      {isCombined && !b.is_merged && (
                         <span className="booking-combined-badge" title="Combined class (joint cohort delivery)">
                           combined
+                        </span>
+                      )}
+                      {b.is_merged && (
+                        <span className="booking-combined-badge" title="Merged clashing classes">
+                          merged
                         </span>
                       )}
                       {showViolation && b.violations.length > 0 && (
@@ -594,6 +605,21 @@ export function WeekGridView({
           sessionId={sessionId}
           booking={contextMenu.booking}
           viewKind={viewKind}
+          clashPeerIds={
+            viewKind === "staff"
+              ? byColumn[columnIndex(contextMenu.booking, grid)]
+                  .filter(
+                    (o) =>
+                      o.id !== contextMenu.booking.id &&
+                      o.start_slot < contextMenu.booking.end_slot &&
+                      contextMenu.booking.start_slot < o.end_slot,
+                  )
+                  .map((o) => o.id)
+              : []
+          }
+          onMergeClasses={onMergeClasses}
+          onUnmergeClasses={onUnmergeClasses}
+          onDeletePlacecard={onDeletePlacecard}
           x={contextMenu.x}
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}

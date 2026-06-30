@@ -16,6 +16,11 @@ type Props = {
   onAlternateMove: (option: AlternatePlacementOption) => void;
   onDismissViolation?: (bookingId: number, code: string) => void;
   onPickClassColour?: () => void;
+  /** Ids of classes overlapping this one in the same lecturer column (staff view). */
+  clashPeerIds?: number[];
+  onMergeClasses?: (bookingIds: number[]) => void;
+  onUnmergeClasses?: (bookingId: number) => void;
+  onDeletePlacecard?: (booking: BookingCard) => void;
   colourByClass?: boolean;
 };
 
@@ -31,9 +36,15 @@ export function BookingContextMenu({
   onAlternateMove,
   onDismissViolation,
   onPickClassColour,
+  clashPeerIds = [],
+  onMergeClasses,
+  onUnmergeClasses,
+  onDeletePlacecard,
   colourByClass = true,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const canMerge = onMergeClasses && clashPeerIds.length > 0;
+  const canUnmerge = onUnmergeClasses && booking.is_merged;
 
   const showAlternate =
     viewKind === "course" ||
@@ -97,6 +108,30 @@ export function BookingContextMenu({
       <button type="button" className="ctx-item" onClick={() => { onEdit(); onClose(); }}>
         Edit booking…
       </button>
+      {canMerge && (
+        <button
+          type="button"
+          className="ctx-item"
+          onClick={() => {
+            onMergeClasses!([booking.id, ...clashPeerIds]);
+            onClose();
+          }}
+        >
+          Merge {clashPeerIds.length > 1 ? "clashing classes" : "with clashing class"}
+        </button>
+      )}
+      {canUnmerge && (
+        <button
+          type="button"
+          className="ctx-item"
+          onClick={() => {
+            onUnmergeClasses!(booking.id);
+            onClose();
+          }}
+        >
+          Unmerge classes
+        </button>
+      )}
       {booking.unit_id != null && onPickClassColour && (
         <>
           <div className="ctx-divider" />
@@ -230,6 +265,26 @@ export function BookingContextMenu({
       <button type="button" className="ctx-item" onClick={() => { onToggleLock("lock_staff"); onClose(); }}>
         {booking.lock_staff ? "Unlock lecturer" : "Lock lecturer"}
       </button>
+      {onDeletePlacecard && (
+        <>
+          <div className="ctx-divider" />
+          <button
+            type="button"
+            className="ctx-item ctx-danger"
+            title={
+              booking.returns_to_holding
+                ? "Remove from the timetable; the class returns to the holding area."
+                : "This class isn't part of the qualification — it will be deleted permanently."
+            }
+            onClick={() => {
+              onDeletePlacecard(booking);
+              onClose();
+            }}
+          >
+            {booking.returns_to_holding ? "Delete (return to holding)" : "Delete placecard"}
+          </button>
+        </>
+      )}
     </div>
   );
 

@@ -21,6 +21,8 @@ from ..schemas import (
     CoverRequestsOut,
     CoverRequestUpdate,
     HoldingClassOut,
+    MergeClassesRequest,
+    UnmergeClassesRequest,
     QualificationOut,
     RoomOut,
     StaffOut,
@@ -45,6 +47,7 @@ from ..services.cover_requests import (
     promote_cover_request,
     update_cover_request,
 )
+from ..services.class_merge import merge_classes, unmerge_classes
 from ..services.holding_area import list_holding_area
 from ..services.alternate_placements import alternate_slots_for_booking
 from ..services.entity_crud import units_to_out_batch
@@ -306,6 +309,38 @@ def booking_cover_candidates(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return {"candidates": rows}
+
+
+@router.post("/sessions/{session_id}/merge-classes")
+def post_merge_classes(
+    session_id: int,
+    body: MergeClassesRequest,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        return merge_classes(db, timetable_session_id=session_id, booking_ids=body.booking_ids)
+    except BookingNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+
+@router.post("/sessions/{session_id}/unmerge-classes")
+def post_unmerge_classes(
+    session_id: int,
+    body: UnmergeClassesRequest,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        return unmerge_classes(db, timetable_session_id=session_id, booking_id=body.booking_id)
+    except BookingNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
 
 @router.get("/sessions/{session_id}/cover-requests", response_model=CoverRequestsOut)

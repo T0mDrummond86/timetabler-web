@@ -911,6 +911,18 @@ export const api = {
     );
   },
 
+  mergeClasses: (sessionId: number, bookingIds: number[]) =>
+    apiFetch<{ group_id: number; merged: number }>(`/sessions/${sessionId}/merge-classes`, {
+      method: "POST",
+      body: JSON.stringify({ booking_ids: bookingIds }),
+    }),
+
+  unmergeClasses: (sessionId: number, bookingId: number) =>
+    apiFetch<{ ok: boolean }>(`/sessions/${sessionId}/unmerge-classes`, {
+      method: "POST",
+      body: JSON.stringify({ booking_id: bookingId }),
+    }),
+
   coverCandidates: (sessionId: number, bookingId: number) =>
     apiFetch<{ candidates: CoverCandidate[] }>(
       `/sessions/${sessionId}/bookings/${bookingId}/cover-candidates`,
