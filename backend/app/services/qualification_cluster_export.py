@@ -60,8 +60,9 @@ def export_qualification_clusters(
         ws = wb.create_sheet(_safe_sheet_name(qual.name, used_names))
         ws["A1"] = "Cluster"
         ws["B1"] = "Units"
-        ws["A1"].font = header_font
-        ws["B1"].font = header_font
+        ws["C1"] = "Hours"
+        for col in ("A1", "B1", "C1"):
+            ws[col].font = header_font
 
         units = (
             db.query(Unit)
@@ -78,12 +79,17 @@ def export_qualification_clusters(
             codes = (unit.component_codes or "").strip()
             # Normalise separators/spacing to a clean comma-joined list.
             codes = ", ".join(c.strip() for c in re.split(r"[,;/]", codes) if c.strip())
+            # Each timetable slot is 30 minutes; length_slots covers both parts
+            # of a double session, so total class hours = length_slots / 2.
+            hours = unit.length_slots / 2 if unit.length_slots else None
             ws.cell(row=row, column=1, value=unit.name)
             ws.cell(row=row, column=2, value=codes)
+            ws.cell(row=row, column=3, value=hours)
             row += 1
 
         ws.column_dimensions["A"].width = 40
         ws.column_dimensions["B"].width = 50
+        ws.column_dimensions["C"].width = 10
 
     buffer = io.BytesIO()
     wb.save(buffer)
