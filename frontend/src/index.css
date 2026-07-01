@@ -1687,6 +1687,27 @@ body:has(.app-shell--fill) #root {
   font-weight: 600;
 }
 
+.cluster-export-list {
+  max-height: 40vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem;
+}
+
+.cluster-export-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cluster-export-row:hover {
+  background: var(--bg-subtle);
+}
+
 .ctx-colour-picker {
   display: flex;
   align-items: center;

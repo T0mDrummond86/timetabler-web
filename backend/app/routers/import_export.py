@@ -27,6 +27,7 @@ from ..services.session_import_export import (
     save_upload_to_temp,
 )
 from ..services.cover_lecturers import export_cover_timetable_pdf_bytes
+from ..services.qualification_cluster_export import export_qualification_clusters
 from ..services.session_excel_export import (
     export_admin_xlsx,
     export_change_log_xlsx_bytes,
@@ -328,6 +329,31 @@ def export_staff_tab_route(
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
     content, filename = export_staff_tab(db, timetable_session_id=session_id)
+    return _file_response(
+        content,
+        filename,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@router.get("/sessions/{session_id}/export/qualification-clusters")
+def export_qualification_clusters_route(
+    session_id: int,
+    qualification_ids: str = Query(..., description="Comma-separated qualification ids"),
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        ids = [int(x) for x in qualification_ids.split(",") if x.strip()]
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid qualification ids") from exc
+    try:
+        content, filename = export_qualification_clusters(
+            db, timetable_session_id=session_id, qualification_ids=ids
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     return _file_response(
         content,
         filename,

@@ -4,6 +4,7 @@ import { useDelayedBusy } from "../hooks/useDelayedBusy";
 import { useDropdown } from "../hooks/useDropdown";
 import { LoadingMark } from "./LoadingMark";
 import { TimetablePrintDialog } from "./TimetablePrintDialog";
+import { QualificationClusterExportDialog } from "./QualificationClusterExportDialog";
 
 type Props = {
   sessionId: number;
@@ -43,6 +44,7 @@ export function DataToolbar({
   const importKindRef = useRef<ImportKind>("session");
   const [importKind, setImportKind] = useState<ImportKind>("session");
   const [printOpen, setPrintOpen] = useState(false);
+  const [clusterExportOpen, setClusterExportOpen] = useState(false);
   const [exportLabel, setExportLabel] = useState("");
   const { busy: exporting, showBusy: showExportOverlay, run: runExport } = useDelayedBusy(5000);
 
@@ -243,6 +245,18 @@ export function DataToolbar({
               <span className="ctx-item-title">Staff tab</span>
               <span className="ctx-item-hint">Lecturer hours spreadsheet</span>
             </button>
+            <button
+              type="button"
+              className="ctx-item ctx-item-desc"
+              role="menuitem"
+              onClick={() => {
+                exportMenu.close();
+                setClusterExportOpen(true);
+              }}
+            >
+              <span className="ctx-item-title">Qualification clusters…</span>
+              <span className="ctx-item-hint">Selected qualifications, one tab each (clusters + units)</span>
+            </button>
             <div className="ctx-divider" />
             <span className="ctx-label">Print</span>
             <button
@@ -320,6 +334,13 @@ export function DataToolbar({
           sessionId={sessionId}
           colourByClass={colourByClass}
           onClose={() => setPrintOpen(false)}
+        />
+      )}
+      {clusterExportOpen && (
+        <QualificationClusterExportDialog
+          sessionId={sessionId}
+          onClose={() => setClusterExportOpen(false)}
+          onError={onError}
         />
       )}
       {showExportOverlay && (
