@@ -26,6 +26,8 @@ type Props = {
   onEdit?: (booking: BookingCard) => void;
   onDismissViolation?: (bookingId: number, code: string) => void;
   onSetClassColour?: (unitId: number, fill: string | null) => void;
+  onMergeClasses?: (bookingIds: number[]) => void;
+  onUnmergeClasses?: (bookingId: number) => void;
   onGroupRenamed?: (course: Course) => void;
   onRenameError?: (message: string) => void;
 };
@@ -46,6 +48,8 @@ export function SplitPane({
   onEdit,
   onDismissViolation,
   onSetClassColour,
+  onMergeClasses,
+  onUnmergeClasses,
   onGroupRenamed,
   onRenameError,
 }: Props) {
@@ -216,6 +220,8 @@ export function SplitPane({
             onEdit={editable ? onEdit : undefined}
             onDismissViolation={editable && showAlerts ? onDismissViolation : undefined}
             onSetClassColour={editable ? onSetClassColour : undefined}
+            onMergeClasses={editable ? onMergeClasses : undefined}
+            onUnmergeClasses={editable ? onUnmergeClasses : undefined}
             colourByClass={colourByClass}
           />
         )}

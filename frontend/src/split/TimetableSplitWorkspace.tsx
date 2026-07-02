@@ -487,6 +487,32 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
     }
   }
 
+  async function onMergeClasses(bookingIds: number[]) {
+    setMutating(true);
+    setError(null);
+    try {
+      await api.mergeClasses(sessionId, bookingIds);
+      await afterMutation();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Merge failed");
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function onUnmergeClasses(bookingId: number) {
+    setMutating(true);
+    setError(null);
+    try {
+      await api.unmergeClasses(sessionId, bookingId);
+      await afterMutation();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unmerge failed");
+    } finally {
+      setMutating(false);
+    }
+  }
+
   const gridClass =
     layout === "4"
       ? "split-grid split-grid-4"
@@ -637,6 +663,8 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
                 onEdit={setEditBooking}
                 onDismissViolation={onDismissViolation}
                 onSetClassColour={onSetClassColour}
+                onMergeClasses={onMergeClasses}
+                onUnmergeClasses={onUnmergeClasses}
                 onGroupRenamed={onGroupRenamed}
                 onRenameError={setError}
               />
