@@ -37,18 +37,43 @@ def _write_sheet(
     ws.freeze_panes = "A2"
 
 
+# Excel's standard "Good"/"Bad" conditional-format colours (fill + matching text).
+_VARIANCE_GREEN = PatternFill(start_color="FFC6EFCE", end_color="FFC6EFCE", fill_type="solid")
+_VARIANCE_RED = PatternFill(start_color="FFFFC7CE", end_color="FFFFC7CE", fill_type="solid")
+_VARIANCE_GREEN_FONT = Font(color="FF006100")
+_VARIANCE_RED_FONT = Font(color="FF9C0006")
+
+
+def _shade_variance_column(ws, row_count: int) -> None:
+    """Paint Variance cells green when >= 1 and red when <= -1 (blank otherwise)."""
+    col = STAFF_TAB_EXPORT_HEADERS.index("Variance") + 1
+    for r in range(2, 2 + row_count):
+        cell = ws.cell(row=r, column=col)
+        try:
+            value = float(cell.value)
+        except (TypeError, ValueError):
+            continue
+        if value >= 1:
+            cell.fill = _VARIANCE_GREEN
+            cell.font = _VARIANCE_GREEN_FONT
+        elif value <= -1:
+            cell.fill = _VARIANCE_RED
+            cell.font = _VARIANCE_RED_FONT
+
+
 def write_staff_tab_xlsx(
     session: Session,
     path: str | Path,
     *,
     workbook_title: str = "Staff",
+    timetable_session_id: int | None = None,
 ) -> str:
     """Single sheet: main Staff hours table."""
     path = Path(path)
     wb = Workbook()
     ws0 = wb.active
     ws0.title = "Staff hours"[:31]
-    main_rows = gather_staff_tab_main_rows(session)
+    main_rows = gather_staff_tab_main_rows(session, timetable_session_id=timetable_session_id)
     _write_sheet(
         ws0,
         STAFF_TAB_EXPORT_HEADERS,
@@ -56,6 +81,7 @@ def write_staff_tab_xlsx(
         header_fill="FF374151",
         col_widths=(18, 8, 14, 18, 10, 48, 14, 14, 28, 12, 12, 10),
     )
+    _shade_variance_column(ws0, len(main_rows))
 
     wb.properties.title = workbook_title[:31] or "Staff"
     wb.save(path)

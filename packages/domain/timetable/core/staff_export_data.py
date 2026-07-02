@@ -32,11 +32,21 @@ def _float_cell(v: float | None) -> str:
     return "" if v is None else f"{float(v):g}"
 
 
-def gather_staff_tab_main_rows(session: Session) -> list[dict[str, str]]:
-    """One dict per lecturer; keys match ``STAFF_TAB_EXPORT_HEADERS``."""
+def gather_staff_tab_main_rows(
+    session: Session, *, timetable_session_id: int | None = None
+) -> list[dict[str, str]]:
+    """One dict per lecturer; keys match ``STAFF_TAB_EXPORT_HEADERS``.
+
+    ``timetable_session_id`` scopes the export to one session's staff. It is
+    optional so single-session (desktop) callers keep the all-staff behaviour;
+    the multi-tenant web app must pass it, or the export leaks other sessions.
+    """
     snap_map = staff_hours_snapshots_by_staff_id(session)
     out: list[dict[str, str]] = []
-    for s in session.query(Staff).order_by(Staff.name).all():
+    query = session.query(Staff)
+    if timetable_session_id is not None:
+        query = query.filter(Staff.timetable_session_id == timetable_session_id)
+    for s in query.order_by(Staff.name).all():
         snap = snap_map.get(s.id) or staff_hours_snapshot_for_bookings([])
         lh = lecturing_hours_from_fte(s.fte)
         variance: float | None = None

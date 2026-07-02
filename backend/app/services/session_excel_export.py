@@ -118,7 +118,7 @@ def export_staff_tab(db: Session, *, timetable_session_id: int) -> tuple[bytes, 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
         out = Path(tmp.name)
     try:
-        write_staff_tab_xlsx(db, out)
+        write_staff_tab_xlsx(db, out, timetable_session_id=timetable_session_id)
         return _read_bytes(out), session_export_filename(session_name, ".xlsx", label="staff tab")
     finally:
         out.unlink(missing_ok=True)
