@@ -8,7 +8,7 @@ type Row = {
   dayIndex: number;
   start: number;
   time: string;
-  qualification: string;
+  group: string;
   unit: string;
   room: string;
   cover: string;
@@ -23,7 +23,7 @@ function buildRows(grid: TimetableGrid, dateByBookingId: Map<number, string>): R
       dayIndex: b.day,
       start: b.start_slot,
       time: `${slotToTimeLabel(b.start_slot)} – ${slotToTimeLabel(b.end_slot)}`,
-      qualification: b.qualification_name ?? "",
+      group: b.course_code ?? "",
       unit: b.unit_name ?? b.course_code ?? "",
       room: b.room_code ?? "",
       cover: b.cover_staff_name ?? "",
@@ -38,7 +38,7 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;");
 }
 
-const HEADERS = ["Date", "Day", "Time", "Qualification", "Class", "Room", "Cover lecturer"];
+const HEADERS = ["Date", "Day", "Time", "Group", "Class", "Room", "Cover lecturer"];
 
 function buildHtml(title: string, rows: Row[]): string {
   const th = (t: string) =>
@@ -49,7 +49,7 @@ function buildHtml(title: string, rows: Row[]): string {
   const body = rows
     .map(
       (r) =>
-        `<tr>${td(r.date || "—")}${td(r.day)}${td(r.time)}${td(r.qualification)}${td(r.unit)}${td(r.room)}${td(
+        `<tr>${td(r.date || "—")}${td(r.day)}${td(r.time)}${td(r.group)}${td(r.unit)}${td(r.room)}${td(
           r.cover || "—"
         )}</tr>`
     )
@@ -67,7 +67,7 @@ function buildPlainText(title: string, rows: Row[]): string {
   const lines = [title, ""];
   lines.push(HEADERS.join("\t"));
   for (const r of rows) {
-    lines.push([r.date || "—", r.day, r.time, r.qualification, r.unit, r.room, r.cover || "—"].join("\t"));
+    lines.push([r.date || "—", r.day, r.time, r.group, r.unit, r.room, r.cover || "—"].join("\t"));
   }
   return lines.join("\n");
 }

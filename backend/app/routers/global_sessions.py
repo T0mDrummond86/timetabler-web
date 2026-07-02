@@ -307,7 +307,7 @@ def add_cover_log_entry(
             cover_date=body.cover_date,
             day_label=body.day_label,
             time_label=body.time_label,
-            qualification_name=body.qualification_name,
+            group_name=body.group_name,
             unit_name=body.unit_name,
             room_code=body.room_code,
             away_staff_name=body.away_staff_name,

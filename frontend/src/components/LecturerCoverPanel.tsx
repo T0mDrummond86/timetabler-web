@@ -60,11 +60,20 @@ export function LecturerCoverPanel({
     [leftGrid, selectedBookingId],
   );
 
+  // The left grid is a single repeating-week template, so it can badge only one
+  // cover per class. When a calendar is loaded, scope to the week currently in
+  // focus (semester + week) so per-week covers for the same class don't collide;
+  // without a calendar, fall back to one request per class.
   const requestByBooking = useMemo(() => {
+    const hasCal = calendar.length > 0;
     const m = new Map<number, CoverRequest>();
-    for (const r of requests) if (r.booking_id != null) m.set(r.booking_id, r);
+    for (const r of requests) {
+      if (r.booking_id == null) continue;
+      if (hasCal && (r.semester !== coverSemester || r.week_number !== coverWeek)) continue;
+      m.set(r.booking_id, r);
+    }
     return m;
-  }, [requests]);
+  }, [requests, calendar, coverSemester, coverWeek]);
 
   const hasCalendar = calendar.length > 0;
   const semesters = useMemo(
@@ -260,7 +269,7 @@ export function LecturerCoverPanel({
         week_number: hasCalendar ? coverWeek : null,
         day_label: leftGrid.days[booking.day] ?? "",
         time_label: slotRangeLabel(booking.start_slot, booking.end_slot),
-        qualification_name: booking.qualification_name ?? "",
+        group_name: booking.course_code ?? "",
         unit_name: booking.unit_name ?? booking.course_code ?? "",
         room_code: booking.room_code ?? "",
         away_staff_name: awayName,
@@ -330,9 +339,10 @@ export function LecturerCoverPanel({
     const awayName =
       staff.find((s) => s.id === needingCoverStaffId)?.name ?? displayLeftGrid.entity_label;
     const title = `Cover timetable — ${awayName}`;
+    // Match the grid badges: only the week in focus (requestByBooking is scoped).
     const dateByBookingId = new Map<number, string>();
-    for (const r of requests) {
-      if (r.booking_id != null && r.cover_date) dateByBookingId.set(r.booking_id, r.cover_date);
+    for (const [bid, r] of requestByBooking) {
+      if (r.cover_date) dateByBookingId.set(bid, r.cover_date);
     }
     try {
       await copyCoverTimetable(displayLeftGrid, title, dateByBookingId);
@@ -532,7 +542,7 @@ export function LecturerCoverPanel({
                 <tr>
                   <th>Date</th>
                   <th>Day / Time</th>
-                  <th>Qualification</th>
+                  <th>Group</th>
                   <th>Class</th>
                   <th>Room</th>
                   <th>Away lecturer</th>
@@ -556,7 +566,7 @@ export function LecturerCoverPanel({
                         />
                       </td>
                       <td>{[r.day_label, r.time_label].filter(Boolean).join(" ")}</td>
-                      <td>{r.qualification_name}</td>
+                      <td>{r.group_name}</td>
                       <td>{r.unit_name}</td>
                       <td>{r.room_code}</td>
                       <td>{r.away_staff_name}</td>

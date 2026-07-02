@@ -34,7 +34,7 @@ def _out(r: CoverRequest) -> dict:
         "week_number": r.week_number,
         "day_label": r.day_label,
         "time_label": r.time_label,
-        "qualification_name": r.qualification_name,
+        "group_name": r.group_name,
         "unit_name": r.unit_name,
         "room_code": r.room_code,
         "away_staff_name": r.away_staff_name,
@@ -63,14 +63,17 @@ def create_cover_request(
     week_number: int | None,
     day_label: str,
     time_label: str,
-    qualification_name: str,
+    group_name: str,
     unit_name: str,
     room_code: str,
     away_staff_name: str,
     cover_staff_id: int | None,
     cover_staff_name: str,
 ) -> dict:
-    # One request per booking: update in place if the class already has one.
+    # One request per (class, week): re-assigning the same week updates in place,
+    # but a different week gets its own row so the same class can have different
+    # cover in different weeks. Without a calendar, semester/week are NULL and this
+    # collapses to one request per class (the pre-calendar behaviour).
     existing = None
     if booking_id is not None:
         existing = (
@@ -78,6 +81,8 @@ def create_cover_request(
             .filter(
                 CoverRequest.timetable_session_id == timetable_session_id,
                 CoverRequest.booking_id == booking_id,
+                CoverRequest.semester == semester,
+                CoverRequest.week_number == week_number,
             )
             .first()
         )
@@ -88,7 +93,7 @@ def create_cover_request(
         existing.week_number = week_number
         existing.day_label = day_label or ""
         existing.time_label = time_label or ""
-        existing.qualification_name = qualification_name or ""
+        existing.group_name = group_name or ""
         existing.unit_name = unit_name or ""
         existing.room_code = room_code or ""
         existing.away_staff_name = away_staff_name or ""
@@ -106,7 +111,7 @@ def create_cover_request(
         week_number=week_number,
         day_label=day_label or "",
         time_label=time_label or "",
-        qualification_name=qualification_name or "",
+        group_name=group_name or "",
         unit_name=unit_name or "",
         room_code=room_code or "",
         away_staff_name=away_staff_name or "",
@@ -169,7 +174,7 @@ def promote_cover_request(db: Session, *, timetable_session_id: int, request_id:
         cover_date=row.cover_date.isoformat(),
         day_label=row.day_label,
         time_label=row.time_label,
-        qualification_name=row.qualification_name,
+        group_name=row.group_name,
         unit_name=row.unit_name,
         room_code=row.room_code,
         away_staff_name=row.away_staff_name,

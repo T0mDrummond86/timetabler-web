@@ -97,7 +97,7 @@ export type CoverLogEntry = {
   cover_date: string | null;
   day_label: string;
   time_label: string;
-  qualification_name: string;
+  group_name: string;
   unit_name: string;
   room_code: string;
   away_staff_name: string;
@@ -110,7 +110,7 @@ export type CoverLogEntryCreate = {
   cover_date: string;
   day_label: string;
   time_label: string;
-  qualification_name: string;
+  group_name: string;
   unit_name: string;
   room_code: string;
   away_staff_name: string;
@@ -133,7 +133,7 @@ export type CoverRequest = {
   week_number: number | null;
   day_label: string;
   time_label: string;
-  qualification_name: string;
+  group_name: string;
   unit_name: string;
   room_code: string;
   away_staff_name: string;
@@ -148,7 +148,7 @@ export type CoverRequestCreate = {
   week_number: number | null;
   day_label: string;
   time_label: string;
-  qualification_name: string;
+  group_name: string;
   unit_name: string;
   room_code: string;
   away_staff_name: string;

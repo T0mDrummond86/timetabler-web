@@ -771,7 +771,7 @@ class CoverRequestCreate(BaseModel):
     week_number: int | None = None
     day_label: str = ""
     time_label: str = ""
-    qualification_name: str = ""
+    group_name: str = ""
     unit_name: str = ""
     room_code: str = ""
     away_staff_name: str = ""
@@ -793,7 +793,7 @@ class CoverRequestOut(BaseModel):
     week_number: int | None = None
     day_label: str = ""
     time_label: str = ""
-    qualification_name: str = ""
+    group_name: str = ""
     unit_name: str = ""
     room_code: str = ""
     away_staff_name: str = ""
@@ -809,7 +809,7 @@ class CoverLogEntryCreate(BaseModel):
     cover_date: str
     day_label: str = ""
     time_label: str = ""
-    qualification_name: str = ""
+    group_name: str = ""
     unit_name: str = ""
     room_code: str = ""
     away_staff_name: str = ""
@@ -822,7 +822,7 @@ class CoverLogEntryOut(BaseModel):
     cover_date: str | None = None
     day_label: str = ""
     time_label: str = ""
-    qualification_name: str = ""
+    group_name: str = ""
     unit_name: str = ""
     room_code: str = ""
     away_staff_name: str = ""

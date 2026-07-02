@@ -547,7 +547,7 @@ export function GlobalSessionPage() {
                   <tr>
                     <th>Date</th>
                     <th>Day / Time</th>
-                    <th>Qualification</th>
+                    <th>Group</th>
                     <th>Class</th>
                     <th>Room</th>
                     <th>Away lecturer</th>
@@ -561,7 +561,7 @@ export function GlobalSessionPage() {
                     <tr key={e.id}>
                       <td>{e.cover_date ?? "—"}</td>
                       <td>{[e.day_label, e.time_label].filter(Boolean).join(" ")}</td>
-                      <td>{e.qualification_name}</td>
+                      <td>{e.group_name}</td>
                       <td>{e.unit_name}</td>
                       <td>{e.room_code}</td>
                       <td>{e.away_staff_name}</td>
