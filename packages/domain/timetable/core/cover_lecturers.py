@@ -40,6 +40,11 @@ def cover_candidates_with_status(
     for person in staff_rows:
         if person.id in exclude:
             continue
-        free = _staff_free_at(booking, day, start, end, person.id, others, ctx)
+        # A substitute covers the whole class on their own, so check only whether
+        # *they* are teaching this slot — ignore the away class's co-teacher, which
+        # is not theirs to inherit (otherwise every candidate looks busy).
+        free = _staff_free_at(
+            booking, day, start, end, person.id, others, ctx, ignore_co_teacher=True
+        )
         out.append((person, not free))
     return out

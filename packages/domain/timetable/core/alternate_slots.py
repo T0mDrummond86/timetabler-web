@@ -56,6 +56,10 @@ class _PlacementProbe:
     end_slot: int
     staff_id: int | None
     room_id: int | None
+    # Cover checks ask whether one substitute lecturer is free; they must not
+    # inherit the class's co-teacher, or every candidate looks busy whenever
+    # that co-teacher is teaching this slot.
+    clear_co_teacher: bool = False
 
     @property
     def id(self) -> int:
@@ -91,6 +95,8 @@ class _PlacementProbe:
 
     @property
     def sfs_co_teacher_staff_id(self) -> int | None:
+        if self.clear_co_teacher:
+            return None
         return getattr(self.source, "sfs_co_teacher_staff_id", None)
 
 
@@ -390,10 +396,20 @@ def _staff_free_at(
     staff_id: int | None,
     others: list[Booking],
     ctx: _ConstraintContext,
+    *,
+    ignore_co_teacher: bool = False,
 ) -> bool:
     if staff_id is None:
         return True
-    probe = _PlacementProbe(booking, day, start_slot, end_slot, staff_id, booking.room_id)
+    probe = _PlacementProbe(
+        booking,
+        day,
+        start_slot,
+        end_slot,
+        staff_id,
+        booking.room_id,
+        clear_co_teacher=ignore_co_teacher,
+    )
     for other in others:
         if other.day != day:
             continue
