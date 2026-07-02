@@ -4178,6 +4178,35 @@ body.staff-editor-resizing {
   font-size: 1rem;
 }
 
+/* Collapsed by default so it stays out of the way; click the summary to expand. */
+.linked-import-summary {
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  list-style: none;
+  user-select: none;
+}
+
+.linked-import-summary::-webkit-details-marker {
+  display: none;
+}
+
+.linked-import-summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 0.4rem;
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+
+.linked-import-details[open] > .linked-import-summary {
+  margin-bottom: 0.5rem;
+}
+
+.linked-import-details[open] > .linked-import-summary::before {
+  content: "▾";
+}
+
 .linked-import-target-hint {
   margin: 0.35rem 0 0;
   font-size: 0.88rem;

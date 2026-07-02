@@ -214,7 +214,8 @@ export function LinkedSessionImportPanel({
   return (
     <>
       <section className="linked-import-panel card">
-        <h3>Import from linked session</h3>
+        <details className="linked-import-details">
+        <summary className="linked-import-summary">Import from linked session</summary>
         {hasTargetPicker && targetLabel && (
           <p className="linked-import-target-hint">
             Importing into: <strong>{targetLabel}</strong>
@@ -313,6 +314,7 @@ export function LinkedSessionImportPanel({
         >
           {busy ? "Importing…" : "Import selected"}
         </button>
+        </details>
       </section>
 
       {picker === "staff" && (
