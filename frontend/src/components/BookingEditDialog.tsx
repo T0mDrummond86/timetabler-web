@@ -62,6 +62,16 @@ export function BookingEditDialog({
     Boolean(selectedRoom?.room_type?.toLowerCase().includes("online")) ||
     Boolean(selectedRoom?.code?.toLowerCase().includes("online"));
 
+  // Study-unit codes associated with this class, stored as a delimited string.
+  const unitCodes = useMemo(
+    () =>
+      (booking.unit_component_codes ?? "")
+        .split(/[,;/]/)
+        .map((c) => c.trim())
+        .filter(Boolean),
+    [booking.unit_component_codes],
+  );
+
   const startOptions = useMemo(() => slotOptions(grid.num_slots - 1), [grid.num_slots]);
   const endOptions = useMemo(
     () => slotOptions(grid.num_slots).filter((o) => o.value > startSlot),
@@ -130,6 +140,11 @@ export function BookingEditDialog({
               {booking.unit_name ?? `Booking #${booking.id}`}
               {booking.session_part && booking.session_part > 1 ? ` · Part ${booking.session_part}` : ""}
             </p>
+            {unitCodes.length > 0 && (
+              <p className="modal-lead-units muted">
+                Units: {unitCodes.join(", ")}
+              </p>
+            )}
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
             ×

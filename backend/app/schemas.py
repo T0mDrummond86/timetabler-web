@@ -231,6 +231,7 @@ class BookingCardOut(BaseModel):
     layout_left_pct: float
     layout_width_pct: float
     unit_name: str | None
+    unit_component_codes: str | None = None
     course_code: str | None
     qualification_name: str | None = None
     returns_to_holding: bool = False

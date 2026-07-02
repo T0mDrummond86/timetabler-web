@@ -24,6 +24,7 @@ export type BookingCard = {
   layout_left_pct?: number;
   layout_width_pct?: number;
   unit_name: string | null;
+  unit_component_codes?: string | null;
   course_code: string | null;
   qualification_name: string | null;
   returns_to_holding?: boolean;

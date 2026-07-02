@@ -237,6 +237,7 @@ def _booking_card(
         "layout_left_pct": layout_left_pct,
         "layout_width_pct": layout_width_pct,
         "unit_name": b.unit.name if b.unit else None,
+        "unit_component_codes": b.unit.component_codes if b.unit else None,
         "course_code": b.course.code if b.course else None,
         "qualification_name": (qual_by_course or {}).get(b.course_id),
         "returns_to_holding": (
@@ -459,6 +460,9 @@ def _build_grid_payload(
             if not members:
                 continue
             card["unit_name"] = _join(m.unit.name if m.unit else None for m in members)
+            card["unit_component_codes"] = _join(
+                m.unit.component_codes if m.unit else None for m in members
+            )
             card["course_code"] = _join(m.course.code if m.course else None for m in members)
             card["qualification_name"] = _join(
                 qual_by_course.get(m.course_id) for m in members
