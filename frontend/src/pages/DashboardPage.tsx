@@ -288,11 +288,13 @@ export function DashboardPage() {
     }
   }
 
-  async function saveSessionAs(session: TimetableSession) {
+  async function saveSessionAs(session: TimetableSession, copyChangeLog = false) {
     const suggested = `${session.name} copy`;
     const name = await prompt({
-      title: "Save session as",
-      message: "Create a copy of this timetable under a new name.",
+      title: copyChangeLog ? "Save session as (with change log)" : "Save session as",
+      message: copyChangeLog
+        ? "Create a copy of this timetable under a new name, keeping its change-log history."
+        : "Create a copy of this timetable under a new name.",
       defaultValue: suggested,
       placeholder: "Session name",
       confirmLabel: "Save copy",
@@ -301,7 +303,7 @@ export function DashboardPage() {
     setBusySessionId(session.id);
     clearBanners();
     try {
-      const row = await api.duplicateSession(session.id, name.trim());
+      const row = await api.duplicateSession(session.id, name.trim(), copyChangeLog);
       setSessions((prev) => [...prev, row].sort((a, b) => a.name.localeCompare(b.name)));
       recordSessionOpen(row.id);
       setRecentIds(readRecentSessionIds());
@@ -544,6 +546,11 @@ export function DashboardPage() {
                     items={[
                       { id: "rename", label: "Rename…", onClick: () => void renameSession(s) },
                       { id: "save-as", label: "Save as…", onClick: () => void saveSessionAs(s) },
+                      {
+                        id: "save-as-log",
+                        label: "Save as with change log…",
+                        onClick: () => void saveSessionAs(s, true),
+                      },
                       {
                         id: "delete",
                         label: "Delete",

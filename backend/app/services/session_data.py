@@ -1,6 +1,7 @@
 """Session-scoped backup serialize/deserialize for multi-tenant web."""
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -394,11 +395,21 @@ def _map_id(id_map: dict[int, int], old: int | None) -> int | None:
     return id_map[old]
 
 
-def restore_session(db: Session, timetable_session_id: int, payload: dict[str, Any]) -> dict[str, int]:
+def restore_session(
+    db: Session,
+    timetable_session_id: int,
+    payload: dict[str, Any],
+    *,
+    id_maps_out: dict[str, Any] | None = None,
+) -> dict[str, int]:
     """Replace session timetable data from a desktop-compatible backup payload.
 
     Desktop exports preserve entity ids from a single SQLite file. On Postgres those
     ids are global, so we allocate fresh ids and remap foreign keys on import.
+
+    If ``id_maps_out`` is given it is filled with the old→new id maps (keyed by
+    "booking", "course", "unit", "staff", "room", "qualification") plus
+    "repeating_week_id" — used to remap the change log when copying it forward.
     """
     if not isinstance(payload, dict) or payload.get("version") not in (PAYLOAD_VERSION,):
         raise ValueError(
@@ -578,10 +589,10 @@ def restore_session(db: Session, timetable_session_id: int, payload: dict[str, A
     if week is None:
         raise RuntimeError("Session has no repeating week")
 
+    new_bookings: list[tuple[int | None, Booking]] = []
     for b in payload.get("bookings", []):
         co_teacher = b.get("sfs_co_teacher_staff_id")
-        db.add(
-            Booking(
+        booking = Booking(
                 week_id=week.id,
                 course_id=course_map[b["course_id"]],
                 unit_id=_map_id(unit_map, b.get("unit_id")),
@@ -614,10 +625,29 @@ def restore_session(db: Session, timetable_session_id: int, payload: dict[str, A
                 block_week_index=b.get("block_week_index"),
                 combined_class_group_id=b.get("combined_class_group_id"),
             )
-        )
+        db.add(booking)
+        new_bookings.append((b.get("id"), booking))
     apply_unit_bracket_fields_from_names(db)
     apply_combined_class_detection(db, timetable_session_id)
     db.flush()
+
+    if id_maps_out is not None:
+        booking_map: dict[int, int] = {}
+        for old_id, booking in new_bookings:
+            if old_id is not None:
+                booking_map[old_id] = booking.id
+        id_maps_out.update(
+            {
+                "booking": booking_map,
+                "course": course_map,
+                "unit": unit_map,
+                "staff": staff_map,
+                "room": room_map,
+                "qualification": qual_map,
+                "repeating_week_id": week.id,
+            }
+        )
+
     return {
         "qualifications": len(payload.get("qualifications", [])),
         "courses": len(payload.get("courses", [])),
@@ -627,6 +657,95 @@ def restore_session(db: Session, timetable_session_id: int, payload: dict[str, A
     }
 
 
+def _remap_change_log_details(details: str | None, maps: dict[str, Any]) -> str | None:
+    """Rewrite the booking/entity ids embedded in a change-log entry's JSON so the
+    entry points at the duplicated session's rows. Ids not in the maps (e.g. a
+    since-deleted booking or entity) are left as-is so the history still reads."""
+    if not details:
+        return details
+    try:
+        payload = json.loads(details)
+    except (ValueError, TypeError):
+        return details
+    if not isinstance(payload, dict):
+        return details
+
+    booking_map: dict[int, int] = maps.get("booking", {})
+    staff_map: dict[int, int] = maps.get("staff", {})
+    new_week_id = maps.get("repeating_week_id")
+    field_maps = {
+        "course_id": maps.get("course", {}),
+        "unit_id": maps.get("unit", {}),
+        "staff_id": staff_map,
+        "room_id": maps.get("room", {}),
+        "sfs_co_teacher_staff_id": staff_map,
+        "cover_staff_id": staff_map,
+    }
+
+    def remap_state(state: Any) -> Any:
+        if not isinstance(state, dict):
+            return state
+        s = dict(state)
+        if s.get("week_id") is not None and new_week_id is not None:
+            s["week_id"] = new_week_id
+        for field, m in field_maps.items():
+            v = s.get(field)
+            if v is not None:
+                s[field] = m.get(v, v)
+        return s
+
+    def remap_bid_key(key: str) -> str:
+        try:
+            old = int(key)
+        except (TypeError, ValueError):
+            return key
+        return str(booking_map.get(old, old))
+
+    bookings = payload.get("bookings")
+    if isinstance(bookings, dict):
+        payload["bookings"] = {
+            remap_bid_key(k): {
+                "before": remap_state(v.get("before")) if isinstance(v, dict) else None,
+                "after": remap_state(v.get("after")) if isinstance(v, dict) else None,
+            }
+            for k, v in bookings.items()
+        }
+    notes = payload.get("notes")
+    if isinstance(notes, dict):
+        payload["notes"] = {remap_bid_key(k): txt for k, txt in notes.items()}
+
+    return json.dumps(payload)
+
+
+def copy_session_change_log(
+    db: Session,
+    *,
+    source_session_id: int,
+    dest_session_id: int,
+    maps: dict[str, Any],
+) -> int:
+    """Copy the source session's change-log entries into the destination session,
+    remapping the ids embedded in each entry. Preserves original timestamps."""
+    entries = (
+        db.query(ChangeLogEntry)
+        .filter(ChangeLogEntry.timetable_session_id == source_session_id)
+        .order_by(ChangeLogEntry.id)
+        .all()
+    )
+    for e in entries:
+        db.add(
+            ChangeLogEntry(
+                timetable_session_id=dest_session_id,
+                ts=e.ts,
+                action=e.action,
+                description=e.description,
+                details=_remap_change_log_details(e.details, maps),
+            )
+        )
+    db.flush()
+    return len(entries)
+
+
 def duplicate_timetable_session(
     db: Session,
     *,
@@ -634,8 +753,12 @@ def duplicate_timetable_session(
     organization_id: int,
     name: str,
     created_by_id: int | None,
+    copy_change_log: bool = False,
 ) -> TimetableSession:
-    """Copy all timetable data into a new session (desktop Save As)."""
+    """Copy all timetable data into a new session (desktop Save As).
+
+    When ``copy_change_log`` is set, the source session's change-log history is
+    copied into the new session too (with its embedded ids remapped)."""
     clean_name = name.strip()
     existing = (
         db.query(TimetableSession)
@@ -657,7 +780,15 @@ def duplicate_timetable_session(
     db.add(row)
     db.flush()
     seed_timetable_session_data(db, row)
-    restore_session(db, row.id, payload)
+    id_maps: dict[str, Any] = {}
+    restore_session(db, row.id, payload, id_maps_out=id_maps)
+    if copy_change_log:
+        copy_session_change_log(
+            db,
+            source_session_id=source_session_id,
+            dest_session_id=row.id,
+            maps=id_maps,
+        )
     db.commit()
     invalidate_session_violations(db, row.id)
     db.refresh(row)

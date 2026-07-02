@@ -130,6 +130,7 @@ class TimetableSessionPatch(BaseModel):
 
 class TimetableSessionDuplicate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
+    copy_change_log: bool = False
 
 
 class TimetableSessionLinkOut(BaseModel):

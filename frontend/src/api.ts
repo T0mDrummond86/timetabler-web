@@ -1100,10 +1100,10 @@ export const api = {
   deleteSession: (sessionId: number) =>
     apiFetch<void>(`/sessions/${sessionId}`, { method: "DELETE" }),
 
-  duplicateSession: (sessionId: number, name: string) =>
+  duplicateSession: (sessionId: number, name: string, copyChangeLog = false) =>
     apiFetch<TimetableSession>(`/sessions/${sessionId}/duplicate`, {
       method: "POST",
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, copy_change_log: copyChangeLog }),
     }),
 
   dismissViolation: (sessionId: number, bookingId: number, code: string) =>

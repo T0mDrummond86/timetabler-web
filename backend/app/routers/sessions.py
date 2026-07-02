@@ -206,6 +206,7 @@ def duplicate_session(
             organization_id=ctx.organization.id,
             name=body.name,
             created_by_id=ctx.user.id,
+            copy_change_log=body.copy_change_log,
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
