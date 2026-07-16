@@ -21,6 +21,7 @@ type Props = {
   onMergeClasses?: (bookingIds: number[]) => void;
   onUnmergeClasses?: (bookingId: number) => void;
   onDeletePlacecard?: (booking: BookingCard) => void;
+  onLogManualChange?: (booking: BookingCard) => void;
   colourByClass?: boolean;
 };
 
@@ -40,6 +41,7 @@ export function BookingContextMenu({
   onMergeClasses,
   onUnmergeClasses,
   onDeletePlacecard,
+  onLogManualChange,
   colourByClass = true,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -265,6 +267,22 @@ export function BookingContextMenu({
       <button type="button" className="ctx-item" onClick={() => { onToggleLock("lock_staff"); onClose(); }}>
         {booking.lock_staff ? "Unlock lecturer" : "Lock lecturer"}
       </button>
+      {onLogManualChange && (
+        <>
+          <div className="ctx-divider" />
+          <button
+            type="button"
+            className="ctx-item"
+            title="Record a change made outside this session's tracking — the entry appears on the resolved change log with editable lecturer/time/day/room fields."
+            onClick={() => {
+              onLogManualChange(booking);
+              onClose();
+            }}
+          >
+            Log manual change…
+          </button>
+        </>
+      )}
       {onDeletePlacecard && (
         <>
           <div className="ctx-divider" />

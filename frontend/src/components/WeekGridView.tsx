@@ -32,6 +32,7 @@ type Props = {
   onMergeClasses?: (bookingIds: number[]) => void;
   onUnmergeClasses?: (bookingId: number) => void;
   onDeletePlacecard?: (booking: BookingCard) => void;
+  onLogManualChange?: (booking: BookingCard) => void;
   colourByClass?: boolean;
   /** Stretch rows to fill the grid area (full day visible, no dead space). */
   fitToViewport?: boolean;
@@ -153,6 +154,7 @@ export function WeekGridView({
   onMergeClasses,
   onUnmergeClasses,
   onDeletePlacecard,
+  onLogManualChange,
   colourByClass = true,
   fitToViewport = false,
   selectedBookingId: selectedBookingIdProp,
@@ -620,6 +622,7 @@ export function WeekGridView({
           onMergeClasses={onMergeClasses}
           onUnmergeClasses={onUnmergeClasses}
           onDeletePlacecard={onDeletePlacecard}
+          onLogManualChange={onLogManualChange}
           x={contextMenu.x}
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}

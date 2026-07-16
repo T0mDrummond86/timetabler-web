@@ -31,6 +31,45 @@ def is_timetabling_change_log_entry(entry: ChangeLogEntry) -> bool:
     return isinstance(payload, dict) and isinstance(payload.get("bookings"), dict)
 
 
+# Hand-written records for changes actioned outside this session's tracking
+# (e.g. on a previous version of the file). They carry a display row rather
+# than before/after snapshots, and always surface on the resolved view.
+MANUAL_LOG_ACTION = "manual"
+
+MANUAL_EDITABLE_ROW_KEYS = ("lecturer_change", "time_change", "day_change", "room_change")
+
+
+def is_manual_change_log_entry(entry: ChangeLogEntry) -> bool:
+    if entry.action != MANUAL_LOG_ACTION or not entry.details:
+        return False
+    try:
+        payload = json.loads(entry.details)
+    except Exception:
+        return False
+    return isinstance(payload, dict) and isinstance(payload.get("row"), dict)
+
+
+def _manual_display_row(entry: ChangeLogEntry) -> ChangeLogDisplayRow | None:
+    if not is_manual_change_log_entry(entry):
+        return None
+    payload = json.loads(entry.details or "{}")
+    from .booking_snapshots import TIMETABLING_TABLE_KEYS
+
+    stored = payload.get("row") or {}
+    row = {key: str(stored.get(key, "") or "") for key in TIMETABLING_TABLE_KEYS}
+    booking_id = payload.get("booking_id")
+    bid = int(booking_id) if isinstance(booking_id, int) else -1
+    notes = _payload_notes(payload)
+    return ChangeLogDisplayRow(
+        when=entry.ts.strftime("%Y-%m-%d %H:%M:%S") if entry.ts else "",
+        action=MANUAL_LOG_ACTION,
+        row=row,
+        booking_id=bid,
+        entry_id=entry.id,
+        note=notes.get(bid, ""),
+    )
+
+
 def payload_booking_maps(payload: dict) -> tuple[dict[int, dict | None], dict[int, dict | None]]:
     before: dict[int, dict | None] = {}
     after: dict[int, dict | None] = {}
@@ -217,6 +256,12 @@ def gather_timetabling_change_log_display_rows(
                     note=latest_note_for_bid.get(bid, ""),
                 )
             )
+        # Manual records always surface on the resolved view, even when the
+        # booking's tracked state shows no net change (oldest first).
+        for e in reversed(entries):
+            manual = _manual_display_row(e)
+            if manual is not None:
+                out.append(manual)
         return out
 
     out: list[ChangeLogDisplayRow] = []
@@ -226,6 +271,10 @@ def gather_timetabling_change_log_display_rows(
         .all()
     )
     for e in entries:
+        manual = _manual_display_row(e)
+        if manual is not None:
+            out.append(manual)
+            continue
         if not is_timetabling_change_log_entry(e):
             continue
         try:

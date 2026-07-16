@@ -513,6 +513,15 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
     }
   }
 
+  async function onLogManualChange(booking: BookingCard) {
+    setError(null);
+    try {
+      await api.createManualChangeLog(sessionId, booking.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not record manual change");
+    }
+  }
+
   const gridClass =
     layout === "4"
       ? "split-grid split-grid-4"
@@ -665,6 +674,7 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
                 onSetClassColour={onSetClassColour}
                 onMergeClasses={onMergeClasses}
                 onUnmergeClasses={onUnmergeClasses}
+                onLogManualChange={onLogManualChange}
                 onGroupRenamed={onGroupRenamed}
                 onRenameError={setError}
               />

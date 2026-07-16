@@ -1,21 +1,31 @@
-"""Change log list, notes, rollback, and export."""
+"""Change log list, notes, manual records, rollback, and export."""
 from __future__ import annotations
 
+import json
 import tempfile
 from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from timetable.core.booking_snapshots import snapshot_bookings
+from timetable.constants import DAYS
+from timetable.core.booking_snapshots import _slot_to_str, snapshot_bookings
 from timetable.core.change_log_data import (
+    MANUAL_EDITABLE_ROW_KEYS,
+    MANUAL_LOG_ACTION,
     gather_timetabling_change_log_display_rows,
+    is_manual_change_log_entry,
     set_change_log_note,
 )
 from timetable.core.changelog import resolve_session_booking_net_maps
 from timetable.core.models import Booking, ChangeLogEntry
 from timetable.io.changelog_export import write_change_log_xlsx
 
-from .booking_mutations import BookingNotFoundError, _apply_snapshots, _mutation_result
+from .booking_mutations import (
+    BookingNotFoundError,
+    _apply_snapshots,
+    _booking_in_session,
+    _mutation_result,
+)
 
 
 def list_change_log_rows(
@@ -60,6 +70,83 @@ def update_change_log_note(
         booking_id=booking_id,
         note=note,
     )
+    db.commit()
+
+
+def create_manual_change_log_entry(
+    db: Session,
+    *,
+    timetable_session_id: int,
+    booking_id: int,
+) -> None:
+    """Hand-written change record seeded from a placecard's current state.
+
+    Logs a change that was actioned outside this session's tracking (e.g. on a
+    previous version of the file). The lecturer/time/day/room fields start as
+    the booking's current values and stay editable; the row always appears on
+    the resolved log even though the tracked state shows no change.
+    """
+    booking = _booking_in_session(db, booking_id, timetable_session_id)
+    row = {
+        "id": (booking.external_id or "").strip(),
+        "group": booking.course.code if booking.course else "",
+        "class": booking.unit.name if booking.unit else "",
+        "lecturer_change": booking.staff.name if booking.staff else "",
+        "time_change": f"{_slot_to_str(booking.start_slot)}–{_slot_to_str(booking.end_slot)}",
+        "day_change": DAYS[booking.day] if 0 <= booking.day < len(DAYS) else "",
+        "room_change": booking.room.code if booking.room else "",
+        "delete": "",
+    }
+    label = row["class"] or f"booking #{booking_id}"
+    entry = ChangeLogEntry(
+        timetable_session_id=timetable_session_id,
+        action=MANUAL_LOG_ACTION,
+        description=f"Manual change record — {label} ({row['group']})".strip(),
+        details=json.dumps({"manual": True, "booking_id": booking_id, "row": row}),
+    )
+    db.add(entry)
+    db.commit()
+
+
+def _manual_entry(db: Session, timetable_session_id: int, entry_id: int) -> ChangeLogEntry:
+    entry = db.get(ChangeLogEntry, entry_id)
+    if (
+        entry is None
+        or entry.timetable_session_id != timetable_session_id
+        or not is_manual_change_log_entry(entry)
+    ):
+        raise LookupError("Manual change-log entry not found")
+    return entry
+
+
+def update_manual_change_log_fields(
+    db: Session,
+    *,
+    timetable_session_id: int,
+    entry_id: int,
+    fields: dict[str, str],
+) -> None:
+    """Edit the lecturer/time/day/room text of a manual record."""
+    entry = _manual_entry(db, timetable_session_id, entry_id)
+    payload = json.loads(entry.details or "{}")
+    row = payload.get("row") or {}
+    for key, value in fields.items():
+        if key in MANUAL_EDITABLE_ROW_KEYS:
+            row[key] = str(value or "").strip()
+    payload["row"] = row
+    entry.details = json.dumps(payload)
+    db.commit()
+
+
+def delete_manual_change_log_entry(
+    db: Session,
+    *,
+    timetable_session_id: int,
+    entry_id: int,
+) -> None:
+    """Remove a manual record. Refuses tracked (non-manual) entries."""
+    entry = _manual_entry(db, timetable_session_id, entry_id)
+    db.delete(entry)
     db.commit()
 
 
