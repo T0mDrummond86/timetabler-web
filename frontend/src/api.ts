@@ -13,6 +13,8 @@ import {
   ViolationsReport,
   ClashCheckSetting,
 } from "./types";
+import { emitApiEvent } from "./tutorial/apiEvents";
+import type { TutorialEntityMap } from "./tutorial/types";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -74,6 +76,17 @@ export type GlobalSessionSummary = {
   member_count: number;
   created_at: string;
   updated_at: string;
+};
+
+export type TutorialStart = {
+  session: TimetableSession;
+  created: boolean;
+  entities: TutorialEntityMap;
+};
+
+export type TutorialInfo = {
+  is_tutorial: boolean;
+  entities: Partial<TutorialEntityMap>;
 };
 
 export type GlobalSession = {
@@ -307,6 +320,8 @@ async function apiFetch<T>(
         : "Network error";
     throw new Error(hint);
   }
+  // Tutorial step verification listens for completed calls (no-op otherwise).
+  emitApiEvent({ path, method: (options.method ?? "GET").toUpperCase(), ok: res.ok });
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -813,6 +828,32 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  createManualChangeLog: (sessionId: number, bookingId: number) =>
+    apiFetch<{ ok: boolean }>(`/sessions/${sessionId}/change-log/manual`, {
+      method: "POST",
+      body: JSON.stringify({ booking_id: bookingId }),
+    }),
+
+  patchManualChangeLogFields: (
+    sessionId: number,
+    entryId: number,
+    fields: {
+      lecturer_change?: string;
+      time_change?: string;
+      day_change?: string;
+      room_change?: string;
+    },
+  ) =>
+    apiFetch<{ ok: boolean }>(
+      `/sessions/${sessionId}/change-log/entries/${entryId}/manual-fields`,
+      { method: "PATCH", body: JSON.stringify(fields) },
+    ),
+
+  deleteManualChangeLog: (sessionId: number, entryId: number) =>
+    apiFetch<void>(`/sessions/${sessionId}/change-log/entries/${entryId}/manual`, {
+      method: "DELETE",
+    }),
+
   async exportChangeLog(sessionId: number): Promise<void> {
     const token = getToken();
     const headers: Record<string, string> = {};
@@ -1106,6 +1147,15 @@ export const api = {
       body: JSON.stringify({ name, copy_change_log: copyChangeLog }),
     }),
 
+  startTutorial: (orgId: number) =>
+    apiFetch<TutorialStart>(`/orgs/${orgId}/tutorial-session`, { method: "POST" }),
+
+  resetTutorial: (sessionId: number) =>
+    apiFetch<TutorialStart>(`/sessions/${sessionId}/tutorial-reset`, { method: "POST" }),
+
+  tutorialInfo: (sessionId: number) =>
+    apiFetch<TutorialInfo>(`/sessions/${sessionId}/tutorial-info`),
+
   dismissViolation: (sessionId: number, bookingId: number, code: string) =>
     apiFetch<{ ok: boolean }>(`/sessions/${sessionId}/violation-dismissals`, {
       method: "POST",
@@ -1234,6 +1284,8 @@ export const api = {
           : "Network error";
       throw new Error(hint);
     }
+    // Tutorial step verification listens for export completions too.
+    emitApiEvent({ path, method: "GET", ok: res.ok });
     if (!res.ok) {
       let detail = res.statusText;
       try {

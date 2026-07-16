@@ -99,7 +99,7 @@ export function TimetableSidebar({
   const viewOptions = VIEW_KINDS_BY_MODE[mode];
 
   return (
-    <aside className="tt-sidebar">
+    <aside className="tt-sidebar" data-tutorial-id="sidebar">
       {header}
 
       <div className="tt-sidebar-section tt-sidebar-mode-view">

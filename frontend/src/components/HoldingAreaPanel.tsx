@@ -55,6 +55,7 @@ export function HoldingAreaPanel({
       className={`panel holding-panel${dropHover ? " holding-drop-hover" : ""}${
         sticky ? " holding-panel--sticky" : ""
       }${collapsed ? " holding-panel--collapsed" : ""}`}
+      data-tutorial-id="holding-area"
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}

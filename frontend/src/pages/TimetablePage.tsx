@@ -25,6 +25,7 @@ import type {
   AlternatePlacementOption,
 } from "../types";
 import { ScheduleVariantBar } from "../components/ScheduleVariantBar";
+import { TutorialHost } from "../tutorial/TutorialHost";
 import { ViolationsReportPanel } from "../components/ViolationsReportPanel";
 import { ClashSettingsPanel } from "../components/ClashSettingsPanel";
 import { TimetableViolationsPanel } from "../components/TimetableViolationsPanel";
@@ -1082,6 +1083,18 @@ export function TimetablePage() {
     }
   }
 
+  async function onLogManualChange(booking: BookingCard) {
+    setError(null);
+    try {
+      await api.createManualChangeLog(sessionId, booking.id);
+      setImportSuccess(
+        `Manual change recorded for ${booking.unit_name ?? "class"} — edit its lecturer/time/day/room on the Change log tab (Resolved view).`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not record manual change");
+    }
+  }
+
   async function onImportFile(
     kind: "session" | "qualifications" | "qualifications-csp" | "qualifications-ep-nb-csp" | "asc" | "lecturer-preferences" | "overall-visual" | "admin-visual",
     file: File,
@@ -1566,6 +1579,7 @@ export function TimetablePage() {
             onClick={() => void undo()}
             disabled={!undoStack.length || mutating}
             title="Undo (⌘Z)"
+            data-tutorial-id="undo-button"
           >
             Undo
           </button>
@@ -1709,7 +1723,7 @@ export function TimetablePage() {
       </div>
       </DropdownGroup>
 
-      <nav className="session-tabs" aria-label="Session views">
+      <nav className="session-tabs" aria-label="Session views" data-tutorial-id="session-tabs">
         {SESSION_TABS.map((tab, index) => (
           <span key={tab.id} style={{ display: "contents" }}>
             {index === 4 && <span className="session-tab-divider" aria-hidden />}
@@ -1719,6 +1733,7 @@ export function TimetablePage() {
                 tab.secondary ? " session-tab--secondary" : ""
               }`}
               aria-current={sessionTab === tab.id ? "page" : undefined}
+              data-tutorial-id={`tab-${tab.id}`}
               onClick={() => setSessionTab(tab.id)}
             >
               {tab.label}
@@ -1879,6 +1894,7 @@ export function TimetablePage() {
                   onMergeClasses={editable ? onMergeClasses : undefined}
                   onUnmergeClasses={editable ? onUnmergeClasses : undefined}
                   onDeletePlacecard={editable ? onDeletePlacecard : undefined}
+                  onLogManualChange={editable ? onLogManualChange : undefined}
                   colourByClass={colourByClass}
                 />
               )
@@ -2062,6 +2078,7 @@ export function TimetablePage() {
         />
       )}
       {dialogs}
+      <TutorialHost sessionId={sessionId} />
     </AppShell>
   );
 }

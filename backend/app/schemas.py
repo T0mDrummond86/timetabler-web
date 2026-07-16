@@ -120,6 +120,17 @@ class TimetableSessionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TutorialStartOut(BaseModel):
+    session: TimetableSessionOut
+    created: bool
+    entities: dict[str, dict[str, int]]
+
+
+class TutorialInfoOut(BaseModel):
+    is_tutorial: bool
+    entities: dict[str, dict[str, int]]
+
+
 class TimetableSessionCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120, default="Default")
 
@@ -706,6 +717,17 @@ class ChangeLogNotePatch(BaseModel):
 class ChangeLogRollbackRequest(BaseModel):
     booking_id: int
     course_id: int
+
+
+class ManualChangeLogCreate(BaseModel):
+    booking_id: int
+
+
+class ManualChangeLogFieldsPatch(BaseModel):
+    lecturer_change: str | None = None
+    time_change: str | None = None
+    day_change: str | None = None
+    room_change: str | None = None
 
 
 class AlternatePlacementOptionOut(BaseModel):

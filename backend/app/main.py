@@ -26,6 +26,7 @@ from .routers import (
     orgs,
     sessions,
     timetable,
+    tutorial,
     violations,
 )
 
@@ -95,6 +96,7 @@ app.include_router(changelog.router)
 app.include_router(bookings.router)
 app.include_router(timetable.router)
 app.include_router(violations.router)
+app.include_router(tutorial.router)
 app.include_router(laps.router)
 
 

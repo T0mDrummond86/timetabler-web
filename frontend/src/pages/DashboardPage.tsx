@@ -16,6 +16,7 @@ import { useConfirmPrompt } from "../hooks/useConfirmPrompt";
 import { useDropdown } from "../hooks/useDropdown";
 import { formatRelativeTime } from "../lib/formatRelativeTime";
 import { readRecentSessionIds, recentRank, recordSessionOpen } from "../lib/recentSessions";
+import { launchTutorial } from "../tutorial/launch";
 
 type SortMode = "recent" | "updated" | "name";
 
@@ -121,6 +122,7 @@ export function DashboardPage() {
   const [newSessionName, setNewSessionName] = useState("");
   const [newGlobalName, setNewGlobalName] = useState("");
   const [creatingSession, setCreatingSession] = useState(false);
+  const [launchingTutorial, setLaunchingTutorial] = useState(false);
   const [creatingGlobal, setCreatingGlobal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -285,6 +287,20 @@ export function DashboardPage() {
       setError(err instanceof Error ? err.message : "Rename failed");
     } finally {
       setBusySessionId(null);
+    }
+  }
+
+  async function startTutorial() {
+    const orgId = orgs[0]?.id;
+    if (orgId == null) return;
+    setLaunchingTutorial(true);
+    clearBanners();
+    try {
+      const url = await launchTutorial(orgId);
+      navigate(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start the tutorial");
+      setLaunchingTutorial(false);
     }
   }
 
@@ -472,6 +488,16 @@ export function DashboardPage() {
         <section className="card dashboard-card">
           <div className="dashboard-card-header">
             <h2>Timetable sessions</h2>
+            {orgs[0] && orgs[0].role !== "viewer" && (
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={launchingTutorial}
+                onClick={() => void startTutorial()}
+              >
+                {launchingTutorial ? "Opening…" : "🎓 Start tutorial"}
+              </button>
+            )}
             <form className="dashboard-create-form" onSubmit={(e) => void createSession(e)}>
               <input
                 className="field-input"

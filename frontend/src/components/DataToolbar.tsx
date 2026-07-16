@@ -183,7 +183,7 @@ export function DataToolbar({
           </div>
         )}
         </span>
-        <span className="tt-dropdown-wrap" ref={exportMenu.wrapRef}>
+        <span className="tt-dropdown-wrap" ref={exportMenu.wrapRef} data-tutorial-id="export-menu">
         <button
           type="button"
           className="btn-secondary"

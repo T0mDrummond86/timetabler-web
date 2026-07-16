@@ -4741,3 +4741,268 @@ body.staff-editor-resizing {
 .clash-settings-combined-msg {
   margin-bottom: 0.75rem;
 }
+
+/* ---------------- tutorial ---------------- */
+
+.tutorial-panel {
+  position: fixed;
+  top: 64px;
+  right: 12px;
+  bottom: 12px;
+  width: 330px;
+  z-index: 90; /* under modals (100) and dropdowns (200) so real dialogs win */
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--panel-bg, #fff);
+  border: 1px solid var(--border, #d5dbe3);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: var(--shadow-md, 0 8px 28px rgba(15, 23, 42, 0.14));
+  padding: 0.85rem 1rem 1rem;
+}
+
+.tutorial-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.tutorial-panel-title {
+  flex: 1;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.tutorial-pill {
+  position: fixed;
+  right: 12px;
+  bottom: 16px;
+  z-index: 90;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border, #d5dbe3);
+  background: var(--panel-bg, #fff);
+  box-shadow: var(--shadow-md, 0 8px 28px rgba(15, 23, 42, 0.14));
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tutorial-goal {
+  margin: 0 0 0.6rem;
+  font-size: 0.9rem;
+}
+
+.tutorial-progressbar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--zone-toolbar, #eef1f6);
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+
+.tutorial-progressbar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent, #2563eb);
+  transition: width 0.4s ease;
+}
+
+.tutorial-module-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.tutorial-module-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border, #d5dbe3);
+  border-radius: var(--radius-md, 8px);
+}
+
+.tutorial-module-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.tutorial-module-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.tutorial-module-goal {
+  font-size: 0.8rem;
+}
+
+.tutorial-chip {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.tutorial-chip-completed {
+  background: #c6efce;
+  color: #006100;
+}
+
+.tutorial-chip-skipped,
+.tutorial-chip-in_progress {
+  background: var(--zone-toolbar, #eef1f6);
+  color: inherit;
+}
+
+.tutorial-step-dots {
+  display: flex;
+  gap: 0.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.tutorial-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--zone-toolbar, #dfe5ee);
+}
+
+.tutorial-dot-current {
+  background: var(--accent, #2563eb);
+}
+
+.tutorial-dot-done {
+  background: #6fbf87;
+}
+
+.tutorial-step-title {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.tutorial-step-body {
+  margin: 0 0 0.6rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.tutorial-verify {
+  margin: 0.2rem 0 0.6rem;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.tutorial-verify-passed {
+  color: #087f2d;
+  font-weight: 700;
+  font-style: normal;
+}
+
+.tutorial-hint {
+  margin: 0 0 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border-left: 3px solid var(--accent, #2563eb);
+  background: var(--zone-toolbar, #eef1f6);
+  border-radius: 0 var(--radius-md, 8px) var(--radius-md, 8px) 0;
+  font-size: 0.85rem;
+}
+
+.tutorial-hint-offered {
+  animation: tutorial-nudge 1.2s ease-in-out infinite;
+}
+
+@keyframes tutorial-nudge {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+.tutorial-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.tutorial-footer-links {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.9rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border, #e2e7ef);
+}
+
+.tutorial-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--muted, #64748b);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.tutorial-recap {
+  margin: 0 0 0.8rem;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.tutorial-notice {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.tutorial-busy {
+  margin: 1rem auto;
+}
+
+.tutorial-menu {
+  left: auto;
+  right: 0;
+}
+
+.tutorial-ring {
+  position: fixed;
+  z-index: 300; /* above panel + modals, below the context menu (10000) */
+  pointer-events: none;
+  border: 3px solid var(--accent, #2563eb);
+  border-radius: 10px;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.25);
+  animation: tutorial-ring-pulse 1.6s ease-in-out infinite;
+}
+
+.tutorial-ring-flash {
+  animation: tutorial-ring-pulse 0.5s ease-in-out 4;
+}
+
+@keyframes tutorial-ring-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.25); }
+  50% { box-shadow: 0 0 0 9px rgba(37, 99, 235, 0.08); }
+}
+
+[data-theme="dark"] .tutorial-panel,
+[data-theme="dark"] .tutorial-pill {
+  background: var(--panel-bg, #1c2432);
+  border-color: var(--border, #33405a);
+}
+
+[data-theme="dark"] .tutorial-chip-completed {
+  background: #14532d;
+  color: #bbf7d0;
+}
+
+[data-theme="dark"] .tutorial-verify-passed {
+  color: #4ade80;
+}
