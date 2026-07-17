@@ -229,21 +229,20 @@ def admin_export_highlights_by_external_id(
             out[eid] = flags
 
     # Manual records highlight exactly the fields chosen when they were logged
-    # (day → the booking's current day header). Legacy records without a
-    # fields list flag the whole card.
+    # (day → the booking's current day header). Records without a stored
+    # selection (made before the field picker existed) highlight nothing —
+    # remove and re-log them to choose fields.
     for payload, booking in _manual_entry_bookings(session, timetable_session_id):
         eid = (booking.external_id or "").strip()
         if not eid:
             continue
         chosen = payload.get("fields")
-        if isinstance(chosen, list):
-            time_c = "time" in chosen
-            lecturer = "lecturer" in chosen
-            room = "room" in chosen
-            day = "day" in chosen
-        else:
-            time_c = lecturer = room = True
-            day = False
+        if not isinstance(chosen, list):
+            continue
+        time_c = "time" in chosen
+        lecturer = "lecturer" in chosen
+        room = "room" in chosen
+        day = "day" in chosen
         flags = AdminExportChangeHighlight(
             time=time_c,
             lecturer=lecturer,
