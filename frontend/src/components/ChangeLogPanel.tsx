@@ -11,9 +11,6 @@ const ACTION_COLOURS: Record<string, string> = {
   manual: "#6b21a8",
 };
 
-const MANUAL_FIELD_KEYS = ["lecturer_change", "time_change", "day_change", "room_change"] as const;
-type ManualFieldKey = (typeof MANUAL_FIELD_KEYS)[number];
-
 type Props = {
   sessionId: number;
   resolveCourseId: (bookingId?: number) => number | null;
@@ -55,14 +52,6 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
       setError(err instanceof Error ? err.message : "Failed to save note");
     } finally {
       setSavingNote(null);
-    }
-  }
-
-  async function saveManualField(entryId: number, key: ManualFieldKey, value: string) {
-    try {
-      await api.patchManualChangeLogFields(sessionId, entryId, { [key]: value });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save manual entry");
     }
   }
 
@@ -182,31 +171,15 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
               )}
               {rows.map((r, idx) => {
                 const actionColour = ACTION_COLOURS[r.action] ?? "#444";
-                const manualEditable = r.action === "manual" && resolved && r.entry_id != null;
                 return (
                   <tr key={`${r.entry_id}-${r.booking_id}-${idx}`}>
                     {showIdColumn && <td>{r.row.id ?? ""}</td>}
                     <td>{r.row.group ?? ""}</td>
                     <td>{r.row.class ?? ""}</td>
-                    {manualEditable ? (
-                      MANUAL_FIELD_KEYS.map((key) => (
-                        <td key={key}>
-                          <input
-                            className="note-input"
-                            defaultValue={r.row[key] ?? ""}
-                            title="Manual record — describe the change, e.g. “Smith → Jones”"
-                            onBlur={(e) => void saveManualField(r.entry_id!, key, e.target.value)}
-                          />
-                        </td>
-                      ))
-                    ) : (
-                      <>
-                        <td>{r.row.lecturer_change ?? ""}</td>
-                        <td>{r.row.time_change ?? ""}</td>
-                        <td>{r.row.day_change ?? ""}</td>
-                        <td>{r.row.room_change ?? ""}</td>
-                      </>
-                    )}
+                    <td>{r.row.lecturer_change ?? ""}</td>
+                    <td>{r.row.time_change ?? ""}</td>
+                    <td>{r.row.day_change ?? ""}</td>
+                    <td>{r.row.room_change ?? ""}</td>
                     {showDelColumn && <td>{r.row.delete ?? ""}</td>}
                     <td>{r.when ?? ""}</td>
                     <td style={{ color: actionColour, fontWeight: 700 }}>{r.action}</td>

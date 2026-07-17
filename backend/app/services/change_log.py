@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from timetable.constants import DAYS
 from timetable.core.booking_snapshots import _slot_to_str, snapshot_bookings
 from timetable.core.change_log_data import (
-    MANUAL_EDITABLE_ROW_KEYS,
     MANUAL_LOG_ACTION,
     gather_timetabling_change_log_display_rows,
     is_manual_change_log_entry,
@@ -78,34 +77,45 @@ def create_manual_change_log_entry(
     *,
     timetable_session_id: int,
     booking_id: int,
+    fields: list[str],
 ) -> None:
-    """Hand-written change record seeded from a placecard's current state.
+    """Hand-written change record for the chosen fields of a placecard.
 
     Logs a change that was actioned outside this session's tracking (e.g. on a
-    previous version of the file). The lecturer/time/day/room fields start as
-    the booking's current values and stay editable; the row always appears on
-    the resolved log even though the tracked state shows no change.
+    previous version of the file). Only the selected lecturer/time/day/room
+    fields are recorded (with the booking's current values); the row always
+    appears on the resolved log even though the tracked state shows no change,
+    and the admin export highlights exactly those fields.
     """
     booking = _booking_in_session(db, booking_id, timetable_session_id)
+    chosen = [f for f in fields if f in ("lecturer", "time", "day", "room")]
+    if not chosen:
+        raise ValueError("Select at least one field to log")
+    values = {
+        "lecturer": booking.staff.name if booking.staff else "",
+        "time": f"{_slot_to_str(booking.start_slot)}–{_slot_to_str(booking.end_slot)}",
+        "day": DAYS[booking.day] if 0 <= booking.day < len(DAYS) else "",
+        "room": booking.room.code if booking.room else "",
+    }
     row = {
         "id": (booking.external_id or "").strip(),
         "group": booking.course.code if booking.course else "",
         "class": booking.unit.name if booking.unit else "",
-        "lecturer_change": booking.staff.name if booking.staff else "",
-        "time_change": f"{_slot_to_str(booking.start_slot)}–{_slot_to_str(booking.end_slot)}",
-        "day_change": DAYS[booking.day] if 0 <= booking.day < len(DAYS) else "",
-        "room_change": booking.room.code if booking.room else "",
+        "lecturer_change": values["lecturer"] if "lecturer" in chosen else "",
+        "time_change": values["time"] if "time" in chosen else "",
+        "day_change": values["day"] if "day" in chosen else "",
+        "room_change": values["room"] if "room" in chosen else "",
         "delete": "",
     }
     label = row["class"] or f"booking #{booking_id}"
     entry = ChangeLogEntry(
         timetable_session_id=timetable_session_id,
         action=MANUAL_LOG_ACTION,
-        description=f"Manual change record — {label} ({row['group']})".strip(),
-        # "seed" keeps the as-created values so exports can tell which fields
-        # the user later edited (those are the ones highlighted red).
+        description=(
+            f"Manual change record — {label} ({row['group']}): {', '.join(chosen)}".strip()
+        ),
         details=json.dumps(
-            {"manual": True, "booking_id": booking_id, "row": row, "seed": dict(row)}
+            {"manual": True, "booking_id": booking_id, "fields": chosen, "row": row}
         ),
     )
     db.add(entry)
@@ -121,25 +131,6 @@ def _manual_entry(db: Session, timetable_session_id: int, entry_id: int) -> Chan
     ):
         raise LookupError("Manual change-log entry not found")
     return entry
-
-
-def update_manual_change_log_fields(
-    db: Session,
-    *,
-    timetable_session_id: int,
-    entry_id: int,
-    fields: dict[str, str],
-) -> None:
-    """Edit the lecturer/time/day/room text of a manual record."""
-    entry = _manual_entry(db, timetable_session_id, entry_id)
-    payload = json.loads(entry.details or "{}")
-    row = payload.get("row") or {}
-    for key, value in fields.items():
-        if key in MANUAL_EDITABLE_ROW_KEYS:
-            row[key] = str(value or "").strip()
-    payload["row"] = row
-    entry.details = json.dumps(payload)
-    db.commit()
 
 
 def delete_manual_change_log_entry(

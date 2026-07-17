@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -721,13 +722,7 @@ class ChangeLogRollbackRequest(BaseModel):
 
 class ManualChangeLogCreate(BaseModel):
     booking_id: int
-
-
-class ManualChangeLogFieldsPatch(BaseModel):
-    lecturer_change: str | None = None
-    time_change: str | None = None
-    day_change: str | None = None
-    room_change: str | None = None
+    fields: list[Literal["lecturer", "time", "day", "room"]] = Field(min_length=1)
 
 
 class AlternatePlacementOptionOut(BaseModel):

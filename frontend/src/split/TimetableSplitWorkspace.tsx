@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, type Course, Room, Staff, TimetableGlobalLink } from "../api";
+import { api, type Course, type ManualChangeField, Room, Staff, TimetableGlobalLink } from "../api";
 import type { BookingCard, BookingChange, TimetableEntity, TimetableGrid } from "../types";
 import { BlockDeliveryPanel } from "../components/BlockDeliveryPanel";
 import { BookingEditDialog } from "../components/BookingEditDialog";
+import { ManualChangeLogDialog } from "../components/ManualChangeLogDialog";
 import { TimetableSidebar } from "../components/TimetableSidebar";
 import type { TimetableMode, ViewKind } from "../viewKinds";
 import {
@@ -85,6 +86,8 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editBooking, setEditBooking] = useState<BookingCard | null>(null);
+  const [manualLogBooking, setManualLogBooking] = useState<BookingCard | null>(null);
+  const [manualLogSaving, setManualLogSaving] = useState(false);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [mutating, setMutating] = useState(false);
@@ -513,12 +516,17 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
     }
   }
 
-  async function onLogManualChange(booking: BookingCard) {
+  async function onConfirmManualChange(fields: ManualChangeField[]) {
+    if (!manualLogBooking) return;
+    setManualLogSaving(true);
     setError(null);
     try {
-      await api.createManualChangeLog(sessionId, booking.id);
+      await api.createManualChangeLog(sessionId, manualLogBooking.id, fields);
+      setManualLogBooking(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not record manual change");
+    } finally {
+      setManualLogSaving(false);
     }
   }
 
@@ -674,7 +682,7 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
                 onSetClassColour={onSetClassColour}
                 onMergeClasses={onMergeClasses}
                 onUnmergeClasses={onUnmergeClasses}
-                onLogManualChange={onLogManualChange}
+                onLogManualChange={setManualLogBooking}
                 onGroupRenamed={onGroupRenamed}
                 onRenameError={setError}
               />
@@ -709,6 +717,14 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
               setMutating(false);
             }
           }}
+        />
+      )}
+      {manualLogBooking && (
+        <ManualChangeLogDialog
+          booking={manualLogBooking}
+          saving={manualLogSaving}
+          onClose={() => setManualLogBooking(null)}
+          onConfirm={(fields) => void onConfirmManualChange(fields)}
         />
       )}
       {dialogs}

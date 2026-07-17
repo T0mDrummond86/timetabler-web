@@ -15,7 +15,6 @@ from ..schemas import (
     ChangeLogRollbackRequest,
     BookingMutationOut,
     ManualChangeLogCreate,
-    ManualChangeLogFieldsPatch,
 )
 from ..services.booking_mutations import BookingNotFoundError
 from ..services.change_log import (
@@ -25,7 +24,6 @@ from ..services.change_log import (
     list_change_log_rows,
     rollback_booking_from_resolved,
     update_change_log_note,
-    update_manual_change_log_fields,
 )
 from ..services.export_filenames import session_export_filename
 from ..services.timetable_grid import assert_session_in_org
@@ -80,29 +78,15 @@ def post_manual_change_log(
     assert_session_in_org(db, session_id, ctx.organization.id)
     try:
         create_manual_change_log_entry(
-            db, timetable_session_id=session_id, booking_id=body.booking_id
+            db,
+            timetable_session_id=session_id,
+            booking_id=body.booking_id,
+            fields=list(body.fields),
         )
     except BookingNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    return {"ok": True}
-
-
-@router.patch("/sessions/{session_id}/change-log/entries/{entry_id}/manual-fields")
-def patch_manual_change_log_fields(
-    session_id: int,
-    entry_id: int,
-    body: ManualChangeLogFieldsPatch,
-    ctx: AuthContext = Depends(require_editor),
-    db: Session = Depends(get_db),
-):
-    assert_session_in_org(db, session_id, ctx.organization.id)
-    fields = {k: v for k, v in body.model_dump().items() if v is not None}
-    try:
-        update_manual_change_log_fields(
-            db, timetable_session_id=session_id, entry_id=entry_id, fields=fields
-        )
-    except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return {"ok": True}
 
 

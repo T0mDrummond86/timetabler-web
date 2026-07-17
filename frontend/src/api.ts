@@ -78,6 +78,8 @@ export type GlobalSessionSummary = {
   updated_at: string;
 };
 
+export type ManualChangeField = "lecturer" | "time" | "day" | "room";
+
 export type TutorialStart = {
   session: TimetableSession;
   created: boolean;
@@ -828,26 +830,15 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  createManualChangeLog: (sessionId: number, bookingId: number) =>
+  createManualChangeLog: (
+    sessionId: number,
+    bookingId: number,
+    fields: ManualChangeField[],
+  ) =>
     apiFetch<{ ok: boolean }>(`/sessions/${sessionId}/change-log/manual`, {
       method: "POST",
-      body: JSON.stringify({ booking_id: bookingId }),
+      body: JSON.stringify({ booking_id: bookingId, fields }),
     }),
-
-  patchManualChangeLogFields: (
-    sessionId: number,
-    entryId: number,
-    fields: {
-      lecturer_change?: string;
-      time_change?: string;
-      day_change?: string;
-      room_change?: string;
-    },
-  ) =>
-    apiFetch<{ ok: boolean }>(
-      `/sessions/${sessionId}/change-log/entries/${entryId}/manual-fields`,
-      { method: "PATCH", body: JSON.stringify(fields) },
-    ),
 
   deleteManualChangeLog: (sessionId: number, entryId: number) =>
     apiFetch<void>(`/sessions/${sessionId}/change-log/entries/${entryId}/manual`, {

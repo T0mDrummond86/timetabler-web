@@ -4742,6 +4742,30 @@ body.staff-editor-resizing {
   margin-bottom: 0.75rem;
 }
 
+/* ---------------- manual change-log dialog ---------------- */
+
+.manual-change-modal {
+  width: min(420px, 92vw);
+}
+
+.manual-change-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.manual-change-option {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.manual-change-label {
+  font-weight: 600;
+  min-width: 4.5rem;
+}
+
 /* ---------------- tutorial ---------------- */
 
 .tutorial-panel {

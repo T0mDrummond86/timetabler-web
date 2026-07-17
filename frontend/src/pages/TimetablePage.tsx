@@ -4,6 +4,7 @@ import {
   api,
   Course,
   getToken,
+  ManualChangeField,
   Qualification,
   Room,
   setToken,
@@ -25,6 +26,7 @@ import type {
   AlternatePlacementOption,
 } from "../types";
 import { ScheduleVariantBar } from "../components/ScheduleVariantBar";
+import { ManualChangeLogDialog } from "../components/ManualChangeLogDialog";
 import { TutorialHost } from "../tutorial/TutorialHost";
 import { ViolationsReportPanel } from "../components/ViolationsReportPanel";
 import { ClashSettingsPanel } from "../components/ClashSettingsPanel";
@@ -194,6 +196,8 @@ export function TimetablePage() {
   const [seeding, setSeeding] = useState(false);
   const [mutating, setMutating] = useState(false);
   const [editBooking, setEditBooking] = useState<BookingCard | null>(null);
+  const [manualLogBooking, setManualLogBooking] = useState<BookingCard | null>(null);
+  const [manualLogSaving, setManualLogSaving] = useState(false);
   const [undoStack, setUndoStack] = useState<BookingChange[]>([]);
   const [redoStack, setRedoStack] = useState<BookingChange[]>([]);
   const [holding, setHolding] = useState<HoldingClass[]>([]);
@@ -1083,15 +1087,20 @@ export function TimetablePage() {
     }
   }
 
-  async function onLogManualChange(booking: BookingCard) {
+  async function onConfirmManualChange(fields: ManualChangeField[]) {
+    if (!manualLogBooking) return;
+    setManualLogSaving(true);
     setError(null);
     try {
-      await api.createManualChangeLog(sessionId, booking.id);
+      await api.createManualChangeLog(sessionId, manualLogBooking.id, fields);
       setImportSuccess(
-        `Manual change recorded for ${booking.unit_name ?? "class"} — edit its lecturer/time/day/room on the Change log tab (Resolved view).`,
+        `Manual change (${fields.join(", ")}) recorded for ${manualLogBooking.unit_name ?? "class"} — see the Change log tab (Resolved view).`,
       );
+      setManualLogBooking(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not record manual change");
+    } finally {
+      setManualLogSaving(false);
     }
   }
 
@@ -1894,7 +1903,7 @@ export function TimetablePage() {
                   onMergeClasses={editable ? onMergeClasses : undefined}
                   onUnmergeClasses={editable ? onUnmergeClasses : undefined}
                   onDeletePlacecard={editable ? onDeletePlacecard : undefined}
-                  onLogManualChange={editable ? onLogManualChange : undefined}
+                  onLogManualChange={editable ? setManualLogBooking : undefined}
                   colourByClass={colourByClass}
                 />
               )
@@ -2075,6 +2084,14 @@ export function TimetablePage() {
           saving={mutating}
           onClose={() => setEditBooking(null)}
           onSave={onSaveEdit}
+        />
+      )}
+      {manualLogBooking && (
+        <ManualChangeLogDialog
+          booking={manualLogBooking}
+          saving={manualLogSaving}
+          onClose={() => setManualLogBooking(null)}
+          onConfirm={(fields) => void onConfirmManualChange(fields)}
         />
       )}
       {dialogs}

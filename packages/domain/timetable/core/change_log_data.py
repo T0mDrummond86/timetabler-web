@@ -36,8 +36,6 @@ def is_timetabling_change_log_entry(entry: ChangeLogEntry) -> bool:
 # than before/after snapshots, and always surface on the resolved view.
 MANUAL_LOG_ACTION = "manual"
 
-MANUAL_EDITABLE_ROW_KEYS = ("lecturer_change", "time_change", "day_change", "room_change")
-
 
 def is_manual_change_log_entry(entry: ChangeLogEntry) -> bool:
     if entry.action != MANUAL_LOG_ACTION or not entry.details:
@@ -230,27 +228,22 @@ def admin_export_highlights_by_external_id(
         if flags.time or flags.lecturer or flags.room or flags.day_header_days:
             out[eid] = flags
 
-    # Manual records highlight their card too. Fields the user edited away
-    # from the seeded values are flagged; an untouched record flags the whole
-    # card (time/lecturer/room) since the recorded change isn't field-specific.
+    # Manual records highlight exactly the fields chosen when they were logged
+    # (day → the booking's current day header). Legacy records without a
+    # fields list flag the whole card.
     for payload, booking in _manual_entry_bookings(session, timetable_session_id):
         eid = (booking.external_id or "").strip()
         if not eid:
             continue
-        row = payload.get("row") or {}
-        seed = payload.get("seed")
-
-        def _edited(key: str) -> bool:
-            if not isinstance(seed, dict):
-                return False  # legacy record without a seed → fall back below
-            return str(row.get(key, "") or "").strip() != str(seed.get(key, "") or "").strip()
-
-        time_c = _edited("time_change")
-        lecturer = _edited("lecturer_change")
-        room = _edited("room_change")
-        day = _edited("day_change")
-        if not (time_c or lecturer or room or day):
+        chosen = payload.get("fields")
+        if isinstance(chosen, list):
+            time_c = "time" in chosen
+            lecturer = "lecturer" in chosen
+            room = "room" in chosen
+            day = "day" in chosen
+        else:
             time_c = lecturer = room = True
+            day = False
         flags = AdminExportChangeHighlight(
             time=time_c,
             lecturer=lecturer,
