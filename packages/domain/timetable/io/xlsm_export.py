@@ -162,10 +162,10 @@ def _week_bookings(session: Session, week_id: int) -> list[Booking]:
     )
 
 
-def _class_title_line(b: Booking) -> str:
+def _class_title_line(b: Booking, *, include_event_id: bool = True) -> str:
     """Class display title (name, booking id, double-session part) without units-of-study codes."""
     name = (b.unit.name if b.unit else "") or ""
-    ext = (b.external_id or "").strip()
+    ext = (b.external_id or "").strip() if include_event_id else ""
     if ext:
         name = f"[{ext}] {name}".strip()
     part = getattr(b, "session_part", 1) or 1
@@ -188,13 +188,19 @@ def _component_codes_line(b: Booking) -> str:
     return (normalize_component_codes_commas(raw) or raw).strip()
 
 
-def placecard_subject_block(b: Booking, *, prefix: str = "", term: str | None = None) -> str:
+def placecard_subject_block(
+    b: Booking,
+    *,
+    prefix: str = "",
+    term: str | None = None,
+    include_event_id: bool = True,
+) -> str:
     """Placecard class block: title, codes, notes, and optional partial-week label."""
     from ..core.block_delivery import block_booking_label, is_block_booking
     from ..core.booking_sessions import format_session_weeks_label
 
     parts: list[str] = []
-    title = _class_title_line(b)
+    title = _class_title_line(b, include_event_id=include_event_id)
     if prefix:
         title = f"{prefix}{title}"
     if title:

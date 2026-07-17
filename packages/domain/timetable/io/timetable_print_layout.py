@@ -182,7 +182,9 @@ def staff_timetable_lines(
     from ..core.booking_sessions import format_session_weeks_label
 
     lines: list[str] = []
-    title = _class_title_line(b)
+    # PDF prints omit the event id — it's an admin-system reference, not
+    # something lecturers or students need on a printed timetable.
+    title = _class_title_line(b, include_event_id=False)
     if title:
         lines.append(title)
     week_label = format_session_weeks_label(b, term=term)
@@ -230,7 +232,11 @@ def print_card_lines_merged(
     lines: list[str] = []
     for b in sorted(group, key=lambda x: ((x.course.code if x.course else ""), x.id)):
         lines.extend(
-            ln for ln in placecard_subject_block(b, **term_kw).split("\n") if ln.strip()
+            ln
+            for ln in placecard_subject_block(
+                b, include_event_id=False, **term_kw
+            ).split("\n")
+            if ln.strip()
         )
     b0 = group[0]
     rooms = sorted({(b.room.code if b.room else "") or "" for b in group} - {""})
@@ -256,7 +262,11 @@ def print_card_lines(
     term_kw = {"term": term} if term in ("t1", "t2") else {}
     if kind == "staff":
         return staff_timetable_lines(b, view_staff_id=view_staff_id, term=term)
-    lines = [ln for ln in placecard_subject_block(b, **term_kw).split("\n") if ln.strip()]
+    lines = [
+        ln
+        for ln in placecard_subject_block(b, include_event_id=False, **term_kw).split("\n")
+        if ln.strip()
+    ]
     if kind == "course":
         room = (b.room.code if b.room else "") or ""
         if room:
