@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from .booking_snapshots import timetabling_changelog_rows
 from .changelog import TIMETABLING_LOG_ACTIONS, resolve_session_booking_net_maps
-from .models import ChangeLogEntry
+from .models import Booking, ChangeLogEntry
 
 
 @dataclass(frozen=True)
@@ -122,6 +122,25 @@ def _course_ids_from_booking_states(*states: dict | None) -> set[int]:
     return ids
 
 
+def _manual_entry_bookings(
+    session: Session, timetable_session_id: int
+) -> list[tuple[dict, Booking]]:
+    """(payload, live booking) pairs for manual records whose booking still exists."""
+    out: list[tuple[dict, Booking]] = []
+    for entry in _session_entries_query(session, timetable_session_id).all():
+        if not is_manual_change_log_entry(entry):
+            continue
+        payload = json.loads(entry.details or "{}")
+        booking_id = payload.get("booking_id")
+        if not isinstance(booking_id, int):
+            continue
+        booking = session.get(Booking, booking_id)
+        if booking is None:
+            continue
+        out.append((payload, booking))
+    return out
+
+
 def affected_course_ids_from_resolved_changelog(
     session: Session,
     *,
@@ -134,6 +153,10 @@ def affected_course_ids_from_resolved_changelog(
     course_ids: set[int] = set()
     for bid in set(before_map) | set(after_map):
         course_ids |= _course_ids_from_booking_states(before_map.get(bid), after_map.get(bid))
+    # Manual records mark their course as changed too (changes-only exports).
+    for _payload, booking in _manual_entry_bookings(session, timetable_session_id):
+        if booking.course_id is not None:
+            course_ids.add(int(booking.course_id))
     return course_ids
 
 
@@ -206,6 +229,43 @@ def admin_export_highlights_by_external_id(
         flags = _highlight_from_net_states(b_state, a_state)
         if flags.time or flags.lecturer or flags.room or flags.day_header_days:
             out[eid] = flags
+
+    # Manual records highlight their card too. Fields the user edited away
+    # from the seeded values are flagged; an untouched record flags the whole
+    # card (time/lecturer/room) since the recorded change isn't field-specific.
+    for payload, booking in _manual_entry_bookings(session, timetable_session_id):
+        eid = (booking.external_id or "").strip()
+        if not eid:
+            continue
+        row = payload.get("row") or {}
+        seed = payload.get("seed")
+
+        def _edited(key: str) -> bool:
+            if not isinstance(seed, dict):
+                return False  # legacy record without a seed → fall back below
+            return str(row.get(key, "") or "").strip() != str(seed.get(key, "") or "").strip()
+
+        time_c = _edited("time_change")
+        lecturer = _edited("lecturer_change")
+        room = _edited("room_change")
+        day = _edited("day_change")
+        if not (time_c or lecturer or room or day):
+            time_c = lecturer = room = True
+        flags = AdminExportChangeHighlight(
+            time=time_c,
+            lecturer=lecturer,
+            room=room,
+            day_header_days=frozenset({int(booking.day)}) if day else frozenset(),
+        )
+        existing = out.get(eid)
+        if existing is not None:
+            flags = AdminExportChangeHighlight(
+                time=existing.time or flags.time,
+                lecturer=existing.lecturer or flags.lecturer,
+                room=existing.room or flags.room,
+                day_header_days=existing.day_header_days | flags.day_header_days,
+            )
+        out[eid] = flags
     return out
 
 

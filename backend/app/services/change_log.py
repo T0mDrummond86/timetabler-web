@@ -102,7 +102,11 @@ def create_manual_change_log_entry(
         timetable_session_id=timetable_session_id,
         action=MANUAL_LOG_ACTION,
         description=f"Manual change record — {label} ({row['group']})".strip(),
-        details=json.dumps({"manual": True, "booking_id": booking_id, "row": row}),
+        # "seed" keeps the as-created values so exports can tell which fields
+        # the user later edited (those are the ones highlighted red).
+        details=json.dumps(
+            {"manual": True, "booking_id": booking_id, "row": row, "seed": dict(row)}
+        ),
     )
     db.add(entry)
     db.commit()
