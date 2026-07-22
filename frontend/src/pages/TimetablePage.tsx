@@ -27,6 +27,7 @@ import type {
 } from "../types";
 import { ScheduleVariantBar } from "../components/ScheduleVariantBar";
 import { ManualChangeLogDialog } from "../components/ManualChangeLogDialog";
+import { copyTimetableGrid } from "../lib/timetableGridClipboard";
 import { TutorialHost } from "../tutorial/TutorialHost";
 import { ViolationsReportPanel } from "../components/ViolationsReportPanel";
 import { ClashSettingsPanel } from "../components/ClashSettingsPanel";
@@ -198,6 +199,7 @@ export function TimetablePage() {
   const [editBooking, setEditBooking] = useState<BookingCard | null>(null);
   const [manualLogBooking, setManualLogBooking] = useState<BookingCard | null>(null);
   const [manualLogSaving, setManualLogSaving] = useState(false);
+  const [gridCopied, setGridCopied] = useState(false);
   const [undoStack, setUndoStack] = useState<BookingChange[]>([]);
   const [redoStack, setRedoStack] = useState<BookingChange[]>([]);
   const [holding, setHolding] = useState<HoldingClass[]>([]);
@@ -1087,6 +1089,18 @@ export function TimetablePage() {
     }
   }
 
+  async function onCopyGridToClipboard() {
+    if (!grid) return;
+    setError(null);
+    try {
+      await copyTimetableGrid(grid, `${grid.entity_label} — weekly timetable`);
+      setGridCopied(true);
+      window.setTimeout(() => setGridCopied(false), 2500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Copy failed");
+    }
+  }
+
   async function onConfirmManualChange(fields: ManualChangeField[]) {
     if (!manualLogBooking) return;
     setManualLogSaving(true);
@@ -1603,6 +1617,15 @@ export function TimetablePage() {
           </button>
           <button type="button" className="btn-secondary" onClick={openAdditionalTab}>
             New tab
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={!grid || !grid.bookings.length || !showsWeekGrid(viewKind)}
+            title="Copy this timetable as a table for email"
+            onClick={() => void onCopyGridToClipboard()}
+          >
+            {gridCopied ? "Copied ✓" : "Copy for email"}
           </button>
           {!isEmbedded && (
             <span className="tt-dropdown-wrap" ref={externalViewsMenu.wrapRef}>
