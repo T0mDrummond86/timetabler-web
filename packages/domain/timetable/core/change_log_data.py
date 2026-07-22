@@ -315,9 +315,13 @@ def gather_timetabling_change_log_display_rows(
         bids = sorted(set(before_map) | set(after_map))
         latest_entry_for_bid: dict[int, int] = {}
         latest_note_for_bid: dict[int, str] = {}
-        entries = _session_entries_query(session, timetable_session_id).order_by(
-            ChangeLogEntry.id.desc()
-        ).all()
+        # Newest first, so the first entry seen for a booking is its latest change.
+        entries = (
+            session.query(ChangeLogEntry)
+            .filter(ChangeLogEntry.timetable_session_id == timetable_session_id)
+            .order_by(ChangeLogEntry.id.desc())
+            .all()
+        )
         for e in entries:
             if not is_timetabling_change_log_entry(e):
                 continue
@@ -351,16 +355,21 @@ def gather_timetabling_change_log_display_rows(
                 )
             )
         # Manual records always surface on the resolved view, even when the
-        # booking's tracked state shows no net change (oldest first).
-        for e in reversed(entries):
+        # booking's tracked state shows no net change.
+        for e in entries:
             manual = _manual_display_row(e)
             if manual is not None:
                 out.append(manual)
+        # Order the whole resolved view newest-first. Each resolution is keyed by
+        # the most recent change that produced it: net rows use the latest change
+        # touching that booking; manual rows use their own entry.
+        out.sort(key=lambda r: r.entry_id if r.entry_id is not None else -1, reverse=True)
         return out
 
     out: list[ChangeLogDisplayRow] = []
     entries = (
-        _session_entries_query(session, timetable_session_id)
+        session.query(ChangeLogEntry)
+        .filter(ChangeLogEntry.timetable_session_id == timetable_session_id)
         .order_by(ChangeLogEntry.id.desc())
         .all()
     )
