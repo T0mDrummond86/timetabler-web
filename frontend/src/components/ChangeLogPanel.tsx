@@ -55,12 +55,12 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
     }
   }
 
-  async function removeManualEntry(entryId: number) {
+  async function deleteManualEntry(entryId: number) {
     if (
       !(await confirm({
-        title: "Remove manual record",
-        message: "Remove this hand-written change record from the log?",
-        confirmLabel: "Remove",
+        title: "Delete manual record",
+        message: "Delete this hand-written change record from the log entirely?",
+        confirmLabel: "Delete",
         danger: true,
       }))
     )
@@ -69,7 +69,24 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
       await api.deleteManualChangeLog(sessionId, entryId);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove manual entry");
+      setError(err instanceof Error ? err.message : "Failed to delete manual entry");
+    }
+  }
+
+  async function toggleHighlightRemoved(
+    entryId: number,
+    bookingId: number,
+    removed: boolean,
+  ) {
+    setError(null);
+    try {
+      await api.setChangeLogHighlightRemoved(sessionId, entryId, {
+        booking_id: bookingId,
+        removed,
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update change");
     }
   }
 
@@ -149,6 +166,7 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
                 <th>When</th>
                 <th>Action</th>
                 {resolved && <th>Notes</th>}
+                {resolved && <th title="Remove a change from the admin-export markup while keeping it logged">Markup</th>}
                 {resolved && <th>Rollback</th>}
               </tr>
             </thead>
@@ -161,7 +179,7 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
                       6 +
                       (showDelColumn ? 1 : 0) +
                       2 +
-                      (resolved ? 2 : 0)
+                      (resolved ? 3 : 0)
                     }
                     className="muted empty-cell"
                   >
@@ -172,7 +190,10 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
               {rows.map((r, idx) => {
                 const actionColour = ACTION_COLOURS[r.action] ?? "#444";
                 return (
-                  <tr key={`${r.entry_id}-${r.booking_id}-${idx}`}>
+                  <tr
+                    key={`${r.entry_id}-${r.booking_id}-${idx}`}
+                    className={r.removed ? "change-log-row--removed" : undefined}
+                  >
                     {showIdColumn && <td>{r.row.id ?? ""}</td>}
                     <td>{r.row.group ?? ""}</td>
                     <td>{r.row.class ?? ""}</td>
@@ -182,7 +203,10 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
                     <td>{r.row.room_change ?? ""}</td>
                     {showDelColumn && <td>{r.row.delete ?? ""}</td>}
                     <td>{r.when ?? ""}</td>
-                    <td style={{ color: actionColour, fontWeight: 700 }}>{r.action}</td>
+                    <td style={{ color: actionColour, fontWeight: 700 }}>
+                      {r.action}
+                      {r.removed && <span className="change-log-removed-tag">removed</span>}
+                    </td>
                     {resolved && (
                       <td>
                         {r.entry_id != null && r.booking_id != null ? (
@@ -202,16 +226,39 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
                     )}
                     {resolved && (
                       <td>
+                        {r.entry_id != null && r.booking_id != null ? (
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            style={{ fontSize: "0.78rem", padding: "0.3rem 0.55rem" }}
+                            title={
+                              r.removed
+                                ? "Restore this change to the admin-export markup"
+                                : "Remove this change from the admin-export markup (stays logged)"
+                            }
+                            onClick={() =>
+                              void toggleHighlightRemoved(r.entry_id!, r.booking_id!, !r.removed)
+                            }
+                          >
+                            {r.removed ? "Restore" : "Remove"}
+                          </button>
+                        ) : (
+                          ""
+                        )}
+                      </td>
+                    )}
+                    {resolved && (
+                      <td>
                         {r.action === "manual" ? (
                           r.entry_id != null && (
                             <button
                               type="button"
                               className="btn-secondary"
                               style={{ fontSize: "0.78rem", padding: "0.3rem 0.55rem" }}
-                              title="Remove this hand-written record"
-                              onClick={() => void removeManualEntry(r.entry_id!)}
+                              title="Delete this hand-written record entirely"
+                              onClick={() => void deleteManualEntry(r.entry_id!)}
                             >
-                              Remove
+                              Delete
                             </button>
                           )
                         ) : r.booking_id != null ? (

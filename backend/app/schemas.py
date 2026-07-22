@@ -703,6 +703,7 @@ class ChangeLogRowOut(BaseModel):
     entry_id: int | None = None
     note: str = ""
     row: dict[str, str]
+    removed: bool = False
 
 
 class ChangeLogListOut(BaseModel):
@@ -723,6 +724,11 @@ class ChangeLogRollbackRequest(BaseModel):
 class ManualChangeLogCreate(BaseModel):
     booking_id: int
     fields: list[Literal["lecturer", "time", "day", "room"]] = Field(min_length=1)
+
+
+class ChangeLogHighlightRemovedPatch(BaseModel):
+    booking_id: int
+    removed: bool
 
 
 class AlternatePlacementOptionOut(BaseModel):

@@ -206,6 +206,7 @@ export type ChangeLogRow = {
   booking_id: number | null;
   entry_id: number | null;
   note: string;
+  removed?: boolean;
   row: {
     id?: string;
     group?: string;

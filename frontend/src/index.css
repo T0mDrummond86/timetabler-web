@@ -2803,6 +2803,29 @@ body:has(.app-shell--fill) #root {
   overflow-x: auto;
 }
 
+/* A change removed from the admin-export markup: still listed, muted + struck. */
+.change-log-row--removed td {
+  opacity: 0.55;
+}
+
+.change-log-row--removed td:nth-child(-n + 8) {
+  text-decoration: line-through;
+}
+
+.change-log-removed-tag {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.02rem 0.4rem;
+  border-radius: 999px;
+  background: var(--violation-hard-bg, #fee2e2);
+  color: var(--violation-hard-fg, #991b1b);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-decoration: none;
+  opacity: 1;
+  vertical-align: middle;
+}
+
 .change-log-table {
   width: 100%;
   border-collapse: collapse;

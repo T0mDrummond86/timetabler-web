@@ -19,6 +19,10 @@ class ChangeLogDisplayRow:
     booking_id: int
     entry_id: int | None
     note: str
+    # True when this change has been removed from the admin-export markup. It
+    # still appears in the log (shown with a "removed" status) but no longer
+    # contributes a highlight.
+    removed: bool = False
 
 
 def is_timetabling_change_log_entry(entry: ChangeLogEntry) -> bool:
@@ -65,7 +69,32 @@ def _manual_display_row(entry: ChangeLogEntry) -> ChangeLogDisplayRow | None:
         booking_id=bid,
         entry_id=entry.id,
         note=notes.get(bid, ""),
+        removed=payload.get("manual_removed") is True,
     )
+
+
+def _removed_net_booking_ids(session: Session, timetable_session_id: int) -> set[int]:
+    """Booking ids whose tracked net change has been removed from the markup.
+
+    Stored session-wide across entries under ``details['removed_net']`` (a
+    ``{str(booking_id): True}`` map), so removal survives later edits that
+    change which entry is "latest" for a booking.
+    """
+    out: set[int] = set()
+    for entry in _session_entries_query(session, timetable_session_id):
+        try:
+            payload = json.loads(entry.details or "{}")
+        except Exception:
+            continue
+        removed = payload.get("removed_net") if isinstance(payload, dict) else None
+        if isinstance(removed, dict):
+            for key, val in removed.items():
+                if val:
+                    try:
+                        out.add(int(key))
+                    except (TypeError, ValueError):
+                        continue
+    return out
 
 
 def payload_booking_maps(payload: dict) -> tuple[dict[int, dict | None], dict[int, dict | None]]:
@@ -148,11 +177,17 @@ def affected_course_ids_from_resolved_changelog(
     before_map, after_map = resolve_session_booking_net_maps(
         session, timetable_session_id=timetable_session_id
     )
+    removed_net = _removed_net_booking_ids(session, timetable_session_id)
     course_ids: set[int] = set()
     for bid in set(before_map) | set(after_map):
+        if bid in removed_net:
+            continue
         course_ids |= _course_ids_from_booking_states(before_map.get(bid), after_map.get(bid))
-    # Manual records mark their course as changed too (changes-only exports).
-    for _payload, booking in _manual_entry_bookings(session, timetable_session_id):
+    # Manual records mark their course as changed too (changes-only exports),
+    # unless they've been removed from the markup.
+    for payload, booking in _manual_entry_bookings(session, timetable_session_id):
+        if payload.get("manual_removed") is True:
+            continue
         if booking.course_id is not None:
             course_ids.add(int(booking.course_id))
     return course_ids
@@ -215,8 +250,11 @@ def admin_export_highlights_by_external_id(
     before_map, after_map = resolve_session_booking_net_maps(
         session, timetable_session_id=timetable_session_id
     )
+    removed_net = _removed_net_booking_ids(session, timetable_session_id)
     out: dict[str, AdminExportChangeHighlight] = {}
     for bid in set(before_map) | set(after_map):
+        if bid in removed_net:
+            continue  # removed from the markup, but still shown in the log
         b_state = before_map.get(bid)
         a_state = after_map.get(bid)
         if a_state is None:
@@ -233,6 +271,8 @@ def admin_export_highlights_by_external_id(
     # selection (made before the field picker existed) highlight nothing —
     # remove and re-log them to choose fields.
     for payload, booking in _manual_entry_bookings(session, timetable_session_id):
+        if payload.get("manual_removed") is True:
+            continue  # removed from the markup, but still shown in the log
         eid = (booking.external_id or "").strip()
         if not eid:
             continue
@@ -295,6 +335,7 @@ def gather_timetabling_change_log_display_rows(
             for bid in notes:
                 if bid not in latest_note_for_bid:
                     latest_note_for_bid[bid] = notes[bid]
+        removed_net = _removed_net_booking_ids(session, timetable_session_id)
         out: list[ChangeLogDisplayRow] = []
         for i, row in enumerate(rows):
             bid = bids[i] if i < len(bids) else -1
@@ -306,6 +347,7 @@ def gather_timetabling_change_log_display_rows(
                     booking_id=bid,
                     entry_id=latest_entry_for_bid.get(bid),
                     note=latest_note_for_bid.get(bid, ""),
+                    removed=bid in removed_net,
                 )
             )
         # Manual records always surface on the resolved view, even when the

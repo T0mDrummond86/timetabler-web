@@ -821,6 +821,16 @@ export const api = {
       { method: "PATCH", body: JSON.stringify(body) },
     ),
 
+  setChangeLogHighlightRemoved: (
+    sessionId: number,
+    entryId: number,
+    body: { booking_id: number; removed: boolean },
+  ) =>
+    apiFetch<{ ok: boolean }>(
+      `/sessions/${sessionId}/change-log/entries/${entryId}/highlight-removed`,
+      { method: "PATCH", body: JSON.stringify(body) },
+    ),
+
   rollbackChangeLog: (
     sessionId: number,
     body: { booking_id: number; course_id: number },

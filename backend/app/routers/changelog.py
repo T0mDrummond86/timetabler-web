@@ -14,6 +14,7 @@ from ..schemas import (
     ChangeLogNotePatch,
     ChangeLogRollbackRequest,
     BookingMutationOut,
+    ChangeLogHighlightRemovedPatch,
     ManualChangeLogCreate,
 )
 from ..services.booking_mutations import BookingNotFoundError
@@ -23,6 +24,7 @@ from ..services.change_log import (
     export_resolved_change_log_xlsx,
     list_change_log_rows,
     rollback_booking_from_resolved,
+    set_change_log_highlight_removed,
     update_change_log_note,
 )
 from ..services.export_filenames import session_export_filename
@@ -62,6 +64,28 @@ def patch_change_log_note(
             entry_id=entry_id,
             booking_id=body.booking_id,
             note=body.note,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+@router.patch("/sessions/{session_id}/change-log/entries/{entry_id}/highlight-removed")
+def patch_change_log_highlight_removed(
+    session_id: int,
+    entry_id: int,
+    body: ChangeLogHighlightRemovedPatch,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        set_change_log_highlight_removed(
+            db,
+            timetable_session_id=session_id,
+            entry_id=entry_id,
+            booking_id=body.booking_id,
+            removed=body.removed,
         )
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

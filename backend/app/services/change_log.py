@@ -46,6 +46,7 @@ def list_change_log_rows(
             "entry_id": r.entry_id,
             "note": r.note,
             "row": r.row,
+            "removed": r.removed,
         }
         for r in rows
     ]
@@ -119,6 +120,67 @@ def create_manual_change_log_entry(
         ),
     )
     db.add(entry)
+    db.commit()
+
+
+def set_change_log_highlight_removed(
+    db: Session,
+    *,
+    timetable_session_id: int,
+    entry_id: int,
+    booking_id: int,
+    removed: bool,
+) -> None:
+    """Toggle whether a resolved change contributes to the admin-export markup.
+
+    The change stays in the log (shown with a "removed" status); it just stops
+    (or resumes) producing a highlight. Manual records store the flag on their
+    own entry; tracked net changes store it session-wide per booking so removal
+    survives later edits that change which entry is "latest" for the booking.
+    """
+    entry = db.get(ChangeLogEntry, entry_id)
+    if entry is None or entry.timetable_session_id != timetable_session_id:
+        raise LookupError("Change log entry not found")
+
+    if is_manual_change_log_entry(entry):
+        payload = json.loads(entry.details or "{}")
+        if removed:
+            payload["manual_removed"] = True
+        else:
+            payload.pop("manual_removed", None)
+        entry.details = json.dumps(payload)
+        db.commit()
+        return
+
+    key = str(booking_id)
+    if removed:
+        payload = json.loads(entry.details or "{}")
+        removed_net = payload.get("removed_net")
+        if not isinstance(removed_net, dict):
+            removed_net = {}
+        removed_net[key] = True
+        payload["removed_net"] = removed_net
+        entry.details = json.dumps(payload)
+    else:
+        # Clear the flag from every entry in the session (it may have been
+        # written against a different "latest" entry earlier).
+        for e in (
+            db.query(ChangeLogEntry)
+            .filter(ChangeLogEntry.timetable_session_id == timetable_session_id)
+            .all()
+        ):
+            try:
+                payload = json.loads(e.details or "{}")
+            except (ValueError, TypeError):
+                continue
+            removed_net = payload.get("removed_net") if isinstance(payload, dict) else None
+            if isinstance(removed_net, dict) and key in removed_net:
+                removed_net.pop(key, None)
+                if removed_net:
+                    payload["removed_net"] = removed_net
+                else:
+                    payload.pop("removed_net", None)
+                e.details = json.dumps(payload)
     db.commit()
 
 
