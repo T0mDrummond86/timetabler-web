@@ -76,30 +76,7 @@ export async function copyChangeLogRows(rows: ChangeLogRow[], title: string): Pr
   return rows.length;
 }
 
-/** Copy a single logged change as a readable labelled block. */
+/** Copy a single logged change as a one-row table (same format as copy-all). */
 export async function copyChangeLogRow(row: ChangeLogRow): Promise<void> {
-  const f = fieldsOf(row);
-  const heading = [f.group, f.cls].filter(Boolean).join(" · ") || "Change";
-  const labelled: [string, string][] = [
-    ["Lecturer", f.lecturer],
-    ["Time", f.time],
-    ["Day", f.day],
-    ["Room", f.room],
-    ["Note", f.note],
-  ].filter(([, v]) => v.trim() !== "") as [string, string][];
-  const meta = [f.action, f.when].filter(Boolean).join(" · ");
-
-  const plain =
-    `${heading}\n` +
-    labelled.map(([k, v]) => `${k}: ${v}`).join("\n") +
-    (meta ? `\n(${meta})` : "");
-
-  const html =
-    `<p style="font-family:Arial,sans-serif;font-size:13px;margin:0;"><strong>${escapeHtml(heading)}</strong></p>` +
-    `<ul style="font-family:Arial,sans-serif;font-size:13px;margin:4px 0;padding-left:18px;">` +
-    labelled.map(([k, v]) => `<li>${escapeHtml(k)}: ${escapeHtml(v)}</li>`).join("") +
-    `</ul>` +
-    (meta ? `<p style="font-family:Arial,sans-serif;font-size:12px;color:#666;margin:0;">${escapeHtml(meta)}</p>` : "");
-
-  await writeClipboard(html, plain);
+  await copyChangeLogRows([row], "Change log");
 }
