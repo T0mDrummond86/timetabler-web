@@ -45,7 +45,7 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
 
   async function copyAll() {
     try {
-      await copyChangeLogRows(rows, `Change log — ${resolved ? "resolved" : "full"}`);
+      await copyChangeLogRows(rows);
       flashCopied("all");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Copy failed");

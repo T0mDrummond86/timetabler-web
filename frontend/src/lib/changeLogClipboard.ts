@@ -44,15 +44,15 @@ async function writeClipboard(html: string, plain: string): Promise<void> {
   }
 }
 
-const HEADERS = ["Group", "Class", "Lecturer", "Time", "Day", "Room", "When", "Action"] as const;
+const HEADERS = ["Group", "Class", "Lecturer", "Time", "Day", "Room"] as const;
 
 /** Copy a set of logged changes as an HTML table (with a tab-separated fallback). */
-export async function copyChangeLogRows(rows: ChangeLogRow[], title: string): Promise<number> {
+export async function copyChangeLogRows(rows: ChangeLogRow[]): Promise<number> {
   const data = rows.map(fieldsOf);
   const hasNote = data.some((f) => f.note.trim() !== "");
   const headers = hasNote ? [...HEADERS, "Note"] : [...HEADERS];
   const cells = (f: Fields): string[] => {
-    const base = [f.group, f.cls, f.lecturer, f.time, f.day, f.room, f.when, f.action];
+    const base = [f.group, f.cls, f.lecturer, f.time, f.day, f.room];
     return hasNote ? [...base, f.note] : base;
   };
 
@@ -64,12 +64,11 @@ export async function copyChangeLogRows(rows: ChangeLogRow[], title: string): Pr
     .map((f) => `<tr>${cells(f).map(td).join("")}</tr>`)
     .join("");
   const html =
-    `<p style="font-family:Arial,sans-serif;font-size:14px;font-weight:bold;margin:0 0 8px;">${escapeHtml(title)}</p>` +
     `<table style="border-collapse:collapse;border:1px solid #ccc;">` +
     `<thead><tr>${headers.map(th).join("")}</tr></thead>` +
     `<tbody>${body}</tbody></table>`;
 
-  const plainLines = [title, "", headers.join("\t")];
+  const plainLines = [headers.join("\t")];
   for (const f of data) plainLines.push(cells(f).map((c) => c || "—").join("\t"));
 
   await writeClipboard(html, plainLines.join("\n"));
@@ -78,5 +77,5 @@ export async function copyChangeLogRows(rows: ChangeLogRow[], title: string): Pr
 
 /** Copy a single logged change as a one-row table (same format as copy-all). */
 export async function copyChangeLogRow(row: ChangeLogRow): Promise<void> {
-  await copyChangeLogRows([row], "Change log");
+  await copyChangeLogRows([row]);
 }
