@@ -27,6 +27,7 @@ import type {
 } from "../types";
 import { ScheduleVariantBar } from "../components/ScheduleVariantBar";
 import { ManualChangeLogDialog } from "../components/ManualChangeLogDialog";
+import { UnitClassMapperPanel } from "../components/UnitClassMapperPanel";
 import { copyTimetableGrid } from "../lib/timetableGridClipboard";
 import { TutorialHost } from "../tutorial/TutorialHost";
 import { ViolationsReportPanel } from "../components/ViolationsReportPanel";
@@ -96,7 +97,8 @@ type SessionTab =
   | "custodians"
   | "usage"
   | "lap"
-  | "lecturer_cover";
+  | "lecturer_cover"
+  | "unit_mapper";
 
 type ViewState = {
   viewKind: ViewKind;
@@ -120,6 +122,7 @@ const SESSION_TABS: { id: SessionTab; label: string; secondary?: boolean }[] = [
   { id: "rooms", label: "Rooms", secondary: true },
   { id: "units", label: "Classes", secondary: true },
   { id: "qualifications", label: "Qualifications", secondary: true },
+  { id: "unit_mapper", label: "Unit-class mapper", secondary: true },
   { id: "custodians", label: "Class custodians", secondary: true },
   { id: "usage", label: "Usage", secondary: true },
   { id: "lap", label: "LAP creation", secondary: true },
@@ -2078,6 +2081,9 @@ export function TimetablePage() {
       )}
       {sessionTab === "usage" && courses.length > 0 && (
         <UsageDashboard sessionId={sessionId} refreshKey={changeLogKey} />
+      )}
+      {sessionTab === "unit_mapper" && (
+        <UnitClassMapperPanel sessionId={sessionId} onError={setError} />
       )}
       {sessionTab === "lap" && courses.length > 0 && (
         <LapCreationPanel sessionId={sessionId} refreshKey={changeLogKey} />
