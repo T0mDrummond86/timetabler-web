@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import type { ChangeLogRow } from "../types";
 import { useConfirmPrompt } from "../hooks/useConfirmPrompt";
+import { copyChangeLogRow, copyChangeLogRows } from "../lib/changeLogClipboard";
 
 const ACTION_COLOURS: Record<string, string> = {
   change: "#0c4a6e",
@@ -25,7 +26,31 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
   const [error, setError] = useState<string | null>(null);
   const [savingNote, setSavingNote] = useState<number | null>(null);
   const [rollingBack, setRollingBack] = useState<number | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
   const { confirm, dialogs } = useConfirmPrompt();
+
+  function flashCopied(key: string) {
+    setCopied(key);
+    window.setTimeout(() => setCopied((c) => (c === key ? null : c)), 1800);
+  }
+
+  async function copyRow(row: ChangeLogRow, key: string) {
+    try {
+      await copyChangeLogRow(row);
+      flashCopied(key);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Copy failed");
+    }
+  }
+
+  async function copyAll() {
+    try {
+      await copyChangeLogRows(rows, `Change log — ${resolved ? "resolved" : "full"}`);
+      flashCopied("all");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Copy failed");
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -145,6 +170,15 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
             Export
           </button>
         )}
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={!rows.length}
+          title="Copy all listed changes to the clipboard, formatted for email"
+          onClick={() => void copyAll()}
+        >
+          {copied === "all" ? "Copied ✓" : "Copy all"}
+        </button>
       </div>
 
       {error && <div className="error-banner" style={{ margin: "0 1rem 0.75rem" }}>{error}</div>}
@@ -168,6 +202,7 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
                 {resolved && <th>Notes</th>}
                 {resolved && <th title="Remove a change from the admin-export markup while keeping it logged">Markup</th>}
                 {resolved && <th>Rollback</th>}
+                <th title="Copy this change to the clipboard for email">Copy</th>
               </tr>
             </thead>
             <tbody>
@@ -179,7 +214,8 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
                       6 +
                       (showDelColumn ? 1 : 0) +
                       2 +
-                      (resolved ? 3 : 0)
+                      (resolved ? 3 : 0) +
+                      1
                     }
                     className="muted empty-cell"
                   >
@@ -276,6 +312,17 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
                         )}
                       </td>
                     )}
+                    <td>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ fontSize: "0.78rem", padding: "0.3rem 0.55rem" }}
+                        title="Copy this change for email"
+                        onClick={() => void copyRow(r, `${r.entry_id}-${r.booking_id}-${idx}`)}
+                      >
+                        {copied === `${r.entry_id}-${r.booking_id}-${idx}` ? "Copied ✓" : "Copy"}
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
