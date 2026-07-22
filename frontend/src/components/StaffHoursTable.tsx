@@ -46,10 +46,16 @@ function varianceTone(category: string): VarianceTone {
 
 function formatVarianceDisplay(v: number | null | undefined): string {
   if (v == null || Number.isNaN(v)) return "—";
-  const fixed = Math.abs(v).toFixed(2);
-  if (Math.abs(v) < 0.005) return "0.00";
+  const fixed = Math.abs(v).toFixed(1);
+  if (Math.abs(v) < 0.05) return "0.0";
   if (v > 0) return `+${fixed}`;
   return `−${fixed}`;
+}
+
+/** Current FTE = total workload ÷ 21, capped at 1.0. */
+function formatCurrentFte(total: number | null | undefined): string {
+  if (total == null || Number.isNaN(total)) return "—";
+  return Math.min(1, total / 21).toFixed(2);
 }
 
 function parseBulkOnlineLines(detail: string | null): string[] {
@@ -271,10 +277,16 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
               <th className="staff-col-primary staff-col-sticky">Lecturer</th>
               <th className="staff-col-staff-id">Staff ID</th>
               <th className="staff-col-meta">Cost centre</th>
-              <th className="staff-col-metric staff-col-metric-group">FTE</th>
+              <th className="staff-col-metric staff-col-metric-group">Subst. FTE</th>
               <th
                 className="staff-col-metric"
-                title="FTE × 21 hours per FTE"
+                title="Total workload ÷ 21, capped at 1.0"
+              >
+                Current FTE
+              </th>
+              <th
+                className="staff-col-metric"
+                title="Subst. FTE × 21 hours per FTE"
               >
                 Lecturing h
               </th>
@@ -289,6 +301,12 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
                 title="Sessions × hours ÷ 20 weeks when class runs fewer than all semester weeks"
               >
                 Session avg
+              </th>
+              <th
+                className="staff-col-metric staff-col-metric-highlight"
+                title="In-class + bulk online + dev + PD + supervision"
+              >
+                Total
               </th>
               <th
                 className="staff-col-metric staff-col-variance"
@@ -309,12 +327,6 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
               <th className="staff-col-meta">Dev description</th>
               <th className="staff-col-meta">PD / training</th>
               <th className="staff-col-meta">Supervision</th>
-              <th
-                className="staff-col-metric staff-col-metric-highlight"
-                title="In-class + bulk online + dev + PD + supervision"
-              >
-                Total
-              </th>
               <th className="staff-col-meta">Non-teach day</th>
               <th className="staff-col-meta staff-col-meta-group">1st prefs</th>
               <th className="staff-col-meta">2nd prefs</th>
@@ -349,6 +361,7 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
                 <td className="staff-col-metric staff-col-metric-group">
                   {formatFte(row.fte)}
                 </td>
+                <td className="staff-col-metric">{formatCurrentFte(row.total_hours)}</td>
                 <td className="staff-col-metric">{formatHours(row.lecturing_hours)}</td>
                 <td className="staff-col-metric staff-col-metric-highlight">
                   {formatHours(row.in_class_timetabled_hours)}
@@ -358,6 +371,9 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
                   title={row.session_schedule_avg ?? undefined}
                 >
                   {row.session_schedule_avg ?? "—"}
+                </td>
+                <td className="staff-col-metric staff-col-metric-highlight">
+                  {formatHours(row.total_hours)}
                 </td>
                 <td className="staff-col-metric staff-col-variance">
                   <VarianceBadge value={row.variance} category={row.variance_category} />
@@ -379,9 +395,6 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
                 </td>
                 <td className="staff-col-meta">{formatOptionalNum(row.tae_hours)}</td>
                 <td className="staff-col-meta">{formatOptionalNum(row.supervision_hours)}</td>
-                <td className="staff-col-metric staff-col-metric-highlight">
-                  {formatHours(row.total_hours)}
-                </td>
                 <td className="staff-col-meta">
                   {row.non_teaching_day != null &&
                   row.non_teaching_day >= 0 &&
@@ -398,7 +411,7 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
             ))}
             {!loading && !filtered.length && (
               <tr>
-                <td colSpan={19} className="staff-hours-empty">
+                <td colSpan={20} className="staff-hours-empty">
                   {rows.length
                     ? search.trim() || varianceFilter !== "all"
                       ? "No lecturers match the current filters."
