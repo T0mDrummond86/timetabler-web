@@ -58,6 +58,12 @@ function formatCurrentFte(total: number | null | undefined): string {
   return Math.min(1, total / 21).toFixed(2);
 }
 
+/** Lecturing hours, rounded to the nearest 0.5. */
+function formatLecturingHours(v: number | null | undefined): string {
+  if (v == null || Number.isNaN(v)) return "—";
+  return (Math.round(v * 2) / 2).toFixed(1);
+}
+
 function parseBulkOnlineLines(detail: string | null): string[] {
   if (!detail || detail === "—") return [];
   return detail
@@ -362,7 +368,7 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
                   {formatFte(row.fte)}
                 </td>
                 <td className="staff-col-metric">{formatCurrentFte(row.total_hours)}</td>
-                <td className="staff-col-metric">{formatHours(row.lecturing_hours)}</td>
+                <td className="staff-col-metric">{formatLecturingHours(row.lecturing_hours)}</td>
                 <td className="staff-col-metric staff-col-metric-highlight">
                   {formatHours(row.in_class_timetabled_hours)}
                 </td>
