@@ -30,11 +30,24 @@ function escapeHtml(s: string): string {
 
 const FONT = "font-family:Arial,sans-serif;font-size:12px;";
 
+/** "T1"/"T2" for a class that runs one term only — matches the placecard badge.
+ *  Empty when it runs both terms (or the flags aren't set). */
+function termLabel(b: BookingCard): string {
+  const t1 = Boolean(b.in_term_1);
+  const t2 = Boolean(b.in_term_2);
+  if (t1 === t2) return "";
+  return t1 ? "T1" : "T2";
+}
+
 function cellContent(block: Block): string {
   return block.bookings
     .map((b) => {
+      const term = termLabel(b);
       const lines = [
-        `<strong>${escapeHtml(b.unit_name ?? b.course_code ?? "Class")}</strong>`,
+        `<strong>${escapeHtml(b.unit_name ?? b.course_code ?? "Class")}</strong>` +
+          (term
+            ? ` <span style="font-weight:bold;color:#b45309;">(${escapeHtml(term)} only)</span>`
+            : ""),
         escapeHtml(`${slotToTimeLabel(b.start_slot)} – ${slotToTimeLabel(b.end_slot)}`),
       ];
       if (b.staff_name) lines.push(escapeHtml(b.staff_name));
@@ -95,9 +108,11 @@ export async function copyTimetableGrid(grid: TimetableGrid, title: string): Pro
     plainLines.push(`${day.label}:`);
     for (const bl of day.blocks) {
       for (const b of bl.bookings) {
+        const term = termLabel(b);
+        const name = b.unit_name ?? b.course_code ?? "Class";
         plainLines.push(
           `  ${slotToTimeLabel(b.start_slot)} – ${slotToTimeLabel(b.end_slot)}  ` +
-            [b.unit_name ?? b.course_code ?? "Class", b.staff_name, b.room_code]
+            [term ? `${name} (${term} only)` : name, b.staff_name, b.room_code]
               .filter(Boolean)
               .join(" — "),
         );
