@@ -704,6 +704,7 @@ class ChangeLogRowOut(BaseModel):
     note: str = ""
     row: dict[str, str]
     removed: bool = False
+    lecturers: list[str] = []
 
 
 class ChangeLogListOut(BaseModel):

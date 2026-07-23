@@ -23,6 +23,10 @@ class ChangeLogDisplayRow:
     # still appears in the log (shown with a "removed" status) but no longer
     # contributes a highlight.
     removed: bool = False
+    # Every lecturer this change touches — the staff (and co-teacher) on the
+    # booking before and after. Populated even when the change itself wasn't a
+    # lecturer swap, so a room or time move still names who has to be told.
+    lecturers: tuple[str, ...] = ()
 
 
 def is_timetabling_change_log_entry(entry: ChangeLogEntry) -> bool:
@@ -71,6 +75,67 @@ def _manual_display_row(entry: ChangeLogEntry) -> ChangeLogDisplayRow | None:
         note=notes.get(bid, ""),
         removed=payload.get("manual_removed") is True,
     )
+
+
+def _staff_ids_from_states(*states: dict | None) -> set[int]:
+    """Staff and co-teacher ids referenced by any of the given booking states."""
+    out: set[int] = set()
+    for state in states:
+        if not state:
+            continue
+        for key in ("staff_id", "sfs_co_teacher_staff_id"):
+            try:
+                sid = int(state.get(key) or 0)
+            except (TypeError, ValueError):
+                continue
+            if sid:
+                out.add(sid)
+    return out
+
+
+def _booking_staff_ids(session: Session, booking_ids: set[int]) -> dict[int, set[int]]:
+    """Current staff/co-teacher ids per booking — used for manual records, which
+    store a display row rather than before/after snapshots."""
+    out: dict[int, set[int]] = {}
+    real = [b for b in booking_ids if b and b > 0]
+    if not real:
+        return out
+    for b in session.query(Booking).filter(Booking.id.in_(real)).all():
+        out[b.id] = _staff_ids_from_states(
+            {
+                "staff_id": b.staff_id,
+                "sfs_co_teacher_staff_id": getattr(b, "sfs_co_teacher_staff_id", None),
+            }
+        )
+    return out
+
+
+def _with_lecturer_names(
+    session: Session,
+    rows: list[ChangeLogDisplayRow],
+    staff_id_sets: list[set[int]],
+) -> list[ChangeLogDisplayRow]:
+    """Resolve the collected staff ids to names in one query and attach them."""
+    from dataclasses import replace
+
+    from .booking_snapshots import _name_lookup
+    from .models import Staff
+
+    all_ids: set[int | None] = set()
+    for ids in staff_id_sets:
+        all_ids |= set(ids)
+    names = _name_lookup(session, Staff, all_ids)
+    out: list[ChangeLogDisplayRow] = []
+    for row, ids in zip(rows, staff_id_sets):
+        labels = sorted(
+            {
+                name
+                for sid in ids
+                if (name := names.get(sid)) and name not in ("—", "?")
+            }
+        )
+        out.append(replace(row, lecturers=tuple(labels)))
+    return out
 
 
 def _removed_net_booking_ids(session: Session, timetable_session_id: int) -> set[int]:
@@ -341,6 +406,7 @@ def gather_timetabling_change_log_display_rows(
                     latest_note_for_bid[bid] = notes[bid]
         removed_net = _removed_net_booking_ids(session, timetable_session_id)
         out: list[ChangeLogDisplayRow] = []
+        staff_ids: list[set[int]] = []
         for i, row in enumerate(rows):
             bid = bids[i] if i < len(bids) else -1
             out.append(
@@ -354,12 +420,15 @@ def gather_timetabling_change_log_display_rows(
                     removed=bid in removed_net,
                 )
             )
+            staff_ids.append(_staff_ids_from_states(before_map.get(bid), after_map.get(bid)))
         # Manual records always surface on the resolved view, even when the
         # booking's tracked state shows no net change.
-        for e in entries:
-            manual = _manual_display_row(e)
-            if manual is not None:
-                out.append(manual)
+        manual_rows = [r for r in (_manual_display_row(e) for e in entries) if r is not None]
+        manual_staff = _booking_staff_ids(session, {r.booking_id for r in manual_rows})
+        for manual in manual_rows:
+            out.append(manual)
+            staff_ids.append(manual_staff.get(manual.booking_id, set()))
+        out = _with_lecturer_names(session, out, staff_ids)
         # Order the whole resolved view newest-first. Each resolution is keyed by
         # the most recent change that produced it: net rows use the latest change
         # touching that booking; manual rows use their own entry.
@@ -367,6 +436,8 @@ def gather_timetabling_change_log_display_rows(
         return out
 
     out: list[ChangeLogDisplayRow] = []
+    staff_ids: list[set[int]] = []
+    manual_pending: list[int] = []
     entries = (
         session.query(ChangeLogEntry)
         .filter(ChangeLogEntry.timetable_session_id == timetable_session_id)
@@ -377,6 +448,9 @@ def gather_timetabling_change_log_display_rows(
         manual = _manual_display_row(e)
         if manual is not None:
             out.append(manual)
+            # Resolved from the live booking once every entry has been walked.
+            manual_pending.append(len(staff_ids))
+            staff_ids.append(set())
             continue
         if not is_timetabling_change_log_entry(e):
             continue
@@ -405,7 +479,11 @@ def gather_timetabling_change_log_display_rows(
                     note=notes.get(bid, ""),
                 )
             )
-    return out
+            staff_ids.append(_staff_ids_from_states(before.get(bid), after.get(bid)))
+    manual_staff = _booking_staff_ids(session, {out[i].booking_id for i in manual_pending})
+    for i in manual_pending:
+        staff_ids[i] = manual_staff.get(out[i].booking_id, set())
+    return _with_lecturer_names(session, out, staff_ids)
 
 
 def set_change_log_note(

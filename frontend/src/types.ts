@@ -207,6 +207,8 @@ export type ChangeLogRow = {
   entry_id: number | null;
   note: string;
   removed?: boolean;
+  /** Every lecturer this change touches, whether or not the lecturer changed. */
+  lecturers?: string[];
   row: {
     id?: string;
     group?: string;

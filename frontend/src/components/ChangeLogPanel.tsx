@@ -2,7 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import type { ChangeLogRow } from "../types";
 import { useConfirmPrompt } from "../hooks/useConfirmPrompt";
-import { copyChangeLogRow, copyChangeLogRows } from "../lib/changeLogClipboard";
+import {
+  copyChangeLogLecturerTable,
+  copyChangeLogRow,
+  copyChangeLogRows,
+} from "../lib/changeLogClipboard";
 
 const ACTION_COLOURS: Record<string, string> = {
   change: "#0c4a6e",
@@ -20,7 +24,8 @@ type Props = {
 };
 
 export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onRollback }: Props) {
-  const [resolved, setResolved] = useState(false);
+  // Resolved (net change per booking) is the view people actually work from.
+  const [resolved, setResolved] = useState(true);
   const [rows, setRows] = useState<ChangeLogRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +52,15 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
     try {
       await copyChangeLogRows(rows);
       flashCopied("all");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Copy failed");
+    }
+  }
+
+  async function copyByLecturer() {
+    try {
+      await copyChangeLogLecturerTable(rows);
+      flashCopied("lecturers");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Copy failed");
     }
@@ -179,6 +193,17 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
         >
           {copied === "all" ? "Copied ✓" : "Copy all"}
         </button>
+        {resolved && (
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={!rows.some((r) => !r.removed)}
+            title="Copy the active changes as a table naming every lecturer each change affects"
+            onClick={() => void copyByLecturer()}
+          >
+            {copied === "lecturers" ? "Copied ✓" : "Copy with lecturers"}
+          </button>
+        )}
       </div>
 
       {error && <div className="error-banner" style={{ margin: "0 1rem 0.75rem" }}>{error}</div>}
