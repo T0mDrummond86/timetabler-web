@@ -27,6 +27,10 @@ class ChangeLogDisplayRow:
     # booking before and after. Populated even when the change itself wasn't a
     # lecturer swap, so a room or time move still names who has to be told.
     lecturers: tuple[str, ...] = ()
+    # The booking as it now stands: lecturer/time/day/room keys, always filled.
+    # ``row`` only carries the fields that changed, so this is what a
+    # notification needs — the full class detail, not just the delta.
+    current: dict[str, str] | None = None
 
 
 def is_timetabling_change_log_entry(entry: ChangeLogEntry) -> bool:
@@ -110,12 +114,82 @@ def _booking_staff_ids(session: Session, booking_ids: set[int]) -> dict[int, set
     return out
 
 
+CURRENT_KEYS = ("lecturer", "time", "day", "room")
+
+
+def _current_from_states(
+    session: Session, states: list[dict | None]
+) -> list[dict[str, str]]:
+    """Render each booking's standing lecturer/time/day/room, resolving names in
+    one query. A deleted booking falls back to its last known state."""
+    from ..constants import DAYS
+    from .booking_snapshots import _name_lookup, _slot_to_str
+    from .models import Room, Staff
+
+    staff_ids: set[int | None] = set()
+    room_ids: set[int | None] = set()
+    for state in states:
+        if state:
+            staff_ids.add(state.get("staff_id"))
+            room_ids.add(state.get("room_id"))
+    staff = _name_lookup(session, Staff, staff_ids)
+    rooms = _name_lookup(session, Room, room_ids)
+
+    out: list[dict[str, str]] = []
+    for state in states:
+        if not state:
+            out.append({key: "" for key in CURRENT_KEYS})
+            continue
+        try:
+            day = DAYS[int(state.get("day", -1))]
+        except (IndexError, TypeError, ValueError):
+            day = ""
+        try:
+            time = (
+                f"{_slot_to_str(int(state['start_slot']))}"
+                f"–{_slot_to_str(int(state['end_slot']))}"
+            )
+        except (KeyError, TypeError, ValueError):
+            time = ""
+        lecturer = staff.get(state.get("staff_id"), "")
+        room = rooms.get(state.get("room_id"), "")
+        out.append(
+            {
+                "lecturer": "" if lecturer in ("—", "?") else lecturer,
+                "time": time,
+                "day": day,
+                "room": "" if room in ("—", "?") else room,
+            }
+        )
+    return out
+
+
+def _booking_states(session: Session, booking_ids: set[int]) -> dict[int, dict]:
+    """Live state for bookings that still exist — used for manual records, which
+    store a display row rather than before/after snapshots."""
+    out: dict[int, dict] = {}
+    real = [b for b in booking_ids if b and b > 0]
+    if not real:
+        return out
+    for b in session.query(Booking).filter(Booking.id.in_(real)).all():
+        out[b.id] = {
+            "staff_id": b.staff_id,
+            "room_id": b.room_id,
+            "day": b.day,
+            "start_slot": b.start_slot,
+            "end_slot": b.end_slot,
+        }
+    return out
+
+
 def _with_lecturer_names(
     session: Session,
     rows: list[ChangeLogDisplayRow],
     staff_id_sets: list[set[int]],
+    current_states: list[dict | None],
 ) -> list[ChangeLogDisplayRow]:
-    """Resolve the collected staff ids to names in one query and attach them."""
+    """Resolve the collected staff ids to names in one query and attach them,
+    along with each booking's standing lecturer/time/day/room."""
     from dataclasses import replace
 
     from .booking_snapshots import _name_lookup
@@ -125,8 +199,9 @@ def _with_lecturer_names(
     for ids in staff_id_sets:
         all_ids |= set(ids)
     names = _name_lookup(session, Staff, all_ids)
+    currents = _current_from_states(session, current_states)
     out: list[ChangeLogDisplayRow] = []
-    for row, ids in zip(rows, staff_id_sets):
+    for row, ids, current in zip(rows, staff_id_sets, currents):
         labels = sorted(
             {
                 name
@@ -134,7 +209,7 @@ def _with_lecturer_names(
                 if (name := names.get(sid)) and name not in ("—", "?")
             }
         )
-        out.append(replace(row, lecturers=tuple(labels)))
+        out.append(replace(row, lecturers=tuple(labels), current=current))
     return out
 
 
@@ -407,6 +482,7 @@ def gather_timetabling_change_log_display_rows(
         removed_net = _removed_net_booking_ids(session, timetable_session_id)
         out: list[ChangeLogDisplayRow] = []
         staff_ids: list[set[int]] = []
+        current_states: list[dict | None] = []
         for i, row in enumerate(rows):
             bid = bids[i] if i < len(bids) else -1
             out.append(
@@ -421,14 +497,20 @@ def gather_timetabling_change_log_display_rows(
                 )
             )
             staff_ids.append(_staff_ids_from_states(before_map.get(bid), after_map.get(bid)))
+            # "After" is where the booking now stands; a deleted one falls back
+            # to its last known state.
+            current_states.append(after_map.get(bid) or before_map.get(bid))
         # Manual records always surface on the resolved view, even when the
         # booking's tracked state shows no net change.
         manual_rows = [r for r in (_manual_display_row(e) for e in entries) if r is not None]
-        manual_staff = _booking_staff_ids(session, {r.booking_id for r in manual_rows})
+        manual_bids = {r.booking_id for r in manual_rows}
+        manual_staff = _booking_staff_ids(session, manual_bids)
+        manual_states = _booking_states(session, manual_bids)
         for manual in manual_rows:
             out.append(manual)
             staff_ids.append(manual_staff.get(manual.booking_id, set()))
-        out = _with_lecturer_names(session, out, staff_ids)
+            current_states.append(manual_states.get(manual.booking_id))
+        out = _with_lecturer_names(session, out, staff_ids, current_states)
         # Order the whole resolved view newest-first. Each resolution is keyed by
         # the most recent change that produced it: net rows use the latest change
         # touching that booking; manual rows use their own entry.
@@ -437,6 +519,7 @@ def gather_timetabling_change_log_display_rows(
 
     out: list[ChangeLogDisplayRow] = []
     staff_ids: list[set[int]] = []
+    current_states: list[dict | None] = []
     manual_pending: list[int] = []
     entries = (
         session.query(ChangeLogEntry)
@@ -451,6 +534,7 @@ def gather_timetabling_change_log_display_rows(
             # Resolved from the live booking once every entry has been walked.
             manual_pending.append(len(staff_ids))
             staff_ids.append(set())
+            current_states.append(None)
             continue
         if not is_timetabling_change_log_entry(e):
             continue
@@ -480,10 +564,14 @@ def gather_timetabling_change_log_display_rows(
                 )
             )
             staff_ids.append(_staff_ids_from_states(before.get(bid), after.get(bid)))
-    manual_staff = _booking_staff_ids(session, {out[i].booking_id for i in manual_pending})
+            current_states.append(after.get(bid) or before.get(bid))
+    manual_bids = {out[i].booking_id for i in manual_pending}
+    manual_staff = _booking_staff_ids(session, manual_bids)
+    manual_states = _booking_states(session, manual_bids)
     for i in manual_pending:
         staff_ids[i] = manual_staff.get(out[i].booking_id, set())
-    return _with_lecturer_names(session, out, staff_ids)
+        current_states[i] = manual_states.get(out[i].booking_id)
+    return _with_lecturer_names(session, out, staff_ids, current_states)
 
 
 def set_change_log_note(

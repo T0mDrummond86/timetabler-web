@@ -48,6 +48,7 @@ def list_change_log_rows(
             "row": r.row,
             "removed": r.removed,
             "lecturers": list(r.lecturers),
+            "current": r.current or {},
         }
         for r in rows
     ]

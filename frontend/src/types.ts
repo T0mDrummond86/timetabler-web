@@ -209,6 +209,13 @@ export type ChangeLogRow = {
   removed?: boolean;
   /** Every lecturer this change touches, whether or not the lecturer changed. */
   lecturers?: string[];
+  /** The booking as it now stands — filled in even for fields that didn't change. */
+  current?: {
+    lecturer?: string;
+    time?: string;
+    day?: string;
+    room?: string;
+  };
   row: {
     id?: string;
     group?: string;

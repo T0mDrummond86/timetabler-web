@@ -97,10 +97,21 @@ const LECTURER_HEADERS = [
  */
 export async function copyChangeLogLecturerTable(rows: ChangeLogRow[]): Promise<number> {
   const active = rows.filter((r) => !r.removed);
-  const data = active.map((r) => ({
-    lecturers: (r.lecturers ?? []).join(", "),
-    ...fieldsOf(r),
-  }));
+  // Show the class as it now stands, not just the delta — a room move should
+  // still tell the reader the lecturer, time and day. Fall back to the change
+  // text when the standing state is unavailable (e.g. a deleted booking).
+  const data = active.map((r) => {
+    const f = fieldsOf(r);
+    const now = r.current ?? {};
+    return {
+      ...f,
+      lecturers: (r.lecturers ?? []).join(", "),
+      lecturer: now.lecturer || f.lecturer,
+      time: now.time || f.time,
+      day: now.day || f.day,
+      room: now.room || f.room,
+    };
+  });
   const hasNote = data.some((f) => f.note.trim() !== "");
   const headers = hasNote ? [...LECTURER_HEADERS, "Note"] : [...LECTURER_HEADERS];
   const cells = (f: (typeof data)[number]): string[] => {
