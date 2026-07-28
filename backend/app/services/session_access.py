@@ -65,6 +65,20 @@ def effective_level(db: Session, user: User, session_id: int) -> str:
     if created_by_id is not None and created_by_id == user.id:
         return ACCESS_EDIT
 
+    # ...and the owner of a workspace keeps control of everything inside it,
+    # so they can never lock themselves out of what they administer.
+    owner_row = (
+        db.query(GlobalSession.created_by_id)
+        .join(
+            GlobalSessionMember,
+            GlobalSessionMember.global_session_id == GlobalSession.id,
+        )
+        .filter(GlobalSessionMember.timetable_session_id == session_id)
+        .first()
+    )
+    if owner_row and owner_row[0] is not None and owner_row[0] == user.id:
+        return ACCESS_EDIT
+
     grant = (
         db.query(SessionUserAccess.level)
         .filter(
@@ -107,21 +121,25 @@ def assert_can_edit_session(db: Session, user: User, session_id: int) -> None:
         )
 
 
-def can_manage_access(db: Session, user: User, global_session_id: int) -> bool:
-    """Platform admins, org owners, and the group's creator manage access."""
-    if user.is_admin:
-        return True
+def global_session_owner_id(db: Session, global_session_id: int) -> int | None:
     row = (
-        db.query(GlobalSession.organization_id, GlobalSession.created_by_id)
+        db.query(GlobalSession.created_by_id)
         .filter(GlobalSession.id == global_session_id)
         .first()
     )
-    if row is None:
-        return False
-    organization_id, created_by_id = row
-    if created_by_id is not None and created_by_id == user.id:
+    return row[0] if row else None
+
+
+def can_manage_access(db: Session, user: User, global_session_id: int) -> bool:
+    """Only the workspace's owner — the person who created it — sets access.
+
+    Platform admins keep a break-glass path so a workspace can still be
+    recovered if its owner leaves or is deactivated.
+    """
+    if user.is_admin:
         return True
-    return _org_role(db, user, organization_id) == "owner"
+    owner_id = global_session_owner_id(db, global_session_id)
+    return owner_id is not None and owner_id == user.id
 
 
 def assert_can_manage_access(db: Session, user: User, global_session_id: int) -> None:

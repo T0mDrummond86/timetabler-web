@@ -87,6 +87,8 @@ export type UserAccessRow = {
 export type GlobalAccessMatrix = {
   global_session_id: number;
   can_manage: boolean;
+  /** The workspace's owner (its creator) — the only person who sets access. */
+  owner_user_id: number | null;
   sessions: { id: number; name: string; created_by_id: number | null }[];
   users: UserAccessRow[];
 };
@@ -1209,6 +1211,16 @@ export const api = {
     apiFetch<{ ok: boolean }>(`/sessions/${sessionId}/staff/${staffId}/online-students`, {
       method: "PUT",
       body: JSON.stringify({ counts }),
+    }),
+
+  inviteToWorkspace: (globalSessionId: number, userId: number) =>
+    apiFetch<{ ok: boolean }>(`/global-sessions/${globalSessionId}/users/${userId}`, {
+      method: "POST",
+    }),
+
+  removeFromWorkspace: (globalSessionId: number, userId: number) =>
+    apiFetch<{ ok: boolean }>(`/global-sessions/${globalSessionId}/users/${userId}`, {
+      method: "DELETE",
     }),
 
   accessMatrix: (globalSessionId: number) =>

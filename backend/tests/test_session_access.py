@@ -259,10 +259,88 @@ def test_editor_keeps_editing(env):
 # ------------------------------------------------------------- management
 
 
-def test_can_manage_access_authority(env):
-    assert can_manage_access(env.db, env.admin, env.group.id) is True
-    assert can_manage_access(env.db, env.owner, env.group.id) is True  # creator + owner
+def test_only_the_workspace_creator_and_admins_manage_access(env):
+    # env.owner created the workspace, so they administer it.
+    assert can_manage_access(env.db, env.owner, env.group.id) is True
+    assert can_manage_access(env.db, env.admin, env.group.id) is True  # break-glass
     assert can_manage_access(env.db, env.alice, env.group.id) is False
+
+
+def test_org_owner_role_alone_does_not_grant_management(env):
+    """Being an org owner is no longer enough — you must own the workspace."""
+    from timetable.core.tenancy_models import GlobalSession
+
+    other = GlobalSession(
+        organization_id=env.org.id, name="Group 2", created_by_id=env.alice.id
+    )
+    env.db.add(other)
+    env.db.commit()
+    assert can_manage_access(env.db, env.alice, other.id) is True
+    assert can_manage_access(env.db, env.owner, other.id) is False
+
+
+def test_workspace_owner_keeps_edit_on_sessions_they_do_not_own(env):
+    """The owner administers the workspace, so they can never be locked out."""
+    env.set_session_level(env.owner, env.sess_a.id, ACCESS_READ_ONLY)
+    assert effective_level(env.db, env.owner, env.sess_a.id) == ACCESS_EDIT
+
+
+def test_owner_invites_and_removes_a_user(env):
+    fresh = env._user("nina", role="editor")
+    env.db.commit()
+    assert effective_level(env.db, fresh, env.sess_a.id) == ACCESS_EDIT  # org editor
+
+    res = env.client.post(
+        f"/global-sessions/{env.group.id}/users/{fresh.id}",
+        headers=env.headers(env.owner),
+    )
+    assert res.status_code == 200, res.text
+
+    # Set them read-only, then remove them: the override goes too.
+    env.client.put(
+        f"/sessions/{env.sess_a.id}/access-levels/{fresh.id}",
+        json={"level": ACCESS_READ_ONLY},
+        headers=env.headers(env.owner),
+    )
+    env.db.expire_all()
+    assert effective_level(env.db, fresh, env.sess_a.id) == ACCESS_READ_ONLY
+
+    res = env.client.delete(
+        f"/global-sessions/{env.group.id}/users/{fresh.id}",
+        headers=env.headers(env.owner),
+    )
+    assert res.status_code == 200, res.text
+    env.db.expire_all()
+    assert (
+        env.db.query(SessionUserAccess)
+        .filter(SessionUserAccess.user_id == fresh.id)
+        .count()
+        == 0
+    )
+
+
+def test_non_owner_cannot_invite(env):
+    res = env.client.post(
+        f"/global-sessions/{env.group.id}/users/{env.viewer.id}",
+        headers=env.headers(env.alice),
+    )
+    assert res.status_code == 403, res.text
+
+
+def test_the_owner_cannot_be_removed_from_their_own_workspace(env):
+    res = env.client.delete(
+        f"/global-sessions/{env.group.id}/users/{env.owner.id}",
+        headers=env.headers(env.owner),
+    )
+    assert res.status_code == 422, res.text
+
+
+def test_matrix_reports_the_owner(env):
+    res = env.client.get(
+        f"/global-sessions/{env.group.id}/access-levels", headers=env.headers(env.owner)
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["owner_user_id"] == env.owner.id
 
 
 def test_non_manager_cannot_set_levels(env):

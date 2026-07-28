@@ -1100,5 +1100,7 @@ class UserAccessRowOut(BaseModel):
 class GlobalAccessMatrixOut(BaseModel):
     global_session_id: int
     can_manage: bool
+    # The workspace's owner (its creator) — the only person who sets access.
+    owner_user_id: int | None = None
     sessions: list[dict]
     users: list[UserAccessRowOut]

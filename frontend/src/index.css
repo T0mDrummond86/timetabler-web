@@ -4820,6 +4820,25 @@ body.staff-editor-resizing {
   font-size: 0.74rem;
 }
 
+.access-invite {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border, #e2e7ef);
+}
+
+.access-invite-label {
+  display: block;
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin-bottom: 0.4rem;
+}
+
+.access-invite-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
 .access-pill {
   display: inline-block;
   padding: 0.12rem 0.5rem;

@@ -2,7 +2,9 @@
 
 Unlike the admin-only grant endpoints in ``admin.py`` (which decide *whether*
 someone can see a workspace), these set *what they can do* — group-wide and per
-individual session. Open to platform admins, org owners, and the group creator.
+individual session, and manage who belongs to the workspace at all.
+Only the workspace's owner (its creator) may change these; platform admins
+keep a break-glass path so an orphaned workspace stays recoverable.
 """
 from __future__ import annotations
 
@@ -12,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from timetable.core.tenancy_models import (
+    ACCESS_EDIT,
     ACCESS_LEVELS,
     GlobalSessionMember,
     GlobalSessionUserAccess,
@@ -29,7 +32,11 @@ from ..schemas import (
     UserAccessRowOut,
 )
 from ..services.global_access import assert_global_user_access
-from ..services.session_access import assert_can_manage_access, can_manage_access
+from ..services.session_access import (
+    assert_can_manage_access,
+    can_manage_access,
+    global_session_owner_id,
+)
 
 router = APIRouter(tags=["access"])
 
@@ -111,6 +118,7 @@ def get_access_matrix(
     return GlobalAccessMatrixOut(
         global_session_id=global_session_id,
         can_manage=can_manage_access(db, ctx.user, global_session_id),
+        owner_user_id=global_session_owner_id(db, global_session_id),
         sessions=[
             {
                 "id": s.id,
@@ -132,6 +140,89 @@ def get_access_matrix(
             for membership, user in members
         ],
     )
+
+
+@router.post("/global-sessions/{global_session_id}/users/{user_id}")
+def invite_user(
+    global_session_id: int,
+    user_id: int,
+    ctx: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    """Add an existing account in this organisation to the workspace."""
+    assert_can_manage_access(db, ctx.user, global_session_id)
+    target = db.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    in_org = (
+        db.query(Membership)
+        .filter(
+            Membership.user_id == user_id,
+            Membership.organization_id == ctx.organization.id,
+        )
+        .first()
+    )
+    if in_org is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="That user is not in this organisation",
+        )
+    existing = (
+        db.query(GlobalSessionUserAccess)
+        .filter(
+            GlobalSessionUserAccess.global_session_id == global_session_id,
+            GlobalSessionUserAccess.user_id == user_id,
+        )
+        .first()
+    )
+    if existing is None:
+        db.add(
+            GlobalSessionUserAccess(
+                global_session_id=global_session_id,
+                user_id=user_id,
+                level=ACCESS_EDIT,
+                granted_by_id=ctx.user.id,
+                granted_at=_dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
+            )
+        )
+        db.commit()
+    return {"ok": True, "level": ACCESS_EDIT}
+
+
+@router.delete("/global-sessions/{global_session_id}/users/{user_id}")
+def remove_user(
+    global_session_id: int,
+    user_id: int,
+    ctx: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    """Remove someone from the workspace, including any per-session overrides."""
+    assert_can_manage_access(db, ctx.user, global_session_id)
+    if user_id == global_session_owner_id(db, global_session_id):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The workspace owner cannot be removed",
+        )
+    (
+        db.query(GlobalSessionUserAccess)
+        .filter(
+            GlobalSessionUserAccess.global_session_id == global_session_id,
+            GlobalSessionUserAccess.user_id == user_id,
+        )
+        .delete()
+    )
+    session_ids = _group_session_ids(db, global_session_id)
+    if session_ids:
+        (
+            db.query(SessionUserAccess)
+            .filter(
+                SessionUserAccess.timetable_session_id.in_(session_ids),
+                SessionUserAccess.user_id == user_id,
+            )
+            .delete(synchronize_session=False)
+        )
+    db.commit()
+    return {"ok": True}
 
 
 @router.put("/global-sessions/{global_session_id}/access-levels/{user_id}")
