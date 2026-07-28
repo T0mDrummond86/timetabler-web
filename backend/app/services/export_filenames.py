@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import re
+import unicodedata
+from urllib.parse import quote
 
 from sqlalchemy.orm import Session
 
@@ -9,6 +11,44 @@ from timetable.core.tenancy_models import TimetableSession
 
 _INVALID_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 _COLLAPSE_WHITESPACE = re.compile(r"\s+")
+
+# Punctuation that people routinely paste into session names but which has no
+# latin-1 equivalent. Mapped to plain ASCII for the fallback filename.
+_ASCII_LOOKALIKES = str.maketrans(
+    {
+        "—": "-",  # em dash
+        "–": "-",  # en dash
+        "‒": "-",
+        "‐": "-",
+        "‘": "'",
+        "’": "'",
+        "“": '"',
+        "”": '"',
+        "…": "...",
+        " ": " ",
+    }
+)
+
+
+def content_disposition(filename: str) -> str:
+    """Build an attachment header that survives non-ASCII session names.
+
+    HTTP headers are latin-1 encoded, so a name like "Term 1 — Cyber" would
+    raise UnicodeEncodeError on send. Per RFC 6266 we emit an ASCII-safe
+    ``filename`` for old clients plus a UTF-8 ``filename*`` that every current
+    browser prefers, so the download keeps its real name.
+    """
+    ascii_name = filename.translate(_ASCII_LOOKALIKES)
+    ascii_name = unicodedata.normalize("NFKD", ascii_name)
+    ascii_name = ascii_name.encode("ascii", "ignore").decode("ascii")
+    ascii_name = ascii_name.replace('"', "").replace("\\", "")
+    ascii_name = _COLLAPSE_WHITESPACE.sub(" ", ascii_name).strip()
+    if not ascii_name or ascii_name.startswith("."):
+        ascii_name = f"export{ascii_name}" if ascii_name else "export"
+    return (
+        f'attachment; filename="{ascii_name}"; '
+        f"filename*=UTF-8''{quote(filename, safe='')}"
+    )
 
 
 def timetable_session_name(db: Session, timetable_session_id: int) -> str:

@@ -11,7 +11,7 @@ from ..auth.deps import AuthContext, require_editor, require_session_editor
 from ..config import settings
 from ..database import get_db
 from ..schemas import ImportReportOut, TimetablePrintInfoOut, TimetablePrintRequest
-from ..services.export_filenames import session_export_filename
+from ..services.export_filenames import content_disposition, session_export_filename
 from ..services.session_import_export import (
     cleanup_temp,
     export_json,
@@ -49,7 +49,7 @@ def _file_response(content: bytes, filename: str, media_type: str) -> Response:
     return Response(
         content=content,
         media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": content_disposition(filename)},
     )
 
 
@@ -271,7 +271,7 @@ def export_session_json(
     return Response(
         content=body,
         media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": content_disposition(filename)},
     )
 
 
