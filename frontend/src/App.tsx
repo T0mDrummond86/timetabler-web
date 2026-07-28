@@ -1,13 +1,26 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { FormEvent, useEffect, useState } from "react";
 import { api, getToken, setToken } from "./api";
 import { AppShell } from "./components/AppShell";
-import { AdminPage } from "./pages/AdminPage";
 import { ChangePasswordPage } from "./pages/ChangePasswordPage";
-import { DashboardPage } from "./pages/DashboardPage";
-import { GlobalSessionPage } from "./pages/GlobalSessionPage";
-import { TimetablePage } from "./pages/TimetablePage";
-import { TimetableSplitPage } from "./pages/TimetableSplitPage";
+
+// Every heavy page is code-split, so a phone opening /m downloads the mobile
+// viewer and the shell — never the desktop timetable editor.
+const MobilePage = lazy(() => import("./mobile/MobilePage"));
+const AdminPage = lazy(() => import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })));
+const DashboardPage = lazy(() =>
+  import("./pages/DashboardPage").then((m) => ({ default: m.DashboardPage })),
+);
+const GlobalSessionPage = lazy(() =>
+  import("./pages/GlobalSessionPage").then((m) => ({ default: m.GlobalSessionPage })),
+);
+const TimetablePage = lazy(() =>
+  import("./pages/TimetablePage").then((m) => ({ default: m.TimetablePage })),
+);
+const TimetableSplitPage = lazy(() =>
+  import("./pages/TimetableSplitPage").then((m) => ({ default: m.TimetableSplitPage })),
+);
 
 function LoginForm() {
   const navigate = useNavigate();
@@ -91,17 +104,20 @@ function HomeRedirect() {
 
 export default function App() {
   return (
+    <Suspense fallback={null}>
     <Routes>
       <Route path="/" element={<HomeRedirect />} />
       <Route path="/login" element={<LoginForm />} />
       <Route path="/change-password" element={<ChangePasswordPage />} />
       <Route path="/account/password" element={<ChangePasswordPage voluntary />} />
       <Route path="/register" element={<Navigate to="/login" replace />} />
+      <Route path="/m" element={<MobilePage />} />
       <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/admin" element={<AdminPage />} />
       <Route path="/global/:globalSessionId" element={<GlobalSessionPage />} />
       <Route path="/timetable/:sessionId" element={<TimetablePage />} />
       <Route path="/timetable/:sessionId/split" element={<TimetableSplitPage />} />
     </Routes>
+    </Suspense>
   );
 }

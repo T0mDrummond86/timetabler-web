@@ -25,6 +25,7 @@ import {
 import { LinkedSessionImportPanel } from "../components/LinkedSessionImportPanel";
 import { LoadingMark } from "../components/LoadingMark";
 import { AccessLevelsPanel } from "../components/AccessLevelsPanel";
+import { PhoneAppCard } from "../components/PhoneAppCard";
 import {
   clearGlobalSessionDirty,
   GLOBAL_DIRTY_STORAGE_KEY,
@@ -534,6 +535,8 @@ export function GlobalSessionPage() {
           )}
         </section>
       )}
+
+      {tab === "members" && <PhoneAppCard />}
 
       {tab === "access" && <AccessLevelsPanel globalSessionId={globalSessionId} />}
 

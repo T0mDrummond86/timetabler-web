@@ -4765,6 +4765,65 @@ body.staff-editor-resizing {
   margin-bottom: 0.75rem;
 }
 
+/* ---------------- phone app card ---------------- */
+
+.phone-app-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border, #e2e7ef);
+  border-radius: var(--radius-md, 8px);
+  background: var(--zone-toolbar, #f7f8fb);
+}
+
+.phone-app-text {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.phone-app-text h3 {
+  margin: 0 0 0.3rem;
+  font-size: 1rem;
+}
+
+.phone-app-text p {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+}
+
+.phone-app-text code {
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+  background: var(--panel-bg, #fff);
+  border: 1px solid var(--border, #e2e7ef);
+  font-size: 0.8rem;
+}
+
+.phone-app-steps {
+  margin: 0 0 0.6rem;
+  padding-left: 1.1rem;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.phone-app-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.phone-app-qr {
+  flex: 0 0 auto;
+  line-height: 0;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid var(--border, #e2e7ef);
+  border-radius: var(--radius-md, 8px);
+}
+
 /* ---------------- access levels ---------------- */
 
 .session-access-badge {

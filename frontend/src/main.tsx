@@ -8,6 +8,16 @@ import "./index.css";
 
 applyTheme(getStoredTheme());
 
+// Registered for everyone (it is what makes the mobile viewer installable),
+// but it only caches reads — it can never affect an edit.
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js").catch(() => {
+      /* offline support is a bonus; never block the app on it */
+    });
+  });
+}
+
 const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
