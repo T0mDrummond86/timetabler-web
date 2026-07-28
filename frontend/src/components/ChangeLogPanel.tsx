@@ -8,6 +8,8 @@ import {
   copyChangeLogRows,
 } from "../lib/changeLogClipboard";
 
+const READ_ONLY_TITLE = "Read-only access — you cannot change the log";
+
 const ACTION_COLOURS: Record<string, string> = {
   change: "#0c4a6e",
   undo: "#9a3412",
@@ -21,9 +23,17 @@ type Props = {
   resolveCourseId: (bookingId?: number) => number | null;
   refreshKey?: number;
   onRollback?: () => void;
+  /** False when the user only has read access — annotations still write data. */
+  canEdit?: boolean;
 };
 
-export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onRollback }: Props) {
+export function ChangeLogPanel({
+  sessionId,
+  resolveCourseId,
+  refreshKey = 0,
+  onRollback,
+  canEdit = true,
+}: Props) {
   // Resolved (net change per booking) is the view people actually work from.
   const [resolved, setResolved] = useState(true);
   const [rows, setRows] = useState<ChangeLogRow[]>([]);
@@ -274,8 +284,9 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
                           <input
                             className="note-input"
                             defaultValue={r.note}
-                            placeholder="Add note…"
-                            disabled={savingNote === r.booking_id}
+                            placeholder={canEdit ? "Add note…" : "—"}
+                            disabled={savingNote === r.booking_id || !canEdit}
+                            title={canEdit ? undefined : READ_ONLY_TITLE}
                             onBlur={(e) =>
                               void saveNote(r.entry_id!, r.booking_id!, e.target.value)
                             }
@@ -292,10 +303,13 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
                             type="button"
                             className="btn-secondary"
                             style={{ fontSize: "0.78rem", padding: "0.3rem 0.55rem" }}
+                            disabled={!canEdit}
                             title={
-                              r.removed
-                                ? "Restore this change to the admin-export markup"
-                                : "Remove this change from the admin-export markup (stays logged)"
+                              !canEdit
+                                ? READ_ONLY_TITLE
+                                : r.removed
+                                  ? "Restore this change to the admin-export markup"
+                                  : "Remove this change from the admin-export markup (stays logged)"
                             }
                             onClick={() =>
                               void toggleHighlightRemoved(r.entry_id!, r.booking_id!, !r.removed)
@@ -316,7 +330,8 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
                               type="button"
                               className="btn-secondary"
                               style={{ fontSize: "0.78rem", padding: "0.3rem 0.55rem" }}
-                              title="Delete this hand-written record entirely"
+                              disabled={!canEdit}
+                              title={canEdit ? "Delete this hand-written record entirely" : READ_ONLY_TITLE}
                               onClick={() => void deleteManualEntry(r.entry_id!)}
                             >
                               Delete
@@ -327,7 +342,8 @@ export function ChangeLogPanel({ sessionId, resolveCourseId, refreshKey = 0, onR
                             type="button"
                             className="btn-secondary"
                             style={{ fontSize: "0.78rem", padding: "0.3rem 0.55rem" }}
-                            disabled={rollingBack === r.booking_id}
+                            disabled={rollingBack === r.booking_id || !canEdit}
+                            title={canEdit ? undefined : READ_ONLY_TITLE}
                             onClick={() => void rollback(r.booking_id!)}
                           >
                             {rollingBack === r.booking_id ? "…" : "Rollback"}

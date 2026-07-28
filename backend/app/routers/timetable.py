@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from ..auth.deps import AuthContext, get_auth_context, require_editor
+from ..auth.deps import AuthContext, get_auth_context, require_session_editor
 from ..config import settings
 from ..database import get_db
 from ..schemas import (
@@ -146,7 +146,7 @@ def session_course_semester_schedule(
 def session_toggle_semester_week(
     session_id: int,
     body: SessionWeekToggleRequest,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -268,7 +268,7 @@ def session_room_usage(
 def session_sidebar_order(
     session_id: int,
     body: SidebarOrderRequest,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -289,7 +289,7 @@ def session_sidebar_order(
 def session_create_block(
     session_id: int,
     qualification_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -327,7 +327,7 @@ def session_duplicate_block_group(
     session_id: int,
     course_id: int,
     body: BlockGroupDuplicateRequest,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -345,7 +345,7 @@ def session_duplicate_block_group(
 def session_delete_block_group(
     session_id: int,
     course_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -362,7 +362,7 @@ def session_delete_block_group(
 @router.post("/sessions/{session_id}/seed-demo")
 def seed_demo(
     session_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     """Create sample course + bookings for UI testing (no-op if data already exists)."""

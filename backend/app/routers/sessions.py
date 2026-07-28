@@ -5,9 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from timetable.core.tenancy_models import GlobalSessionMember, TimetableSession
+from timetable.core.tenancy_models import (
+    ACCESS_EDIT,
+    GlobalSessionMember,
+    TimetableSession,
+)
 
-from ..auth.deps import AuthContext, get_auth_context, require_editor
+from ..auth.deps import AuthContext, get_auth_context, require_session_editor
 from ..database import get_db
 from ..schemas import (
     TimetableSessionCreate,
@@ -15,6 +19,7 @@ from ..schemas import (
     TimetableSessionOut,
     TimetableSessionPatch,
 )
+from ..services.session_access import effective_level
 from ..services.session_data import duplicate_timetable_session
 from ..services.session_seed import seed_timetable_session_data
 from ..services.session_stats import session_stats_map
@@ -28,6 +33,7 @@ def _session_out(
     db: Session,
     *,
     stats: dict[str, int] | None = None,
+    ctx: AuthContext | None = None,
 ) -> TimetableSessionOut:
     member = (
         db.query(GlobalSessionMember)
@@ -53,12 +59,17 @@ def _session_out(
         global_session_name=gs_name,
         course_count=counts.get("course_count", 0),
         booking_count=counts.get("booking_count", 0),
+        access_level=(
+            effective_level(db, ctx.user, row.id) if ctx is not None else ACCESS_EDIT
+        ),
     )
 
 
-def _session_out_with_stats(row: TimetableSession, db: Session) -> TimetableSessionOut:
+def _session_out_with_stats(
+    row: TimetableSession, db: Session, ctx: AuthContext | None = None
+) -> TimetableSessionOut:
     stats = session_stats_map(db, [row.id])
-    return _session_out(row, db, stats=stats.get(row.id))
+    return _session_out(row, db, stats=stats.get(row.id), ctx=ctx)
 
 
 def _visible_sessions_query(db: Session, *, org_id: int, ctx: AuthContext):
@@ -104,7 +115,7 @@ def list_sessions(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong organization")
     rows = _visible_sessions_query(db, org_id=org_id, ctx=ctx).order_by(TimetableSession.name).all()
     stats = session_stats_map(db, [r.id for r in rows])
-    return [_session_out(r, db, stats=stats.get(r.id)) for r in rows]
+    return [_session_out(r, db, stats=stats.get(r.id), ctx=ctx) for r in rows]
 
 
 @router.post(
@@ -115,7 +126,7 @@ def list_sessions(
 def create_session(
     org_id: int,
     body: TimetableSessionCreate,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     if ctx.organization.id != org_id:
@@ -146,7 +157,7 @@ def create_session(
     seed_timetable_session_data(db, row)
     db.commit()
     db.refresh(row)
-    return _session_out(row, db)
+    return _session_out(row, db, ctx=ctx)
 
 
 @router.get("/sessions/{session_id}", response_model=TimetableSessionOut)
@@ -155,14 +166,16 @@ def get_session(
     ctx: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
-    return _session_out_with_stats(_session_in_org(db, session_id, ctx.organization.id, ctx), db)
+    return _session_out_with_stats(
+        _session_in_org(db, session_id, ctx.organization.id, ctx), db, ctx
+    )
 
 
 @router.patch("/sessions/{session_id}", response_model=TimetableSessionOut)
 def update_session(
     session_id: int,
     body: TimetableSessionPatch,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     row = _session_in_org(db, session_id, ctx.organization.id, ctx)
@@ -184,7 +197,7 @@ def update_session(
     row.name = name
     db.commit()
     db.refresh(row)
-    return _session_out_with_stats(row, db)
+    return _session_out_with_stats(row, db, ctx)
 
 
 @router.post(
@@ -195,7 +208,7 @@ def update_session(
 def duplicate_session(
     session_id: int,
     body: TimetableSessionDuplicate,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     _session_in_org(db, session_id, ctx.organization.id, ctx)
@@ -210,13 +223,13 @@ def duplicate_session(
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
-    return _session_out_with_stats(row, db)
+    return _session_out_with_stats(row, db, ctx)
 
 
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_session(
     session_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     row = _session_in_org(db, session_id, ctx.organization.id, ctx)

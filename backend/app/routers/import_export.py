@@ -7,7 +7,7 @@ from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, Upload
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from ..auth.deps import AuthContext, require_editor
+from ..auth.deps import AuthContext, require_editor, require_session_editor
 from ..config import settings
 from ..database import get_db
 from ..schemas import ImportReportOut, TimetablePrintInfoOut, TimetablePrintRequest
@@ -73,7 +73,7 @@ async def _upload_to_temp(file: UploadFile, default_suffix: str = ".xlsx") -> st
 async def import_session(
     session_id: int,
     file: UploadFile = File(...),
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     """Restore session from desktop Timetable Export / Admin export (.xlsm/.xlsx)."""
@@ -97,7 +97,7 @@ async def import_session(
 async def import_qualifications(
     session_id: int,
     file: UploadFile = File(...),
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -114,7 +114,7 @@ async def import_qualifications(
 async def import_qualifications_csp(
     session_id: int,
     file: UploadFile = File(...),
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -131,7 +131,7 @@ async def import_qualifications_csp(
 async def import_qualifications_ep_nb_csp(
     session_id: int,
     file: UploadFile = File(...),
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -158,7 +158,7 @@ async def import_qualifications_ep_nb_csp(
 async def import_lecturer_preferences(
     session_id: int,
     file: UploadFile = File(...),
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -175,7 +175,7 @@ async def import_lecturer_preferences(
 async def import_overall_visual(
     session_id: int,
     file: UploadFile = File(...),
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -192,7 +192,7 @@ async def import_overall_visual(
 async def import_admin_visual(
     session_id: int,
     file: UploadFile = File(...),
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -219,7 +219,7 @@ async def import_admin_visual(
 async def import_asc_export(
     session_id: int,
     file: UploadFile = File(...),
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -247,7 +247,7 @@ async def import_asc_export(
 def import_session_json(
     session_id: int,
     payload: dict = Body(...),
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -432,7 +432,7 @@ def print_timetables_info(
 def print_timetables_pdf(
     session_id: int,
     body: TimetablePrintRequest,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     """Render selected course/staff/room timetables as a multi-page PDF (A4 landscape)."""

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from timetable.core.tenancy_models import GlobalSession, GlobalSessionMember, User
 
-from ..auth.deps import AuthContext, get_auth_context, require_admin, require_editor
+from ..auth.deps import AuthContext, get_auth_context, require_admin, require_session_editor
 from ..database import get_db
 from ..config import settings
 from ..schemas import (
@@ -138,7 +138,7 @@ def create_global_session(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Global session {name!r} already exists",
         )
-    row = GlobalSession(organization_id=org_id, name=name)
+    row = GlobalSession(organization_id=org_id, name=name, created_by_id=ctx.user.id)
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -206,7 +206,7 @@ def delete_global_session(
 def put_global_members(
     global_session_id: int,
     body: GlobalSessionMembersPatch,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     row = assert_global_user_access(
@@ -294,7 +294,7 @@ def get_cover_log(
 def add_cover_log_entry(
     global_session_id: int,
     body: CoverLogEntryCreate,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_global_user_access(
@@ -325,7 +325,7 @@ def add_cover_log_entry(
 def remove_cover_log_entry(
     global_session_id: int,
     entry_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_global_user_access(
@@ -353,7 +353,7 @@ def get_calendar(
 async def upload_calendar(
     global_session_id: int,
     file: UploadFile = File(...),
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_global_user_access(
@@ -412,7 +412,7 @@ def linked_import_options(
 def import_from_linked(
     session_id: int,
     body: LinkedSessionImportIn,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     """Copy selected staff and/or qualifications from another session in the same global group."""

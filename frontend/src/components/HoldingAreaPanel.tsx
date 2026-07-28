@@ -11,6 +11,8 @@ type Props = {
   acceptBookingDrop?: boolean;
   onBookingDrop?: (bookingId: number) => void;
   sticky?: boolean;
+  /** False when the user only has read access — dragging would 403. */
+  canEdit?: boolean;
 };
 
 export function HoldingAreaPanel({
@@ -19,6 +21,7 @@ export function HoldingAreaPanel({
   acceptBookingDrop = false,
   onBookingDrop,
   sticky = false,
+  canEdit = true,
 }: Props) {
   const [dropHover, setDropHover] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -103,7 +106,8 @@ export function HoldingAreaPanel({
                 <li key={`${item.unit_id}-${item.session_part}`}>
                   <div
                     className="holding-chip"
-                    draggable
+                    draggable={canEdit}
+                    title={canEdit ? undefined : "Read-only access — you cannot schedule classes"}
                     onDragStart={(e) => {
                       e.dataTransfer.setData(MIME_PENDING, JSON.stringify(item));
                       e.dataTransfer.effectAllowed = "copy";

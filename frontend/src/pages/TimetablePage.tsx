@@ -112,6 +112,9 @@ type ViewState = {
   previewSemesterWeek: number | null;
 };
 
+const READ_ONLY_HINT =
+  "Read-only access to this session — you can view and export, but not make changes";
+
 const SESSION_TABS: { id: SessionTab; label: string; secondary?: boolean }[] = [
   { id: "timetable", label: "Timetable" },
   { id: "warnings", label: "Warnings" },
@@ -1515,7 +1518,11 @@ export function TimetablePage() {
   const courseAdmin = isCourseViewKind(viewKind);
   const activeCourse = courses.find((c) => c.id === courseId);
 
-  const editable = grid ? isGridEditable(viewKind, grid.readonly) : false;
+  // A read-only grant blocks every write; the backend enforces it regardless,
+  // this just keeps the UI honest about what will be accepted.
+  const canEditSession =
+    (sessions.find((s) => s.id === sessionId)?.access_level ?? "edit") === "edit";
+  const editable = grid ? isGridEditable(viewKind, grid.readonly) && canEditSession : false;
 
   const goToWarningBooking = useCallback(
     async (bookingId: number, row: ViolationRow) => {
@@ -1562,6 +1569,14 @@ export function TimetablePage() {
           <Link to="/dashboard">Dashboard</Link>
           <span aria-hidden> / </span>
           {sessionName}
+          {!canEditSession && (
+            <span
+              className="session-access-badge"
+              title="You have read-only access to this session. You can view and export, but not make changes."
+            >
+              Read-only
+            </span>
+          )}
         </>
       }
       title={pageTitle}
@@ -1754,6 +1769,7 @@ export function TimetablePage() {
           onError={setError}
           importing={importing}
           showDisplay={sessionTab === "timetable"}
+          canEdit={canEditSession}
         />
       </div>
       </DropdownGroup>
@@ -1829,10 +1845,22 @@ export function TimetablePage() {
                     e.target.value = "";
                   }}
                 />
-                <button type="button" className="btn-primary" onClick={() => importRef.current?.click()} disabled={importing}>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => importRef.current?.click()}
+                  disabled={importing || !canEditSession}
+                  title={canEditSession ? undefined : READ_ONLY_HINT}
+                >
                   Import from desktop
                 </button>
-                <button type="button" className="btn-secondary" onClick={() => void onSeedDemo()} disabled={seeding}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => void onSeedDemo()}
+                  disabled={seeding || !canEditSession}
+                  title={canEditSession ? undefined : READ_ONLY_HINT}
+                >
                   Load demo data
                 </button>
               </div>
@@ -1842,6 +1870,7 @@ export function TimetablePage() {
           {courses.length > 0 && (
         <div className="tt-workspace">
           <TimetableSidebar
+            canEdit={canEditSession}
             mode={timetableMode}
             onModeChange={(m) => void onModeChange(m)}
             viewKind={viewKind}
@@ -1937,6 +1966,7 @@ export function TimetablePage() {
             </div>
             {showsHoldingArea(viewKind) && (
               <HoldingAreaPanel
+                canEdit={canEditSession}
                 items={holding}
                 loading={holdingLoading}
                 acceptBookingDrop={editable}
@@ -2037,6 +2067,7 @@ export function TimetablePage() {
       {sessionTab === "changelog" && courses.length > 0 && (
         <ChangeLogPanel
           sessionId={sessionId}
+          canEdit={canEditSession}
           resolveCourseId={resolveCourseId}
           refreshKey={changeLogKey}
           onRollback={() => {

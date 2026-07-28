@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from timetable.core.models import Qualification, Room, Staff, Unit
 
-from ..auth.deps import AuthContext, require_editor
+from ..auth.deps import AuthContext, require_editor, require_session_editor
 from ..database import get_db
 from ..schemas import (
     AlternateSlotsOut,
@@ -145,7 +145,7 @@ def session_holding_area(
 def add_booking(
     session_id: int,
     body: BookingCreateRequest,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -178,7 +178,7 @@ def remove_booking(
     session_id: int,
     booking_id: int,
     course_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -203,7 +203,7 @@ def update_booking(
     session_id: int,
     booking_id: int,
     body: BookingPatchRequest,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -244,7 +244,7 @@ def update_booking(
 def restore_bookings(
     session_id: int,
     body: BookingRestoreRequest,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -315,7 +315,7 @@ def booking_cover_candidates(
 def post_merge_classes(
     session_id: int,
     body: MergeClassesRequest,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -331,7 +331,7 @@ def post_merge_classes(
 def post_unmerge_classes(
     session_id: int,
     body: UnmergeClassesRequest,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -357,7 +357,7 @@ def get_cover_requests(
 def add_cover_request(
     session_id: int,
     body: CoverRequestCreate,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -387,7 +387,7 @@ def patch_cover_request(
     session_id: int,
     request_id: int,
     body: CoverRequestUpdate,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -413,7 +413,7 @@ def patch_cover_request(
 def remove_cover_request(
     session_id: int,
     request_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -427,7 +427,7 @@ def remove_cover_request(
 def push_cover_request_to_log(
     session_id: int,
     request_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -449,7 +449,7 @@ def booking_assign_cover(
     session_id: int,
     booking_id: int,
     body: CoverAssignRequest,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)

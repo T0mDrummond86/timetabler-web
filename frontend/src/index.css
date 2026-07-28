@@ -4765,6 +4765,81 @@ body.staff-editor-resizing {
   margin-bottom: 0.75rem;
 }
 
+/* ---------------- access levels ---------------- */
+
+.session-access-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  vertical-align: middle;
+}
+
+.access-panel {
+  padding: 0.5rem 0 1rem;
+}
+
+.access-table-wrap {
+  overflow-x: auto;
+  margin-top: 0.75rem;
+}
+
+.access-table {
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  min-width: 100%;
+}
+
+.access-table th,
+.access-table td {
+  border: 1px solid var(--border, #e2e7ef);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.access-table thead th {
+  background: var(--zone-toolbar, #f0f3f8);
+  font-weight: 700;
+}
+
+.access-user {
+  display: block;
+  font-weight: 600;
+}
+
+.access-username {
+  display: block;
+  font-size: 0.74rem;
+}
+
+.access-pill {
+  display: inline-block;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.access-pill--fixed {
+  background: var(--zone-toolbar, #eef2f7);
+  color: var(--muted, #64748b);
+  border: 1px solid var(--border, #d7dee8);
+}
+
+[data-theme="dark"] .session-access-badge {
+  background: #47320c;
+  color: #fcd34d;
+  border-color: #7c5a12;
+}
+
 /* ---------------- unit-class mapper ---------------- */
 
 .unit-mapper-panel {

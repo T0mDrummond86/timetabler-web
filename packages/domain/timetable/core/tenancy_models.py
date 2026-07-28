@@ -101,6 +101,10 @@ class GlobalSession(Base):
         ForeignKey("organization.id", ondelete="CASCADE")
     )
     name: Mapped[str] = mapped_column(String(120))
+    # The creator may manage access within the group, alongside admins/owners.
+    created_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[_dt.datetime] = mapped_column(
         DateTime,
         default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
@@ -124,8 +128,17 @@ class GlobalSession(Base):
     )
 
 
+ACCESS_EDIT = "edit"
+ACCESS_READ_ONLY = "read_only"
+ACCESS_LEVELS = frozenset({ACCESS_EDIT, ACCESS_READ_ONLY})
+
+
 class GlobalSessionUserAccess(Base):
-    """Grants a user access to view and use a global workspace."""
+    """Grants a user access to view and use a global workspace.
+
+    ``level`` is the user's default permission across every session in the
+    group; a ``SessionUserAccess`` row overrides it for one session.
+    """
 
     __tablename__ = "global_session_user_access"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -135,6 +148,7 @@ class GlobalSessionUserAccess(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("user_account.id", ondelete="CASCADE"), index=True
     )
+    level: Mapped[str] = mapped_column(String(16), default=ACCESS_EDIT)
     granted_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("user_account.id", ondelete="SET NULL"), nullable=True
     )
@@ -150,6 +164,34 @@ class GlobalSessionUserAccess(Base):
 
     __table_args__ = (
         UniqueConstraint("global_session_id", "user_id", name="global_session_user_access_uk"),
+    )
+
+
+class SessionUserAccess(Base):
+    """A user's permission on one timetable session.
+
+    Overrides the group-wide default in ``GlobalSessionUserAccess.level``.
+    """
+
+    __tablename__ = "session_user_access"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    timetable_session_id: Mapped[int] = mapped_column(
+        ForeignKey("timetable_session.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE"), index=True
+    )
+    level: Mapped[str] = mapped_column(String(16), default=ACCESS_EDIT)
+    granted_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[_dt.datetime] = mapped_column(
+        DateTime,
+        default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("timetable_session_id", "user_id", name="session_user_access_uk"),
     )
 
 

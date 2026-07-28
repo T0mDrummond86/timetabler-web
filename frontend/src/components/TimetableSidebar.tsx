@@ -3,6 +3,8 @@ import type { TimetableMode, ViewKind } from "../viewKinds";
 import { VIEW_KINDS_BY_MODE } from "../viewKinds";
 import type { TimetableEntity } from "../types";
 
+const READ_ONLY = "Read-only access — you cannot make changes to this session";
+
 type Props = {
   mode: TimetableMode;
   onModeChange: (mode: TimetableMode) => void;
@@ -19,6 +21,8 @@ type Props = {
   courseAdmin?: boolean;
   onCourseAdd?: () => void;
   onCourseDuplicate?: () => void;
+  /** False when the user only has read access. */
+  canEdit?: boolean;
   onCourseDelete?: () => void;
   onCourseToggleLock?: () => void;
   courseLocked?: boolean;
@@ -84,6 +88,7 @@ export function TimetableSidebar({
   courseAdmin = false,
   onCourseAdd,
   onCourseDuplicate,
+  canEdit = true,
   onCourseDelete,
   onCourseToggleLock,
   courseLocked = false,
@@ -125,16 +130,16 @@ export function TimetableSidebar({
         <div className="tt-sidebar-section tt-sidebar-course-admin">
           <span className="tt-sidebar-label">Course</span>
           <div className="tt-course-admin-btns">
-            <button type="button" className="btn-secondary btn-xs" onClick={onCourseAdd}>
+            <button type="button" className="btn-secondary btn-xs" onClick={onCourseAdd} disabled={!canEdit} title={canEdit ? undefined : READ_ONLY}>
               Add
             </button>
-            <button type="button" className="btn-secondary btn-xs" onClick={onCourseDuplicate}>
+            <button type="button" className="btn-secondary btn-xs" onClick={onCourseDuplicate} disabled={!canEdit} title={canEdit ? undefined : READ_ONLY}>
               Duplicate
             </button>
-            <button type="button" className="btn-secondary btn-xs" onClick={onCourseDelete}>
+            <button type="button" className="btn-secondary btn-xs" onClick={onCourseDelete} disabled={!canEdit} title={canEdit ? undefined : READ_ONLY}>
               Delete
             </button>
-            <button type="button" className="btn-secondary btn-xs" onClick={onCourseToggleLock}>
+            <button type="button" className="btn-secondary btn-xs" onClick={onCourseToggleLock} disabled={!canEdit} title={canEdit ? undefined : READ_ONLY}>
               {courseLocked ? "Unlock" : "Lock"}
             </button>
           </div>

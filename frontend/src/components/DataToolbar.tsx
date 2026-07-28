@@ -20,6 +20,8 @@ type Props = {
   onError?: (message: string) => void;
   importing?: boolean;
   showDisplay?: boolean;
+  /** False when the user only has read access — imports write data. */
+  canEdit?: boolean;
 };
 
 export function DataToolbar({
@@ -36,6 +38,7 @@ export function DataToolbar({
   onError,
   importing,
   showDisplay = true,
+  canEdit = true,
 }: Props) {
   const exportMenu = useDropdown();
   const importMenu = useDropdown();
@@ -140,7 +143,8 @@ export function DataToolbar({
           type="button"
           className="btn-secondary"
           onClick={importMenu.toggle}
-          disabled={importing}
+          disabled={importing || !canEdit}
+          title={canEdit ? undefined : "Read-only access — importing is disabled"}
           aria-expanded={importMenu.open}
           aria-haspopup="menu"
         >

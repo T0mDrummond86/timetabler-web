@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from ..auth.deps import AuthContext, get_auth_context, require_editor
+from ..auth.deps import AuthContext, get_auth_context, require_session_editor
 from ..database import get_db
 from ..schemas import TutorialInfoOut, TutorialStartOut
 from ..services.tutorial.lifecycle import (
@@ -25,7 +25,7 @@ router = APIRouter(tags=["tutorial"])
 )
 def start_tutorial_session(
     org_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     """Find or create the caller's tutorial sandbox with the synthetic dataset."""
@@ -42,7 +42,7 @@ def start_tutorial_session(
 @router.post("/sessions/{session_id}/tutorial-reset", response_model=TutorialStartOut)
 def reset_tutorial_session(
     session_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     """Re-apply the pristine tutorial dataset. Refuses non-tutorial sessions."""

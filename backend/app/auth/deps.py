@@ -129,3 +129,29 @@ def require_editor(ctx: AuthContext = Depends(get_auth_context)) -> AuthContext:
     if ctx.membership.role not in EDITOR_ROLES:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Editor access required")
     return ctx
+
+
+def require_session_editor(
+    request: Request,
+    ctx: AuthContext = Depends(require_editor),
+    db: Session = Depends(get_db),
+) -> AuthContext:
+    """Editor rights on the session named in the path.
+
+    Org-level editor rights are necessary but no longer sufficient: a user can
+    be set read-only on individual sessions, or across a whole global group.
+    Read-only users keep every GET, so exports stay available to them.
+    """
+    # Imported here: the service imports domain models, which would otherwise
+    # make this module part of an import cycle.
+    from ..services.session_access import assert_can_edit_session
+
+    raw = request.path_params.get("session_id")
+    if raw is None:
+        return ctx
+    try:
+        session_id = int(raw)
+    except (TypeError, ValueError):
+        return ctx
+    assert_can_edit_session(db, ctx.user, session_id)
+    return ctx

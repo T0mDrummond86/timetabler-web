@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from ..auth.deps import AuthContext, require_editor
+from ..auth.deps import AuthContext, require_editor, require_session_editor
 from ..database import get_db
 from ..schemas import (
     ChangeLogListOut,
@@ -53,7 +53,7 @@ def patch_change_log_note(
     session_id: int,
     entry_id: int,
     body: ChangeLogNotePatch,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -75,7 +75,7 @@ def patch_change_log_highlight_removed(
     session_id: int,
     entry_id: int,
     body: ChangeLogHighlightRemovedPatch,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -96,7 +96,7 @@ def patch_change_log_highlight_removed(
 def post_manual_change_log(
     session_id: int,
     body: ManualChangeLogCreate,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -121,7 +121,7 @@ def post_manual_change_log(
 def delete_manual_change_log(
     session_id: int,
     entry_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -141,7 +141,7 @@ def delete_manual_change_log(
 def rollback_change_log_booking(
     session_id: int,
     body: ChangeLogRollbackRequest,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)

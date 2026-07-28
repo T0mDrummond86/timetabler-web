@@ -15,6 +15,7 @@ from .config import settings
 from .database import check_database, create_all_tables, get_session_factory
 from .services.bootstrap import ensure_bootstrap_admin
 from .routers import (
+    access_levels,
     admin,
     auth,
     bookings,
@@ -98,6 +99,7 @@ app.include_router(timetable.router)
 app.include_router(violations.router)
 app.include_router(tutorial.router)
 app.include_router(laps.router)
+app.include_router(access_levels.router)
 
 
 @app.exception_handler(LookupError)

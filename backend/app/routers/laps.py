@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
-from ..auth.deps import AuthContext, require_editor
+from ..auth.deps import AuthContext, require_editor, require_session_editor
 from ..database import get_db
 from ..services.timetable_grid import assert_session_in_org
 from ..schemas import LapRowOut, LapListOut
@@ -35,7 +35,7 @@ async def upload_lap(
     session_id: int,
     unit_id: int,
     file: UploadFile = File(...),
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -58,7 +58,7 @@ async def upload_lap(
 def remove_lap(
     session_id: int,
     unit_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)

@@ -24,6 +24,7 @@ import {
 } from "../components/GlobalFilteredAggregateTable";
 import { LinkedSessionImportPanel } from "../components/LinkedSessionImportPanel";
 import { LoadingMark } from "../components/LoadingMark";
+import { AccessLevelsPanel } from "../components/AccessLevelsPanel";
 import {
   clearGlobalSessionDirty,
   GLOBAL_DIRTY_STORAGE_KEY,
@@ -38,7 +39,8 @@ type Tab =
   | "custodians"
   | "members"
   | "cover_log"
-  | "calendar";
+  | "calendar"
+  | "access";
 
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 
@@ -73,6 +75,7 @@ function formatVaries(value: string | number | null | undefined): string | numbe
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "members", label: "Linked sessions" },
+  { id: "access", label: "Access" },
   { id: "staff", label: "Staff" },
   { id: "rooms", label: "Rooms" },
   { id: "units", label: "Classes" },
@@ -531,6 +534,8 @@ export function GlobalSessionPage() {
           )}
         </section>
       )}
+
+      {tab === "access" && <AccessLevelsPanel globalSessionId={globalSessionId} />}
 
       {tab === "cover_log" && (
         <section className="card">

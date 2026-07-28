@@ -67,6 +67,28 @@ export type TimetableSession = {
   global_session_name?: string | null;
   course_count?: number;
   booking_count?: number;
+  /** The signed-in user's permission on this session. */
+  access_level?: AccessLevel;
+};
+
+export type AccessLevel = "edit" | "read_only";
+
+export type UserAccessRow = {
+  user_id: number;
+  username: string;
+  name?: string | null;
+  is_admin: boolean;
+  org_role?: string | null;
+  global_level?: AccessLevel | null;
+  /** Per-session overrides, keyed by session id (JSON keys arrive as strings). */
+  session_levels: Record<string, AccessLevel>;
+};
+
+export type GlobalAccessMatrix = {
+  global_session_id: number;
+  can_manage: boolean;
+  sessions: { id: number; name: string; created_by_id: number | null }[];
+  users: UserAccessRow[];
 };
 
 export type GlobalSessionSummary = {
@@ -1187,6 +1209,26 @@ export const api = {
     apiFetch<{ ok: boolean }>(`/sessions/${sessionId}/staff/${staffId}/online-students`, {
       method: "PUT",
       body: JSON.stringify({ counts }),
+    }),
+
+  accessMatrix: (globalSessionId: number) =>
+    apiFetch<GlobalAccessMatrix>(`/global-sessions/${globalSessionId}/access-levels`),
+
+  setGroupAccessLevel: (globalSessionId: number, userId: number, level: AccessLevel) =>
+    apiFetch<{ ok: boolean; level: AccessLevel }>(
+      `/global-sessions/${globalSessionId}/access-levels/${userId}`,
+      { method: "PUT", body: JSON.stringify({ level }) },
+    ),
+
+  setSessionAccessLevel: (sessionId: number, userId: number, level: AccessLevel) =>
+    apiFetch<{ ok: boolean; level: AccessLevel }>(
+      `/sessions/${sessionId}/access-levels/${userId}`,
+      { method: "PUT", body: JSON.stringify({ level }) },
+    ),
+
+  clearSessionAccessLevel: (sessionId: number, userId: number) =>
+    apiFetch<{ ok: boolean }>(`/sessions/${sessionId}/access-levels/${userId}`, {
+      method: "DELETE",
     }),
 
   qualificationDetail: (sessionId: number, qualificationId: number) =>

@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from ..auth.deps import AuthContext, require_editor
+from ..auth.deps import AuthContext, require_editor, require_session_editor
 from ..database import get_db
 from ..schemas import (
     ClashCheckSettingsPatch,
@@ -39,7 +39,7 @@ def get_clash_settings(
 def update_clash_settings(
     session_id: int,
     body: ClashCheckSettingsPatch,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -54,7 +54,7 @@ def update_clash_settings(
 @router.post("/sessions/{session_id}/clash-settings/reset", response_model=list[ClashCheckSettingOut])
 def reset_session_clash_settings(
     session_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -72,7 +72,7 @@ def reset_session_clash_settings(
 )
 def reapply_combined_classes(
     session_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     """Re-scan existing bookings and assign combined-class groups (no re-import)."""
@@ -90,7 +90,7 @@ def reapply_combined_classes(
 def create_violation_dismissal(
     session_id: int,
     body: ViolationDismissRequest,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -110,7 +110,7 @@ def create_violation_dismissal(
 @router.delete("/sessions/{session_id}/violation-dismissals")
 def clear_violation_dismissals(
     session_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)

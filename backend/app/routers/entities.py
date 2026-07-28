@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from timetable.core.models import Course, Qualification, Room, Staff, Unit
 
-from ..auth.deps import AuthContext, get_auth_context, require_editor
+from ..auth.deps import AuthContext, get_auth_context, require_session_editor
 from ..database import get_db
 from ..schemas import (
     CourseCreate,
@@ -105,7 +105,7 @@ def update_staff_preferences(
     session_id: int,
     staff_id: int,
     body: StaffPreferencesPatch,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -132,7 +132,7 @@ def update_staff_online_students(
     session_id: int,
     staff_id: int,
     body: StaffOnlineStudentsPatch,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -213,7 +213,7 @@ def update_unit_allowed_rooms(
     session_id: int,
     unit_id: int,
     body: UnitAllowedRoomsPatch,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -251,7 +251,7 @@ def update_unit_competencies(
     session_id: int,
     unit_id: int,
     body: UnitCompetenciesPatch,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -289,7 +289,7 @@ def update_staff_competencies(
     session_id: int,
     staff_id: int,
     body: StaffCompetenciesPatch,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -311,7 +311,7 @@ def update_staff(
     session_id: int,
     staff_id: int,
     body: StaffPatch,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -360,7 +360,7 @@ def update_staff_availability(
     session_id: int,
     staff_id: int,
     body: StaffAvailabilityPatch,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -389,7 +389,7 @@ def update_room(
     session_id: int,
     room_id: int,
     body: RoomPatch,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -411,7 +411,7 @@ def update_unit(
     session_id: int,
     unit_id: int,
     body: UnitPatch,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -436,7 +436,7 @@ def update_unit_qualifications(
     session_id: int,
     unit_id: int,
     body: UnitQualificationsPatch,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -458,7 +458,7 @@ def update_unit_qualifications(
 def add_staff(
     session_id: int,
     body: StaffCreate,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -472,7 +472,7 @@ def add_staff(
 def remove_staff(
     session_id: int,
     staff_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -488,7 +488,7 @@ def remove_staff(
 def add_room(
     session_id: int,
     body: RoomCreate,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -502,7 +502,7 @@ def add_room(
 def remove_room(
     session_id: int,
     room_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -518,7 +518,7 @@ def remove_room(
 def add_unit(
     session_id: int,
     body: UnitCreate,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -531,7 +531,7 @@ def add_unit(
 def remove_unit(
     session_id: int,
     unit_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -547,7 +547,7 @@ def remove_unit(
 def add_qualification(
     session_id: int,
     body: QualificationCreate,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -566,7 +566,7 @@ def add_qualification(
 def remove_qualification(
     session_id: int,
     qualification_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -586,7 +586,7 @@ def remove_qualification(
 def add_course(
     session_id: int,
     body: CourseCreate,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -612,7 +612,7 @@ def duplicate_course_route(
     session_id: int,
     course_id: int,
     body: CourseDuplicateRequest,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -638,7 +638,7 @@ def duplicate_course_route(
 def remove_course(
     session_id: int,
     course_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -676,7 +676,7 @@ def update_qualification(
     session_id: int,
     qualification_id: int,
     body: QualificationPatch,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -710,7 +710,7 @@ def update_qualification(
 @router.post("/sessions/{session_id}/units/split-from-brackets")
 def split_units_from_brackets(
     session_id: int,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
@@ -726,7 +726,7 @@ def update_course(
     session_id: int,
     course_id: int,
     body: CoursePatch,
-    ctx: AuthContext = Depends(require_editor),
+    ctx: AuthContext = Depends(require_session_editor),
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)

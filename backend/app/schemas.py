@@ -117,6 +117,8 @@ class TimetableSessionOut(BaseModel):
     global_session_name: str | None = None
     course_count: int = 0
     booking_count: int = 0
+    # The caller's own permission on this session: "edit" or "read_only".
+    access_level: str = "edit"
 
     model_config = {"from_attributes": True}
 
@@ -1075,3 +1077,28 @@ class LapRowOut(BaseModel):
 
 class LapListOut(BaseModel):
     rows: list[LapRowOut]
+
+
+class SessionAccessLevelPatch(BaseModel):
+    """Set a user's permission. ``level`` is "edit" or "read_only"."""
+
+    level: str
+
+
+class UserAccessRowOut(BaseModel):
+    user_id: int
+    username: str
+    name: str | None = None
+    is_admin: bool = False
+    org_role: str | None = None
+    # Group-wide default; None when the user has no grant on this group.
+    global_level: str | None = None
+    # Per-session overrides, keyed by timetable session id.
+    session_levels: dict[int, str] = {}
+
+
+class GlobalAccessMatrixOut(BaseModel):
+    global_session_id: int
+    can_manage: bool
+    sessions: list[dict]
+    users: list[UserAccessRowOut]
