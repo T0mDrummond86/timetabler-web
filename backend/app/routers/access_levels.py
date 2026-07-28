@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from timetable.core.tenancy_models import (
     ACCESS_EDIT,
+    ACCESS_READ_ONLY,
     ACCESS_LEVELS,
     GlobalSessionMember,
     GlobalSessionUserAccess,
@@ -28,6 +29,8 @@ from ..auth.deps import AuthContext, get_auth_context
 from ..database import get_db
 from ..schemas import (
     GlobalAccessMatrixOut,
+    SessionAccessListOut,
+    SessionAccessUserOut,
     SessionAccessLevelPatch,
     UserAccessRowOut,
 )
@@ -329,3 +332,82 @@ def clear_session_level(
     )
     db.commit()
     return {"ok": True}
+
+
+@router.get("/sessions/{session_id}/access-levels", response_model=SessionAccessListOut)
+def get_session_access(
+    session_id: int,
+    ctx: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    """Everyone in the org with their effective level on this one session."""
+    session_row = db.get(TimetableSession, session_id)
+    if session_row is None or session_row.organization_id != ctx.organization.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+    member = (
+        db.query(GlobalSessionMember)
+        .filter(GlobalSessionMember.timetable_session_id == session_id)
+        .first()
+    )
+    global_id = member.global_session_id if member else None
+
+    overrides = {
+        row.user_id: row.level
+        for row in db.query(SessionUserAccess)
+        .filter(SessionUserAccess.timetable_session_id == session_id)
+        .all()
+    }
+    group_levels: dict[int, str] = {}
+    if global_id is not None:
+        group_levels = {
+            row.user_id: row.level
+            for row in db.query(GlobalSessionUserAccess)
+            .filter(GlobalSessionUserAccess.global_session_id == global_id)
+            .all()
+        }
+
+    members = (
+        db.query(Membership, User)
+        .join(User, User.id == Membership.user_id)
+        .filter(Membership.organization_id == ctx.organization.id)
+        .order_by(User.username)
+        .all()
+    )
+
+    out: list[SessionAccessUserOut] = []
+    for membership, user in members:
+        # Mirrors effective_level's order so the page explains itself.
+        if user.is_admin:
+            source, level = "admin", ACCESS_EDIT
+        elif membership.role == "owner":
+            source, level = "org owner", ACCESS_EDIT
+        elif session_row.created_by_id == user.id:
+            source, level = "creator", ACCESS_EDIT
+        elif user.id in overrides:
+            source, level = "this session", overrides[user.id]
+        elif user.id in group_levels:
+            source, level = "workspace default", group_levels[user.id]
+        else:
+            source = "org role"
+            level = ACCESS_READ_ONLY if membership.role == "viewer" else ACCESS_EDIT
+        out.append(
+            SessionAccessUserOut(
+                user_id=user.id,
+                username=user.username,
+                name=user.name,
+                is_admin=user.is_admin,
+                org_role=membership.role,
+                source=source,
+                level=level,
+                override=overrides.get(user.id),
+            )
+        )
+
+    return SessionAccessListOut(
+        can_manage=(
+            can_manage_access(db, ctx.user, global_id) if global_id is not None else False
+        ),
+        global_session_id=global_id,
+        users=out,
+    )

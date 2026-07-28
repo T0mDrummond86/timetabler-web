@@ -28,20 +28,69 @@ export type LecturerWeek = {
   cachedAt: string | null;
 };
 
-export function lecturersFromStaffRows(rows: GlobalAggregatedStaffRow[]): LecturerRef[] {
-  const out: LecturerRef[] = [];
+/** One timetable session the viewer can choose to include. */
+export type SessionChoice = {
+  sessionId: number;
+  sessionName: string;
+  workspaceName: string;
+};
+
+/**
+ * Fold the aggregated staff rows of every workspace into one lecturer list,
+ * keeping only the sessions the viewer has chosen.
+ *
+ * Rows are keyed by lecturer name, which is how the aggregated staff endpoint
+ * already groups people across sessions.
+ */
+export function lecturersFromStaffRows(
+  rows: GlobalAggregatedStaffRow[],
+  includeSessionIds?: Set<number>,
+): LecturerRef[] {
+  const byName = new Map<string, LecturerRef["places"]>();
   for (const row of rows) {
     const places = (row.members ?? [])
       .filter((m) => m.entity_id != null)
+      .filter((m) => !includeSessionIds || includeSessionIds.has(m.session_id))
       .map((m) => ({
         sessionId: m.session_id,
         sessionName: m.session_name,
         staffId: m.entity_id as number,
       }));
-    if (places.length) out.push({ name: row.name, places });
+    if (!places.length) continue;
+    const existing = byName.get(row.name);
+    if (existing) {
+      // The same person can surface from two workspaces; don't fetch twice.
+      for (const p of places) {
+        if (!existing.some((e) => e.sessionId === p.sessionId)) existing.push(p);
+      }
+    } else {
+      byName.set(row.name, places);
+    }
   }
-  out.sort((a, b) => a.name.localeCompare(b.name));
-  return out;
+  return [...byName.entries()]
+    .map(([name, places]) => ({ name, places }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Every session reachable through the workspaces the viewer can see. */
+export function sessionChoicesFromWorkspaces(
+  workspaces: { name: string; rows: GlobalAggregatedStaffRow[] }[],
+): SessionChoice[] {
+  const seen = new Map<number, SessionChoice>();
+  for (const ws of workspaces) {
+    for (const row of ws.rows) {
+      for (const m of row.members ?? []) {
+        if (!seen.has(m.session_id)) {
+          seen.set(m.session_id, {
+            sessionId: m.session_id,
+            sessionName: m.session_name,
+            workspaceName: ws.name,
+          });
+        }
+      }
+    }
+  }
+  return [...seen.values()].sort((a, b) => a.sessionName.localeCompare(b.sessionName));
 }
 
 const DEFAULT_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];

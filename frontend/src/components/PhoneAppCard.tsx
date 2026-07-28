@@ -29,7 +29,7 @@ function qrSvg(text: string, size = 148): string {
   );
 }
 
-export function PhoneAppCard() {
+export function PhoneAppCard({ bare = false }: { bare?: boolean } = {}) {
   const [copied, setCopied] = useState(false);
   const url = useMemo(() => `${window.location.origin}/m`, []);
   const svg = useMemo(() => {
@@ -51,9 +51,9 @@ export function PhoneAppCard() {
   }
 
   return (
-    <section className="phone-app-card">
+    <section className={`phone-app-card${bare ? " phone-app-card--bare" : ""}`}>
       <div className="phone-app-text">
-        <h3>Timetables on your phone</h3>
+        {!bare && <h3>Timetables on your phone</h3>}
         <p className="muted">
           A read-only viewer for lecturer timetables across this workspace. Scan the code
           with a phone camera, or open <code>{url}</code>, then add it to the home screen —

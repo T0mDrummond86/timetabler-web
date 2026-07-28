@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from timetable.core.tenancy_models import (
     ACCESS_EDIT,
+    TIMETABLE_MODE_HYBRID,
+    TIMETABLE_MODES,
     GlobalSessionMember,
     TimetableSession,
 )
@@ -16,6 +18,7 @@ from ..database import get_db
 from ..schemas import (
     TimetableSessionCreate,
     TimetableSessionDuplicate,
+    SessionSettingsPatch,
     TimetableSessionOut,
     TimetableSessionPatch,
 )
@@ -24,6 +27,7 @@ from ..services.session_data import duplicate_timetable_session
 from ..services.session_seed import seed_timetable_session_data
 from ..services.session_stats import session_stats_map
 from ..services.global_access import visible_global_session_ids
+from timetable.constants import NUM_SLOTS
 
 router = APIRouter(tags=["sessions"])
 
@@ -62,6 +66,9 @@ def _session_out(
         access_level=(
             effective_level(db, ctx.user, row.id) if ctx is not None else ACCESS_EDIT
         ),
+        timetable_mode=row.timetable_mode or TIMETABLE_MODE_HYBRID,
+        grid_start_slot=row.grid_start_slot,
+        grid_end_slot=row.grid_end_slot,
     )
 
 
@@ -236,3 +243,65 @@ def delete_session(
     db.delete(row)
     db.commit()
     return None
+
+
+@router.patch("/sessions/{session_id}/settings", response_model=TimetableSessionOut)
+def update_session_settings(
+    session_id: int,
+    body: SessionSettingsPatch,
+    ctx: AuthContext = Depends(require_session_editor),
+    db: Session = Depends(get_db),
+):
+    """Delivery mode and displayed teaching day."""
+    row = _session_in_org(db, session_id, ctx.organization.id, ctx)
+
+    if body.timetable_mode is not None:
+        if body.timetable_mode not in TIMETABLE_MODES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"mode must be one of {sorted(TIMETABLE_MODES)}",
+            )
+        row.timetable_mode = body.timetable_mode
+
+    if body.clear_grid_window:
+        row.grid_start_slot = None
+        row.grid_end_slot = None
+    elif body.grid_start_slot is not None or body.grid_end_slot is not None:
+        start = body.grid_start_slot if body.grid_start_slot is not None else 0
+        end = body.grid_end_slot if body.grid_end_slot is not None else NUM_SLOTS
+        if start >= end:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="The day must start before it ends",
+            )
+        # Narrowing the window must never hide a class that is already placed.
+        outside = _bookings_outside_window(db, session_id, start, end)
+        if outside:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"{outside} class{'es' if outside != 1 else ''} fall outside that "
+                    "window. Move them first, or choose a wider day."
+                ),
+            )
+        row.grid_start_slot = start
+        row.grid_end_slot = end
+
+    db.commit()
+    db.refresh(row)
+    return _session_out_with_stats(row, db, ctx)
+
+
+def _bookings_outside_window(db: Session, session_id: int, start: int, end: int) -> int:
+    from timetable.core.models import Booking, Semester, Week
+
+    return (
+        db.query(Booking)
+        .join(Week, Week.id == Booking.week_id)
+        .join(Semester, Semester.id == Week.semester_id)
+        .filter(
+            Semester.timetable_session_id == session_id,
+            or_(Booking.start_slot < start, Booking.end_slot > end),
+        )
+        .count()
+    )

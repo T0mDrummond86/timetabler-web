@@ -3,21 +3,32 @@
  * Deliberately narrow: sign in, pick a workspace, pick a lecturer, see their
  * week. It contains no mutating action of any kind. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, getToken, setToken, type GlobalSessionSummary } from "../api";
+import { api, getToken, setToken, type GlobalAggregatedStaffRow } from "../api";
 import {
   lecturersFromStaffRows,
   loadLecturerWeek,
   minutesToLabel,
+  sessionChoicesFromWorkspaces,
   slotToMinutes,
-  type LecturerRef,
   type LecturerWeek,
+  type SessionChoice,
 } from "./lecturerWeek";
 import { MobileWeekGrid } from "./MobileWeekGrid";
 import "./mobile.css";
 
 const LAST_VIEW_KEY = "tafetabler-mobile-last";
+const SESSIONS_KEY = "tafetabler-mobile-sessions";
 
-type Remembered = { workspaceId: number; lecturer: string };
+type Remembered = { lecturer: string };
+
+function readIncluded(): number[] | null {
+  try {
+    const raw = localStorage.getItem(SESSIONS_KEY);
+    return raw ? (JSON.parse(raw) as number[]) : null;
+  } catch {
+    return null;
+  }
+}
 
 function readRemembered(): Remembered | null {
   try {
@@ -30,9 +41,12 @@ function readRemembered(): Remembered | null {
 
 export default function MobilePage() {
   const [authed, setAuthed] = useState(() => !!getToken());
-  const [workspaces, setWorkspaces] = useState<GlobalSessionSummary[]>([]);
-  const [workspaceId, setWorkspaceId] = useState<number | null>(null);
-  const [lecturers, setLecturers] = useState<LecturerRef[]>([]);
+  const [staffRows, setStaffRows] = useState<
+    { name: string; rows: GlobalAggregatedStaffRow[] }[]
+  >([]);
+  const [sessionChoices, setSessionChoices] = useState<SessionChoice[]>([]);
+  const [included, setIncluded] = useState<number[] | null>(() => readIncluded());
+  const [showSessions, setShowSessions] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [week, setWeek] = useState<LecturerWeek | null>(null);
   const [filter, setFilter] = useState("");
@@ -54,7 +68,8 @@ export default function MobilePage() {
     };
   }, []);
 
-  // Workspaces the signed-in user can see.
+  // Every workspace the user can see, with its aggregated staff. Sessions are
+  // reachable only through a workspace, which is what gates phone access.
   useEffect(() => {
     if (!authed) return;
     let cancelled = false;
@@ -63,15 +78,22 @@ export default function MobilePage() {
       try {
         const orgs = await api.orgs();
         if (!orgs.length) return;
-        const rows = await api.globalSessions(orgs[0].id);
+        const workspaces = await api.globalSessions(orgs[0].id);
+        const loaded = await Promise.all(
+          workspaces.map(async (w) => {
+            try {
+              const data = await api.globalSessionStaff(w.id);
+              return { name: w.name, rows: data.rows };
+            } catch {
+              return { name: w.name, rows: [] };
+            }
+          }),
+        );
         if (cancelled) return;
-        setWorkspaces(rows);
-        const remembered = readRemembered();
-        const initial =
-          rows.find((r) => r.id === remembered?.workspaceId)?.id ?? rows[0]?.id ?? null;
-        setWorkspaceId(initial);
+        setStaffRows(loaded);
+        setSessionChoices(sessionChoicesFromWorkspaces(loaded));
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load workspaces");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load timetables");
       }
     })();
     return () => {
@@ -79,36 +101,36 @@ export default function MobilePage() {
     };
   }, [authed]);
 
-  // Lecturers in the chosen workspace.
+  // Default to every session until the viewer narrows it down.
+  const includedSet = useMemo(
+    () => new Set(included ?? sessionChoices.map((c) => c.sessionId)),
+    [included, sessionChoices],
+  );
+
+  const lecturers = useMemo(
+    () => lecturersFromStaffRows(staffRows.flatMap((w) => w.rows), includedSet),
+    [staffRows, includedSet],
+  );
+
+  // Reopen on the last lecturer, with the picker out of the way.
   useEffect(() => {
-    if (workspaceId == null) return;
-    let cancelled = false;
-    void (async () => {
-      setError(null);
-      try {
-        const data = await api.globalSessionStaff(workspaceId);
-        if (cancelled) return;
-        const refs = lecturersFromStaffRows(data.rows);
-        setLecturers(refs);
-        // Reopen on the last lecturer, with the picker out of the way.
-        const remembered = readRemembered();
-        if (
-          !restored.current &&
-          remembered?.workspaceId === workspaceId &&
-          refs.some((r) => r.name === remembered.lecturer)
-        ) {
-          restored.current = true;
-          setSelected(remembered.lecturer);
-          setPanelOpen(false);
-        }
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load lecturers");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceId]);
+    if (restored.current || !lecturers.length) return;
+    const remembered = readRemembered();
+    if (remembered && lecturers.some((l) => l.name === remembered.lecturer)) {
+      restored.current = true;
+      setSelected(remembered.lecturer);
+      setPanelOpen(false);
+    }
+  }, [lecturers]);
+
+  function toggleSession(id: number) {
+    setIncluded((prev) => {
+      const base = prev ?? sessionChoices.map((c) => c.sessionId);
+      const next = base.includes(id) ? base.filter((x) => x !== id) : [...base, id];
+      localStorage.setItem(SESSIONS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
 
   const loadWeek = useCallback(
     async (name: string) => {
@@ -118,19 +140,17 @@ export default function MobilePage() {
       setError(null);
       try {
         setWeek(await loadLecturerWeek(ref));
-        if (workspaceId != null) {
-          localStorage.setItem(
-            LAST_VIEW_KEY,
-            JSON.stringify({ workspaceId, lecturer: name } satisfies Remembered),
-          );
-        }
+        localStorage.setItem(
+          LAST_VIEW_KEY,
+          JSON.stringify({ lecturer: name } satisfies Remembered),
+        );
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not load that timetable");
       } finally {
         setLoading(false);
       }
     },
-    [lecturers, workspaceId],
+    [lecturers],
   );
 
   useEffect(() => {
@@ -176,22 +196,34 @@ export default function MobilePage() {
 
       <div className="mv-body">
         <aside className={`mv-panel${panelOpen ? "" : " mv-panel--closed"}`}>
-          {workspaces.length > 1 && (
-            <select
-              className="mv-select"
-              value={workspaceId ?? ""}
-              onChange={(e) => {
-                setWorkspaceId(Number(e.target.value));
-                setSelected(null);
-                setWeek(null);
-              }}
+          {sessionChoices.length > 1 && (
+            <button
+              type="button"
+              className="mv-sessions-toggle"
+              onClick={() => setShowSessions((v) => !v)}
+              title="Choose which timetables to include"
             >
-              {workspaces.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
+              {includedSet.size} of {sessionChoices.length} timetables {showSessions ? "▴" : "▾"}
+            </button>
+          )}
+          {showSessions && (
+            <ul className="mv-sessions">
+              {sessionChoices.map((c) => (
+                <li key={c.sessionId}>
+                  <label className="mv-session">
+                    <input
+                      type="checkbox"
+                      checked={includedSet.has(c.sessionId)}
+                      onChange={() => toggleSession(c.sessionId)}
+                    />
+                    <span>
+                      {c.sessionName}
+                      <span className="mv-session-ws muted"> · {c.workspaceName}</span>
+                    </span>
+                  </label>
+                </li>
               ))}
-            </select>
+            </ul>
           )}
           <input
             className="mv-search"

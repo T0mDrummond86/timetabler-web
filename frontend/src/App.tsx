@@ -18,6 +18,9 @@ const GlobalSessionPage = lazy(() =>
 const TimetablePage = lazy(() =>
   import("./pages/TimetablePage").then((m) => ({ default: m.TimetablePage })),
 );
+const SessionSettingsPage = lazy(() =>
+  import("./pages/SessionSettingsPage").then((m) => ({ default: m.SessionSettingsPage })),
+);
 const TimetableSplitPage = lazy(() =>
   import("./pages/TimetableSplitPage").then((m) => ({ default: m.TimetableSplitPage })),
 );
@@ -116,6 +119,7 @@ export default function App() {
       <Route path="/admin" element={<AdminPage />} />
       <Route path="/global/:globalSessionId" element={<GlobalSessionPage />} />
       <Route path="/timetable/:sessionId" element={<TimetablePage />} />
+      <Route path="/timetable/:sessionId/settings" element={<SessionSettingsPage />} />
       <Route path="/timetable/:sessionId/split" element={<TimetableSplitPage />} />
     </Routes>
     </Suspense>

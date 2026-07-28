@@ -128,6 +128,13 @@ class GlobalSession(Base):
     )
 
 
+TIMETABLE_MODE_HYBRID = "hybrid"
+TIMETABLE_MODE_REGULAR = "regular"
+TIMETABLE_MODE_BLOCK = "block"
+TIMETABLE_MODES = frozenset(
+    {TIMETABLE_MODE_HYBRID, TIMETABLE_MODE_REGULAR, TIMETABLE_MODE_BLOCK}
+)
+
 ACCESS_EDIT = "edit"
 ACCESS_READ_ONLY = "read_only"
 ACCESS_LEVELS = frozenset({ACCESS_EDIT, ACCESS_READ_ONLY})
@@ -308,6 +315,13 @@ class TimetableSession(Base):
         ForeignKey("organization.id", ondelete="CASCADE")
     )
     name: Mapped[str] = mapped_column(String(120))
+    # "hybrid" keeps the regular/block selector; "regular"/"block" pin the
+    # session to one family of views and hide the selector.
+    timetable_mode: Mapped[str] = mapped_column(String(16), default=TIMETABLE_MODE_HYBRID)
+    # Displayed teaching day, as slot indices into the full grid. NULL means
+    # the whole day.
+    grid_start_slot: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    grid_end_slot: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("user_account.id", ondelete="SET NULL"), nullable=True
     )

@@ -23,6 +23,8 @@ type Props = {
   onCourseDuplicate?: () => void;
   /** False when the user only has read access. */
   canEdit?: boolean;
+  /** False when the session is pinned to a single mode — hides the selector. */
+  showModeSelector?: boolean;
   onCourseDelete?: () => void;
   onCourseToggleLock?: () => void;
   courseLocked?: boolean;
@@ -89,6 +91,7 @@ export function TimetableSidebar({
   onCourseAdd,
   onCourseDuplicate,
   canEdit = true,
+  showModeSelector = true,
   onCourseDelete,
   onCourseToggleLock,
   courseLocked = false,
@@ -108,13 +111,15 @@ export function TimetableSidebar({
       {header}
 
       <div className="tt-sidebar-section tt-sidebar-mode-view">
-        <SidebarSelect
-          id="tt-sidebar-mode"
-          label="Mode"
-          options={MODES}
-          value={mode}
-          onChange={onModeChange}
-        />
+        {showModeSelector && (
+          <SidebarSelect
+            id="tt-sidebar-mode"
+            label="Mode"
+            options={MODES}
+            value={mode}
+            onChange={onModeChange}
+          />
+        )}
         <SidebarSelect
           id="tt-sidebar-view"
           label="View"

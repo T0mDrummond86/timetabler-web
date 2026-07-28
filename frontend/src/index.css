@@ -4765,6 +4765,116 @@ body.staff-editor-resizing {
   margin-bottom: 0.75rem;
 }
 
+/* ---------------- session settings ---------------- */
+
+.settings-card {
+  margin-bottom: 1rem;
+  padding: 1rem 1.15rem 1.15rem;
+}
+
+.settings-card h2 {
+  margin: 0 0 0.3rem;
+  font-size: 1.05rem;
+}
+
+.settings-readonly {
+  margin-bottom: 1rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-md, 8px);
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  font-size: 0.86rem;
+}
+
+.settings-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.settings-mode {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.55rem;
+  align-items: baseline;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border, #e2e7ef);
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+}
+
+.settings-mode--on {
+  border-color: var(--accent, #2563eb);
+  background: color-mix(in srgb, var(--accent, #2563eb) 7%, transparent);
+}
+
+.settings-mode-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.settings-mode-hint {
+  grid-column: 2;
+  font-size: 0.8rem;
+}
+
+.settings-row {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.settings-danger {
+  border-color: #fca5a5;
+}
+
+.settings-danger-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.settings-danger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border, #e2e7ef);
+  border-radius: var(--radius-md, 8px);
+}
+
+.settings-danger-row p {
+  margin: 0.1rem 0 0;
+  font-size: 0.82rem;
+}
+
+.phone-app-card--bare {
+  margin-top: 0.4rem;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+[data-theme="dark"] .settings-readonly {
+  background: #47320c;
+  color: #fcd34d;
+  border-color: #7c5a12;
+}
+
 /* ---------------- phone app card ---------------- */
 
 .phone-app-card {

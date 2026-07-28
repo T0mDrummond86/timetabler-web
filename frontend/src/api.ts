@@ -69,6 +69,30 @@ export type TimetableSession = {
   booking_count?: number;
   /** The signed-in user's permission on this session. */
   access_level?: AccessLevel;
+  /** Which timetable views this session offers. */
+  timetable_mode?: SessionMode;
+  /** Displayed teaching day, as slot indices; null means the whole day. */
+  grid_start_slot?: number | null;
+  grid_end_slot?: number | null;
+};
+
+export type SessionMode = "hybrid" | "regular" | "block";
+
+export type SessionAccessUser = {
+  user_id: number;
+  username: string;
+  name?: string | null;
+  is_admin: boolean;
+  org_role?: string | null;
+  source: string;
+  level: AccessLevel;
+  override?: AccessLevel | null;
+};
+
+export type SessionAccessList = {
+  can_manage: boolean;
+  global_session_id: number | null;
+  users: SessionAccessUser[];
 };
 
 export type AccessLevel = "edit" | "read_only";
@@ -474,6 +498,8 @@ export const api = {
   orgs: () => apiFetch<Organization[]>("/orgs"),
 
   sessions: (orgId: number) => apiFetch<TimetableSession[]>(`/orgs/${orgId}/sessions`),
+
+  session: (sessionId: number) => apiFetch<TimetableSession>(`/sessions/${sessionId}`),
 
   globalSessions: (orgId: number) => apiFetch<GlobalSessionSummary[]>(`/orgs/${orgId}/global-sessions`),
 
@@ -1222,6 +1248,23 @@ export const api = {
     apiFetch<{ ok: boolean }>(`/global-sessions/${globalSessionId}/users/${userId}`, {
       method: "DELETE",
     }),
+
+  sessionSettings: (
+    sessionId: number,
+    body: {
+      timetable_mode?: SessionMode;
+      grid_start_slot?: number | null;
+      grid_end_slot?: number | null;
+      clear_grid_window?: boolean;
+    },
+  ) =>
+    apiFetch<TimetableSession>(`/sessions/${sessionId}/settings`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  sessionAccess: (sessionId: number) =>
+    apiFetch<SessionAccessList>(`/sessions/${sessionId}/access-levels`),
 
   accessMatrix: (globalSessionId: number) =>
     apiFetch<GlobalAccessMatrix>(`/global-sessions/${globalSessionId}/access-levels`),

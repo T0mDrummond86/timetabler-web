@@ -1522,7 +1522,27 @@ export function TimetablePage() {
   // this just keeps the UI honest about what will be accepted.
   const canEditSession =
     (sessions.find((s) => s.id === sessionId)?.access_level ?? "edit") === "edit";
+  // "regular"/"block" pin the session to one family of views; "hybrid" keeps
+  // the selector. Set in the session's Settings.
+  const sessionMode = sessions.find((s) => s.id === sessionId)?.timetable_mode ?? "hybrid";
+  const pinnedMode: TimetableMode | null =
+    sessionMode === "regular" || sessionMode === "block" ? sessionMode : null;
   const editable = grid ? isGridEditable(viewKind, grid.readonly) && canEditSession : false;
+
+  // A pinned session must never sit on a view from the other family — e.g. a
+  // bookmarked ?view=staff link opened on a block-only session.
+  useEffect(() => {
+    if (!pinnedMode || !sessionId) return;
+    if (viewKindMode(viewKind) === pinnedMode) return;
+    setTimetableMode(pinnedMode);
+    void applyViewChange({
+      viewKind: defaultViewKindForMode(pinnedMode),
+      qualificationId:
+        pinnedMode === "block" ? qualificationId ?? sidebarEntities[0]?.id ?? null : null,
+    });
+    // applyViewChange is stable enough here; re-running on viewKind is the point.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pinnedMode, viewKind, sessionId]);
 
   const goToWarningBooking = useCallback(
     async (bookingId: number, row: ViolationRow) => {
@@ -1871,7 +1891,8 @@ export function TimetablePage() {
         <div className="tt-workspace">
           <TimetableSidebar
             canEdit={canEditSession}
-            mode={timetableMode}
+            mode={pinnedMode ?? timetableMode}
+            showModeSelector={pinnedMode === null}
             onModeChange={(m) => void onModeChange(m)}
             viewKind={viewKind}
             onViewKindChange={(k) => void onViewKindChange(k)}

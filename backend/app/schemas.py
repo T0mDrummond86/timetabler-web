@@ -119,6 +119,11 @@ class TimetableSessionOut(BaseModel):
     booking_count: int = 0
     # The caller's own permission on this session: "edit" or "read_only".
     access_level: str = "edit"
+    # "hybrid" | "regular" | "block" — which timetable views the session offers.
+    timetable_mode: str = "hybrid"
+    # Displayed teaching day, as slot indices; null means the whole day.
+    grid_start_slot: int | None = None
+    grid_end_slot: int | None = None
 
     model_config = {"from_attributes": True}
 
@@ -1104,3 +1109,31 @@ class GlobalAccessMatrixOut(BaseModel):
     owner_user_id: int | None = None
     sessions: list[dict]
     users: list[UserAccessRowOut]
+
+
+class SessionSettingsPatch(BaseModel):
+    """Any omitted field is left unchanged."""
+
+    timetable_mode: str | None = None
+    grid_start_slot: int | None = Field(default=None, ge=0, le=27)
+    grid_end_slot: int | None = Field(default=None, ge=1, le=28)
+    # Explicitly clear the window back to the full teaching day.
+    clear_grid_window: bool = False
+
+
+class SessionAccessUserOut(BaseModel):
+    user_id: int
+    username: str
+    name: str | None = None
+    is_admin: bool = False
+    org_role: str | None = None
+    """Where this user's level comes from: admin/owner/creator/session/group/org role."""
+    source: str
+    level: str
+    override: str | None = None
+
+
+class SessionAccessListOut(BaseModel):
+    can_manage: bool
+    global_session_id: int | None = None
+    users: list[SessionAccessUserOut]

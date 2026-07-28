@@ -570,6 +570,11 @@ export function DashboardPage() {
                     label={s.name}
                     busy={busySessionId === s.id}
                     items={[
+                      {
+                        id: "settings",
+                        label: "Settings…",
+                        onClick: () => navigate(`/timetable/${s.id}/settings`),
+                      },
                       { id: "rename", label: "Rename…", onClick: () => void renameSession(s) },
                       { id: "save-as", label: "Save as…", onClick: () => void saveSessionAs(s) },
                       {
