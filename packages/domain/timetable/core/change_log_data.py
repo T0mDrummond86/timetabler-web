@@ -213,28 +213,77 @@ def _with_lecturer_names(
     return out
 
 
-def _removed_net_booking_ids(session: Session, timetable_session_id: int) -> set[int]:
-    """Booking ids whose tracked net change has been removed from the markup.
+def _latest_entry_for_bookings(
+    session: Session, timetable_session_id: int
+) -> dict[int, int]:
+    """Booking id -> id of the most recent entry that changed it."""
+    out: dict[int, int] = {}
+    entries = (
+        session.query(ChangeLogEntry)
+        .filter(ChangeLogEntry.timetable_session_id == timetable_session_id)
+        .order_by(ChangeLogEntry.id.desc())
+        .all()
+    )
+    for e in entries:
+        if not is_timetabling_change_log_entry(e):
+            continue
+        try:
+            payload = json.loads(e.details or "")
+        except Exception:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        before, after = payload_booking_maps(payload)
+        for bid in set(before) | set(after):
+            # Newest first, so the first sighting is the latest change.
+            out.setdefault(bid, e.id)
+    return out
 
-    Stored session-wide across entries under ``details['removed_net']`` (a
-    ``{str(booking_id): True}`` map), so removal survives later edits that
-    change which entry is "latest" for a booking.
+
+def _removed_net_pins(session: Session, timetable_session_id: int) -> dict[int, int]:
+    """Booking id -> the change its removal was applied to.
+
+    A removal is recorded on the entry that was the booking's latest change at
+    the time, under ``details['removed_net']``. Pinning it to that entry is
+    what makes removal apply to *one* change rather than to the booking
+    forever: once the class is changed again, a newer entry becomes its latest,
+    the pin no longer matches, and the new change is logged and marked up
+    normally. Removing that one too is a separate, deliberate act.
     """
-    out: set[int] = set()
+    out: dict[int, int] = {}
     for entry in _session_entries_query(session, timetable_session_id):
         try:
             payload = json.loads(entry.details or "{}")
         except Exception:
             continue
         removed = payload.get("removed_net") if isinstance(payload, dict) else None
-        if isinstance(removed, dict):
-            for key, val in removed.items():
-                if val:
-                    try:
-                        out.add(int(key))
-                    except (TypeError, ValueError):
-                        continue
+        if not isinstance(removed, dict):
+            continue
+        for key, val in removed.items():
+            if not val:
+                continue
+            try:
+                bid = int(key)
+            except (TypeError, ValueError):
+                continue
+            # Later removals win if a booking was removed more than once.
+            if entry.id is not None and entry.id > out.get(bid, -1):
+                out[bid] = entry.id
     return out
+
+
+def _removed_booking_ids_for_latest(
+    session: Session,
+    timetable_session_id: int,
+    latest_entry_for_bid: dict[int, int],
+) -> set[int]:
+    """Bookings whose *current* net change is the one that was removed."""
+    pins = _removed_net_pins(session, timetable_session_id)
+    return {
+        bid
+        for bid, pinned in pins.items()
+        if latest_entry_for_bid.get(bid) == pinned
+    }
 
 
 def payload_booking_maps(payload: dict) -> tuple[dict[int, dict | None], dict[int, dict | None]]:
@@ -317,7 +366,11 @@ def affected_course_ids_from_resolved_changelog(
     before_map, after_map = resolve_session_booking_net_maps(
         session, timetable_session_id=timetable_session_id
     )
-    removed_net = _removed_net_booking_ids(session, timetable_session_id)
+    removed_net = _removed_booking_ids_for_latest(
+        session,
+        timetable_session_id,
+        _latest_entry_for_bookings(session, timetable_session_id),
+    )
     course_ids: set[int] = set()
     for bid in set(before_map) | set(after_map):
         if bid in removed_net:
@@ -390,7 +443,11 @@ def admin_export_highlights_by_external_id(
     before_map, after_map = resolve_session_booking_net_maps(
         session, timetable_session_id=timetable_session_id
     )
-    removed_net = _removed_net_booking_ids(session, timetable_session_id)
+    removed_net = _removed_booking_ids_for_latest(
+        session,
+        timetable_session_id,
+        _latest_entry_for_bookings(session, timetable_session_id),
+    )
     out: dict[str, AdminExportChangeHighlight] = {}
     for bid in set(before_map) | set(after_map):
         if bid in removed_net:
@@ -479,7 +536,9 @@ def gather_timetabling_change_log_display_rows(
             for bid in notes:
                 if bid not in latest_note_for_bid:
                     latest_note_for_bid[bid] = notes[bid]
-        removed_net = _removed_net_booking_ids(session, timetable_session_id)
+        removed_net = _removed_booking_ids_for_latest(
+            session, timetable_session_id, latest_entry_for_bid
+        )
         out: list[ChangeLogDisplayRow] = []
         staff_ids: list[set[int]] = []
         current_states: list[dict | None] = []

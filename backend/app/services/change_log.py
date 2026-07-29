@@ -136,9 +136,12 @@ def set_change_log_highlight_removed(
     """Toggle whether a resolved change contributes to the admin-export markup.
 
     The change stays in the log (shown with a "removed" status); it just stops
-    (or resumes) producing a highlight. Manual records store the flag on their
-    own entry; tracked net changes store it session-wide per booking so removal
-    survives later edits that change which entry is "latest" for the booking.
+    (or resumes) producing a highlight.
+
+    Manual records store the flag on their own entry. Tracked net changes store
+    it on the entry that is the booking's latest change right now, which pins
+    the removal to *that* change: edit the class again and the new change is
+    logged and marked up as normal, rather than inheriting the earlier removal.
     """
     entry = db.get(ChangeLogEntry, entry_id)
     if entry is None or entry.timetable_session_id != timetable_session_id:
