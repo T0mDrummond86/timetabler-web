@@ -26,10 +26,10 @@ export function HoldingAreaPanel({
   canEdit = true,
 }: Props) {
   const [dropHover, setDropHover] = useState(false);
-  // Remembered per browser: a scheduler who works from the grid shouldn't have
-  // to re-hide this every visit.
+  // Collapsed by default — the grid is the point of the page, and the strip
+  // still shows the unscheduled count. Only an explicit "expanded" is honoured.
   const [collapsed, setCollapsed] = useState(
-    () => localStorage.getItem(COLLAPSE_KEY) === "1",
+    () => localStorage.getItem(COLLAPSE_KEY) !== "0",
   );
 
   function toggleCollapsed() {
