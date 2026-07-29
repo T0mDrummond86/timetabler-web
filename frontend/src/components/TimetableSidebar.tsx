@@ -35,6 +35,9 @@ type Props = {
   header?: ReactNode;
   /** Inserted after view controls, before SELECT (semester week, block delivery). */
   viewExtras?: ReactNode;
+  /** Collapsed to a rail, handing the grid the sidebar's width. */
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
 };
 
 const MODES: { value: TimetableMode; label: string }[] = [
@@ -100,14 +103,50 @@ export function TimetableSidebar({
   staffLocked = false,
   header,
   viewExtras,
+  collapsed = false,
+  onToggleCollapsed,
 }: Props) {
   const filtered = entities.filter((e) =>
     e.label.toLowerCase().includes(filter.toLowerCase()),
   );
   const viewOptions = VIEW_KINDS_BY_MODE[mode];
 
+  const selectedLabel = entities.find((e) => e.id === selectedId)?.label ?? null;
+
+  if (collapsed) {
+    return (
+      <aside className="tt-sidebar tt-sidebar--rail" data-tutorial-id="sidebar">
+        <button
+          type="button"
+          className="tt-rail-toggle"
+          onClick={onToggleCollapsed}
+          aria-expanded={false}
+          title="Show the view and selection controls"
+        >
+          ›
+        </button>
+        {selectedLabel && (
+          <span className="tt-rail-label" title={selectedLabel}>
+            {selectedLabel}
+          </span>
+        )}
+      </aside>
+    );
+  }
+
   return (
     <aside className="tt-sidebar" data-tutorial-id="sidebar">
+      {onToggleCollapsed && (
+        <button
+          type="button"
+          className="tt-rail-toggle tt-rail-toggle--open"
+          onClick={onToggleCollapsed}
+          aria-expanded
+          title="Collapse this panel and give the grid the space"
+        >
+          ‹
+        </button>
+      )}
       {header}
 
       <div className="tt-sidebar-section tt-sidebar-mode-view">

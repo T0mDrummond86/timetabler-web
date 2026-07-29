@@ -32,7 +32,7 @@ import { copyTimetableGrid } from "../lib/timetableGridClipboard";
 import { TutorialHost } from "../tutorial/TutorialHost";
 import { ViolationsReportPanel } from "../components/ViolationsReportPanel";
 import { ClashSettingsPanel } from "../components/ClashSettingsPanel";
-import { TimetableViolationsPanel } from "../components/TimetableViolationsPanel";
+import { ViolationsChip } from "../components/ViolationsChip";
 import { BlockDeliveryPanel } from "../components/BlockDeliveryPanel";
 import { BlockOverviewView } from "../components/BlockOverviewView";
 import { AppShell } from "../components/AppShell";
@@ -183,6 +183,9 @@ export function TimetablePage() {
   const [semesterWeek, setSemesterWeek] = useState(1);
   const [previewSemesterWeek, setPreviewSemesterWeek] = useState<number | null>(null);
   const [gridZoom, setGridZoom] = useState(DEFAULT_GRID_ZOOM);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem("timetabler-sidebar-collapsed") === "1",
+  );
   const [suggestedBlockCode, setSuggestedBlockCode] = useState<string | null>(null);
   const [sidebarEntities, setSidebarEntities] = useState<TimetableEntity[]>([]);
   const [grid, setGrid] = useState<TimetableGrid | null>(null);
@@ -1622,11 +1625,19 @@ export function TimetablePage() {
         ) : undefined
       }
       actions={
-        mutating ? (
-          <span className="muted" style={{ fontSize: "0.85rem" }}>
-            Saving…
-          </span>
-        ) : undefined
+        <>
+          {sessionTab === "timetable" && grid && showAlerts && (
+            <ViolationsChip
+              violations={grid.violations}
+              onViewAll={() => setSessionTab("warnings")}
+            />
+          )}
+          {mutating && (
+            <span className="muted" style={{ fontSize: "0.85rem" }}>
+              Saving…
+            </span>
+          )}
+        </>
       }
     >
       <DropdownGroup>
@@ -1888,8 +1899,15 @@ export function TimetablePage() {
           )}
 
           {courses.length > 0 && (
-        <div className="tt-workspace">
+        <div className={`tt-workspace${sidebarCollapsed ? " tt-workspace--railed" : ""}`}>
           <TimetableSidebar
+            collapsed={sidebarCollapsed}
+            onToggleCollapsed={() =>
+              setSidebarCollapsed((v) => {
+                localStorage.setItem("timetabler-sidebar-collapsed", v ? "0" : "1");
+                return !v;
+              })
+            }
             canEdit={canEditSession}
             mode={pinnedMode ?? timetableMode}
             showModeSelector={pinnedMode === null}
@@ -1993,12 +2011,6 @@ export function TimetablePage() {
                 acceptBookingDrop={editable}
                 onBookingDrop={editable ? (id) => void onReturnToHolding(id) : undefined}
                 sticky
-              />
-            )}
-            {grid && showAlerts && grid.violations.length > 0 && (
-              <TimetableViolationsPanel
-                violations={grid.violations}
-                onViewAll={() => setSessionTab("warnings")}
               />
             )}
           </div>
