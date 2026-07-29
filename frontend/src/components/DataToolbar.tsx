@@ -42,6 +42,7 @@ export function DataToolbar({
 }: Props) {
   const exportMenu = useDropdown();
   const importMenu = useDropdown();
+  const displayMenu = useDropdown();
   const importRef = useRef<HTMLInputElement>(null);
   type ImportKind = Props["onImport"] extends (k: infer K, f: File) => void ? K : never;
   const importKindRef = useRef<ImportKind>("session");
@@ -98,31 +99,49 @@ export function DataToolbar({
       />
       {showDisplay && (
         <div className="tt-toolbar-group">
-          <span className="tt-toolbar-label">View</span>
-          <label className="checkbox tt-toolbar-check">
-            <input
-              type="checkbox"
-              checked={colourByClass}
-              onChange={(e) => onColourByClassChange(e.target.checked)}
-            />
-            Class colours
-          </label>
-          <label className="checkbox tt-toolbar-check">
-            <input
-              type="checkbox"
-              checked={showAlerts}
-              onChange={(e) => onShowAlertsChange(e.target.checked)}
-            />
-            Alerts
-          </label>
-          <label className="checkbox tt-toolbar-check" title="When off, clashes are not checked after each move — use Check clashes to run once">
-            <input
-              type="checkbox"
-              checked={autoClashDetect}
-              onChange={(e) => onAutoClashDetectChange(e.target.checked)}
-            />
-            Auto-detect clashes
-          </label>
+          <span className="tt-dropdown-wrap" ref={displayMenu.wrapRef}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={displayMenu.toggle}
+              aria-expanded={displayMenu.open}
+              aria-haspopup="menu"
+              title="Colours, alerts and clash checking"
+            >
+              Display ▾
+            </button>
+            {displayMenu.open && (
+              <div className="tt-dropdown-menu" role="menu">
+                <label className="checkbox ctx-check">
+                  <input
+                    type="checkbox"
+                    checked={colourByClass}
+                    onChange={(e) => onColourByClassChange(e.target.checked)}
+                  />
+                  Class colours
+                </label>
+                <label className="checkbox ctx-check">
+                  <input
+                    type="checkbox"
+                    checked={showAlerts}
+                    onChange={(e) => onShowAlertsChange(e.target.checked)}
+                  />
+                  Alerts
+                </label>
+                <label
+                  className="checkbox ctx-check"
+                  title="When off, clashes are not checked after each move — use Check clashes to run once"
+                >
+                  <input
+                    type="checkbox"
+                    checked={autoClashDetect}
+                    onChange={(e) => onAutoClashDetectChange(e.target.checked)}
+                  />
+                  Auto-detect clashes
+                </label>
+              </div>
+            )}
+          </span>
           {!autoClashDetect && onCheckClashes && (
             <button
               type="button"

@@ -273,6 +273,94 @@ code {
   margin-bottom: 1.25rem;
 }
 
+/* ---------------- compact topbar (working screens) ---------------- */
+
+.app-topbar--compact {
+  height: 44px;
+  justify-content: flex-start;
+  gap: 0.6rem;
+  padding: 0 0.9rem;
+}
+
+.app-brand-lockup--sm {
+  height: 17px;
+  display: block;
+}
+
+.topbar-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.topbar-session {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar-crumb::after {
+  content: "/";
+  color: var(--border);
+}
+
+.topbar-title {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The editable group title inherits the bar's scale instead of h1's. */
+.topbar-title .editable-group-title-btn,
+.topbar-title .editable-group-title-input {
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 0.1rem 0.3rem;
+}
+
+.topbar-subtitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.topbar-info {
+  text-decoration: none;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.topbar-spacer {
+  flex: 1;
+}
+
+/* Checkbox rows inside dropdown menus (e.g. the Display menu). */
+.ctx-check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ctx-check:hover {
+  background: var(--bg-hover, rgba(125, 125, 125, 0.08));
+}
+
 .page-breadcrumb {
   font-size: 0.82rem;
   color: var(--text-muted);
@@ -743,13 +831,22 @@ button.danger {
 /* Session tabs — mirrors desktop QTabWidget */
 .session-tabs {
   display: flex;
-  flex-wrap: wrap;
+  /* One row always: overflow scrolls sideways rather than stacking a second
+     row between the toolbar and the grid. */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
   gap: 0;
   margin-bottom: 1rem;
   border-bottom: 1px solid var(--border);
   background: var(--zone-tabs, var(--bg-elevated));
   border-radius: var(--radius-md) var(--radius-md) 0 0;
   padding: 0 0.5rem;
+}
+
+.session-tabs .session-tab {
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .session-tab {

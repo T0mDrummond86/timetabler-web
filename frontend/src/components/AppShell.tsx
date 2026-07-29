@@ -16,6 +16,9 @@ type Props = {
   minimal?: boolean;
   /** Lock shell to viewport height (timetable grid + scrollable sidebar). */
   fillViewport?: boolean;
+  /** Fold the brand bar, breadcrumb, title and subtitle into one slim bar —
+   *  used by working screens where vertical space belongs to the content. */
+  compact?: boolean;
 };
 
 export function AppShell({
@@ -27,12 +30,26 @@ export function AppShell({
   wide = false,
   minimal = false,
   fillViewport = false,
+  compact = false,
 }: Props) {
   const theme = useTheme();
   const lockup = theme === "dark" ? lockupDark : lockupLight;
   return (
     <div className={`app-shell${fillViewport ? " app-shell--fill" : ""}`}>
-      {!minimal && (
+      {!minimal && compact && (
+        <header className="app-topbar app-topbar--compact">
+          <Link to="/dashboard" className="app-brand" aria-label={`${APP_NAME} — dashboard`}>
+            <img src={lockup} alt={APP_NAME} className="app-brand-lockup app-brand-lockup--sm" />
+          </Link>
+          {breadcrumb && <span className="topbar-crumb">{breadcrumb}</span>}
+          {title && <span className="topbar-title">{title}</span>}
+          {subtitle && <span className="topbar-subtitle">{subtitle}</span>}
+          <span className="topbar-spacer" />
+          {actions}
+          <ThemeToggle />
+        </header>
+      )}
+      {!minimal && !compact && (
         <header className="app-topbar">
           <div className="app-topbar-start">
             <Link to="/dashboard" className="app-brand" aria-label={APP_NAME}>
@@ -49,7 +66,7 @@ export function AppShell({
       <main
         className={`app-main${wide ? " app-main-wide" : ""}${fillViewport ? " app-main--fill" : ""}`}
       >
-        {!minimal && (breadcrumb || title) && (
+        {!minimal && !compact && (breadcrumb || title) && (
           <div className="page-head">
             {breadcrumb && <div className="page-breadcrumb">{breadcrumb}</div>}
             {title && <h1 className="page-title">{title}</h1>}

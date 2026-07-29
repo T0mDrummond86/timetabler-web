@@ -1580,15 +1580,18 @@ export function TimetablePage() {
   return (
     <AppShell
       wide
+      compact
       minimal={isEmbedded}
       fillViewport={
         (sessionTab === "timetable" && courses.length > 0) || ENTITY_SPLIT_TABS.has(sessionTab)
       }
       breadcrumb={
+        // The session name doubles as the breadcrumb; the brand mark is the
+        // way back to the dashboard.
         <>
-          <Link to="/dashboard">Dashboard</Link>
-          <span aria-hidden> / </span>
-          {sessionName}
+          <span className="topbar-session" title={`Session: ${sessionName}`}>
+            {sessionName}
+          </span>
           {!canEditSession && (
             <span
               className="session-access-badge"
@@ -1602,23 +1605,20 @@ export function TimetablePage() {
       title={pageTitle}
       subtitle={
         sessionTab === "timetable" && viewKind !== "block_overview" ? (
-          <span className="tt-page-subtitle">
+          <>
             {grid?.week_label ?? "Repeating week"}
-            {editable ? (
-              <span className="tt-edit-hint">Drag to move · Double-click to edit</span>
-            ) : (
-              <span className="tt-readonly-badge" role="status">
-                Read-only — viewing only
-              </span>
-            )}
             {globalLink?.linked && viewKind === "staff" && (
-              <span className="tt-global-link-hint muted">
-                Dark grey = scheduled in linked session
-                {globalLink.global_session_name ? ` (${globalLink.global_session_name})` : ""}.{" "}
-                <Link to={`/global/${globalLink.global_session_id}`}>Global group</Link>
-              </span>
+              <Link
+                to={`/global/${globalLink.global_session_id}`}
+                className="topbar-info"
+                title={`Dark grey = scheduled in linked session${
+                  globalLink.global_session_name ? ` (${globalLink.global_session_name})` : ""
+                }. Open the global group.`}
+              >
+                ⓘ
+              </Link>
             )}
-          </span>
+          </>
         ) : undefined
       }
       actions={
