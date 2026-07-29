@@ -2187,6 +2187,34 @@ body:has(.app-shell--fill) #root {
   margin-bottom: 0;
 }
 
+/* Collapsed, this is a one-line drop target — it should cost a row, not a
+   band. It stays a drop target so you can still unschedule onto it. */
+.tt-page--timetable .tt-main .holding-panel--collapsed {
+  max-height: none;
+  padding: 0.15rem 0.6rem;
+  overflow: visible;
+}
+
+.holding-panel--collapsed .holding-panel-header {
+  align-items: center;
+  /* .panel-header carries a heading rhythm this one-line bar doesn't need. */
+  padding: 0;
+  margin: 0;
+  border-bottom: none;
+  min-height: 0;
+}
+
+.holding-panel--collapsed .holding-panel-heading h2 {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.holding-panel--collapsed .holding-count-badge {
+  font-size: 0.72rem;
+}
+
 .holding-panel-body {
   padding: 0 1rem 1rem;
 }

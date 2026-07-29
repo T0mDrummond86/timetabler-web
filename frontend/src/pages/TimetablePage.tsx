@@ -1664,18 +1664,6 @@ export function TimetablePage() {
           >
             Redo
           </button>
-          <button type="button" className="btn-secondary" onClick={openAdditionalTab}>
-            New tab
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            disabled={!grid || !grid.bookings.length || !showsWeekGrid(viewKind)}
-            title="Copy this timetable as a table for email"
-            onClick={() => void onCopyGridToClipboard()}
-          >
-            {gridCopied ? "Copied ✓" : "Copy for email"}
-          </button>
           {!isEmbedded && (
             <span className="tt-dropdown-wrap" ref={externalViewsMenu.wrapRef}>
               <button
@@ -1684,12 +1672,36 @@ export function TimetablePage() {
                 onClick={externalViewsMenu.toggle}
                 aria-expanded={externalViewsMenu.open}
                 aria-haspopup="menu"
-                title="Open the same timetable view in a new browser tab or split layout"
+                title="More schedule actions"
               >
-                Open in new tab ▾
+                ⋯
               </button>
               {externalViewsMenu.open && (
                 <div className="tt-dropdown-menu" role="menu">
+                  <button
+                    type="button"
+                    className="ctx-item"
+                    role="menuitem"
+                    disabled={!grid || !grid.bookings.length || !showsWeekGrid(viewKind)}
+                    onClick={() => {
+                      externalViewsMenu.close();
+                      void onCopyGridToClipboard();
+                    }}
+                  >
+                    {gridCopied ? "Copied ✓" : "Copy for email"}
+                  </button>
+                  <button
+                    type="button"
+                    className="ctx-item"
+                    role="menuitem"
+                    onClick={() => {
+                      externalViewsMenu.close();
+                      openAdditionalTab();
+                    }}
+                  >
+                    New tab
+                  </button>
+                  <div className="ctx-divider" />
                   <span className="ctx-label">New browser tab</span>
                   {[...VIEW_KINDS_BY_MODE.regular, ...VIEW_KINDS_BY_MODE.block].map((opt) => (
                     <button

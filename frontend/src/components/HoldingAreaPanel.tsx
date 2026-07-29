@@ -2,6 +2,8 @@ import { useState } from "react";
 import { slotsToDurationLabel } from "../lib/timeUtils";
 import { HoldingClass } from "../types";
 
+const COLLAPSE_KEY = "timetabler-holding-collapsed";
+
 export const MIME_BOOKING = "application/timetabler-booking";
 export const MIME_PENDING = "application/timetabler-pending";
 
@@ -24,7 +26,18 @@ export function HoldingAreaPanel({
   canEdit = true,
 }: Props) {
   const [dropHover, setDropHover] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  // Remembered per browser: a scheduler who works from the grid shouldn't have
+  // to re-hide this every visit.
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem(COLLAPSE_KEY) === "1",
+  );
+
+  function toggleCollapsed() {
+    setCollapsed((c) => {
+      localStorage.setItem(COLLAPSE_KEY, c ? "0" : "1");
+      return !c;
+    });
+  }
 
   function acceptsDrag(e: React.DragEvent) {
     return acceptBookingDrop && e.dataTransfer.types.includes(MIME_BOOKING);
@@ -64,7 +77,7 @@ export function HoldingAreaPanel({
       onDrop={onDrop}
     >
       <div className="panel-header holding-panel-header">
-        <div>
+        <div className="holding-panel-heading">
           <h2>
             Holding area
             {items.length > 0 && (
@@ -82,7 +95,7 @@ export function HoldingAreaPanel({
         <button
           type="button"
           className="btn-ghost btn-xs holding-collapse-btn"
-          onClick={() => setCollapsed((c) => !c)}
+          onClick={toggleCollapsed}
           aria-expanded={!collapsed}
           aria-label={collapsed ? "Expand holding area" : "Collapse holding area"}
         >
