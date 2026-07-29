@@ -13,6 +13,7 @@ import {
   type LecturerWeek,
   type SessionChoice,
 } from "./lecturerWeek";
+import { InstallBanner } from "./InstallBanner";
 import { MobileWeekGrid } from "./MobileWeekGrid";
 import "./mobile.css";
 
@@ -192,6 +193,7 @@ export default function MobilePage() {
         {week && <StaleIndicator week={week} onRefresh={() => selected && void loadWeek(selected)} />}
       </header>
 
+      <InstallBanner />
       {error && <div className="mv-error">{error}</div>}
 
       <div className="mv-body">
@@ -316,6 +318,7 @@ function MobileLogin({ onSignedIn }: { onSignedIn: () => void }) {
 
   return (
     <div className="mv-login">
+      <InstallBanner />
       <form className="mv-login-card" onSubmit={submit}>
         <h1>TAFEtabler</h1>
         <p className="mv-login-hint">Sign in to view timetables.</p>
