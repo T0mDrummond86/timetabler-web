@@ -2739,6 +2739,12 @@ body:has(.app-shell--fill) #root {
   font-size: 0.78rem;
 }
 
+/* Under-hours candidates in the picker. Colour is a bonus — Safari ignores it
+   on a native <option>, so the dot in the label carries the meaning. */
+.cover-option-under-hours {
+  color: var(--warning);
+}
+
 /* Flags a cover lecturer who is under their contracted hours: covering this
    class pays down what they owe, so they are the one to ask first. */
 .cover-under-hours-badge {

@@ -19,19 +19,13 @@ type Props = {
 };
 
 /** How a candidate reads in the picker. Under-hours lecturers are the ones who
- * should be asked first, so they carry a marker and what they still owe — but
- * the list order is left alone, since availability still decides who can go. */
+ * should be asked first, so they carry a dot — the list order is left alone,
+ * since availability still decides who can go. The dot rather than colour
+ * alone: a native <option> ignores styling in some browsers, and a colour with
+ * no shape reads as nothing to anyone who can't distinguish it. */
 function candidateLabel(c: CoverCandidate): string {
-  const notes: string[] = [];
-  if (c.busy) notes.push("teaching this slot");
-  if (c.under_hours) {
-    notes.push(
-      c.still_to_make_up != null
-        ? `under hours, ${formatHours(c.still_to_make_up, 1)}h to make up`
-        : "under hours",
-    );
-  }
-  return notes.length ? `${c.label} — ${notes.join("; ")}` : c.label;
+  const marked = c.under_hours ? `● ${c.label}` : c.label;
+  return c.busy ? `${marked} — teaching this slot` : marked;
 }
 
 function todayIso(): string {
@@ -407,7 +401,11 @@ export function LecturerCoverPanel({
                 {coverCandidates.length ? "Select cover lecturer…" : "No lecturers in this session"}
               </option>
               {coverCandidates.map((c) => (
-                <option key={c.id} value={c.id}>
+                <option
+                  key={c.id}
+                  value={c.id}
+                  className={c.under_hours ? "cover-option-under-hours" : undefined}
+                >
                   {candidateLabel(c)}
                 </option>
               ))}
