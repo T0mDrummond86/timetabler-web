@@ -308,6 +308,7 @@ export type GlobalAggregatedStaffRow = {
   fte?: number | null | string;
   max_hours_per_week?: number | null | string;
   non_teaching_day?: number | null | string;
+  total_hours?: number | null | string;
   variance?: number | null | string;
   member_variances?: (number | null)[];
   /** Ledger figures, present only for lecturers under their contracted hours. */

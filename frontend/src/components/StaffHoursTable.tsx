@@ -280,6 +280,19 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
           <thead>
             <tr>
               <th className="staff-col-primary staff-col-sticky">Lecturer</th>
+              {/* Total and variance lead: they are what the table is read for. */}
+              <th
+                className="staff-col-metric staff-col-metric-highlight"
+                title="In-class + bulk online + dev + PD + supervision"
+              >
+                Total
+              </th>
+              <th
+                className="staff-col-metric staff-col-variance"
+                title="Total workload minus lecturing hours"
+              >
+                Variance
+              </th>
               <th className="staff-col-meta">Cost centre</th>
               <th className="staff-col-metric staff-col-metric-group">Subst. FTE</th>
               <th
@@ -305,18 +318,6 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
                 title="Sessions × hours ÷ 20 weeks when class runs fewer than all semester weeks"
               >
                 Session avg
-              </th>
-              <th
-                className="staff-col-metric staff-col-metric-highlight"
-                title="In-class + bulk online + dev + PD + supervision"
-              >
-                Total
-              </th>
-              <th
-                className="staff-col-metric staff-col-variance"
-                title="Total workload minus lecturing hours"
-              >
-                Variance
               </th>
               <th
                 className="staff-col-detail staff-hours-bulk-online-col"
@@ -358,6 +359,12 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
                     </span>
                   </div>
                 </td>
+                <td className="staff-col-metric staff-col-metric-highlight">
+                  {formatHours(row.total_hours)}
+                </td>
+                <td className="staff-col-metric staff-col-variance">
+                  <VarianceBadge value={row.variance} category={row.variance_category} />
+                </td>
                 <td className="staff-col-meta staff-hours-wrap">{row.cost_centre ?? ""}</td>
                 <td className="staff-col-metric staff-col-metric-group">
                   {formatFte(row.fte)}
@@ -372,12 +379,6 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
                   title={row.session_schedule_avg ?? undefined}
                 >
                   {row.session_schedule_avg ?? "—"}
-                </td>
-                <td className="staff-col-metric staff-col-metric-highlight">
-                  {formatHours(row.total_hours)}
-                </td>
-                <td className="staff-col-metric staff-col-variance">
-                  <VarianceBadge value={row.variance} category={row.variance_category} />
                 </td>
                 <td className="staff-col-detail staff-hours-bulk-online-col">
                   <BulkOnlineCell

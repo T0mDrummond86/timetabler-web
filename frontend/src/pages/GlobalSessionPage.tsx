@@ -439,12 +439,8 @@ export function GlobalSessionPage() {
           ]}
           columns={[
             { header: "Name", cell: (r) => r.name },
-            { header: "Used in sessions", cell: (r) => formatSessions(r.session_names) },
-            { header: "FTE", cell: (r) => formatVaries(r.fte) },
-            {
-              header: "Non-teaching day",
-              cell: (r) => formatNonTeachingDay(r.non_teaching_day),
-            },
+            // Total and variance lead: they are what the table is read for.
+            { header: "Total", cell: (r) => formatGlobalVariance(r.total_hours) },
             {
               header: "Variance",
               cell: (r) => formatGlobalVariance(r.variance),
@@ -455,6 +451,12 @@ export function GlobalSessionPage() {
                 if (v > 0.001) return "variance-cell variance-full-fte-overtime";
                 return "variance-cell";
               },
+            },
+            { header: "Used in sessions", cell: (r) => formatSessions(r.session_names) },
+            { header: "FTE", cell: (r) => formatVaries(r.fte) },
+            {
+              header: "Non-teaching day",
+              cell: (r) => formatNonTeachingDay(r.non_teaching_day),
             },
             {
               header: "Hours owed",

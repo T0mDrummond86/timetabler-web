@@ -297,6 +297,7 @@ def aggregated_staff(db: Session, global_session_id: int) -> list[dict]:
                     "fte": s.fte,
                     "max_hours_per_week": s.max_hours_per_week,
                     "non_teaching_day": s.non_teaching_day,
+                    "total_hours": total,
                     "variance": variance,
                     "variance_category": category,
                 }
@@ -309,6 +310,7 @@ def aggregated_staff(db: Session, global_session_id: int) -> list[dict]:
             "fte": _merge_field(members, "fte"),
             "max_hours_per_week": _merge_field(members, "max_hours_per_week"),
             "non_teaching_day": _merge_field(members, "non_teaching_day"),
+            "total_hours": _merge_field(members, "total_hours"),
             "variance": variance,
             "member_variances": [m.get("variance") for m in members],
             **ledger_for(variance, covered.get(key, 0.0)),
