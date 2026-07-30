@@ -44,6 +44,15 @@ export function TutorialHost({ sessionId }: { sessionId: number }) {
 
   const active = progress.active && progress.sessionId === sessionId;
 
+  // The panel is fixed, so the app has to give up the width itself or the
+  // panel just covers it. Cleared on unmount too, or leaving the tutorial
+  // would strand the gutter with nothing in it.
+  useEffect(() => {
+    const docked = active && !collapsed;
+    document.body.classList.toggle("tutorial-docked", docked);
+    return () => document.body.classList.remove("tutorial-docked");
+  }, [active, collapsed]);
+
   const apply = useCallback((patch: Partial<TutorialProgress>) => {
     setProgress(updateTutorialProgress(patch));
   }, []);

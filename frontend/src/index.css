@@ -1395,7 +1395,12 @@ body:has(.app-shell--fill) #root {
   flex: 1 1 0;
   min-height: 0;
   max-height: none;
-  overflow: hidden;
+  /* Vertical fit is what "fit" means, and the overflow modifier below reopens
+     it when the day is too tall. Horizontal must always be scrollable: the
+     grid carries a min-width floor, so a container narrower than that would
+     otherwise clip the last day with no way to reach it. */
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .tt-page--timetable .tt-main .timetable-grid-scroll--fit.timetable-grid-scroll--overflow {
@@ -5517,6 +5522,16 @@ body.staff-editor-resizing {
 }
 
 /* ---------------- tutorial ---------------- */
+
+/* The panel is fixed, so on its own it sits on top of the app and hides the
+   right of the grid. Reserving a gutter makes the app reflow beside it rather
+   than under it. Only where there is width to spare — on a narrow screen a
+   354px gutter would cost more than the overlap did. */
+@media (min-width: 1000px) {
+  body.tutorial-docked #root {
+    padding-right: 354px; /* panel 330 + its 12px offset + 12px breathing room */
+  }
+}
 
 .tutorial-panel {
   position: fixed;
