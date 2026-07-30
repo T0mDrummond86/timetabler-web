@@ -267,7 +267,10 @@ def aggregated_staff(db: Session, global_session_id: int) -> list[dict]:
         staff_tab_total_hours,
     )
 
+    from .cover_ledger import cover_hours_by_lecturer, ledger_for
     from .global_staff_hours import staff_hours_snapshot_for_staff_linked
+
+    covered = cover_hours_by_lecturer(db, global_session_id)
 
     for sid in names:
         for s in (
@@ -300,12 +303,15 @@ def aggregated_staff(db: Session, global_session_id: int) -> list[dict]:
             )
 
     def enrich(members: list[dict]) -> dict:
+        variance = _merge_field(members, "variance")
+        key = normalize_staff_name(members[0].get("name")) if members else ""
         return {
             "fte": _merge_field(members, "fte"),
             "max_hours_per_week": _merge_field(members, "max_hours_per_week"),
             "non_teaching_day": _merge_field(members, "non_teaching_day"),
-            "variance": _merge_field(members, "variance"),
+            "variance": variance,
             "member_variances": [m.get("variance") for m in members],
+            **ledger_for(variance, covered.get(key, 0.0)),
         }
 
     return _amalgamate(

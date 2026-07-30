@@ -7,6 +7,7 @@ import { DEFAULT_GRID_ZOOM, displayZoomPercent, resetGridZoom, zoomIn, zoomOut }
 import { readDisplayPrefs } from "../lib/displayPrefs";
 import { copyCoverTimetable } from "../lib/coverTimetableClipboard";
 import { slotRangeLabel } from "../lib/timeUtils";
+import { formatHours } from "../lib/staffVariance";
 
 type Props = {
   sessionId: number;
@@ -16,6 +17,22 @@ type Props = {
   /** Global session this timetable belongs to; null if not linked. */
   globalSessionId: number | null;
 };
+
+/** How a candidate reads in the picker. Under-hours lecturers are the ones who
+ * should be asked first, so they carry a marker and what they still owe — but
+ * the list order is left alone, since availability still decides who can go. */
+function candidateLabel(c: CoverCandidate): string {
+  const notes: string[] = [];
+  if (c.busy) notes.push("teaching this slot");
+  if (c.under_hours) {
+    notes.push(
+      c.still_to_make_up != null
+        ? `under hours, ${formatHours(c.still_to_make_up, 1)}h to make up`
+        : "under hours",
+    );
+  }
+  return notes.length ? `${c.label} — ${notes.join("; ")}` : c.label;
+}
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -391,10 +408,24 @@ export function LecturerCoverPanel({
               </option>
               {coverCandidates.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.busy ? `${c.label} — teaching this slot` : c.label}
+                  {candidateLabel(c)}
                 </option>
               ))}
             </select>
+            {(() => {
+              // A native <option> can't carry a styled badge, so the chip sits
+              // beside the control for whoever is currently selected.
+              const picked = coverCandidates.find((c) => c.id === coverStaffId);
+              if (!picked?.under_hours) return null;
+              return (
+                <span className="cover-under-hours-badge">
+                  Under hours
+                  {picked.still_to_make_up != null
+                    ? ` · ${formatHours(picked.still_to_make_up, 1)}h owed`
+                    : ""}
+                </span>
+              );
+            })()}
             <p className="muted lecturer-cover-hint">
               Single-click a class on the left, then double-click it to create a cover request for{" "}
               {coverStaffId

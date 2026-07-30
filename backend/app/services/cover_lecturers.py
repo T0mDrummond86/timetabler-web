@@ -10,6 +10,7 @@ from timetable.io.cover_export_pdf import render_cover_timetable_pdf
 
 from .booking_mutations import _booking_in_session, _mutation_result
 from .timetable_grid import get_repeating_week
+from .cover_ledger import normalize_staff_name
 
 
 def week_label_for_print(db: Session, timetable_session_id: int) -> str | None:
@@ -39,7 +40,44 @@ def list_cover_candidates(
         week_bookings,
         timetable_session_id=timetable_session_id,
     )
-    return [{"id": s.id, "label": s.name, "busy": busy} for s, busy in rows]
+    # Mark whoever is under their hours so the scheduler can see who should be
+    # called first. Ordering is deliberately left alone.
+    shortfall = _shortfall_by_lecturer(db, timetable_session_id)
+    out = []
+    for s, busy in rows:
+        left = shortfall.get(normalize_staff_name(s.name))
+        out.append(
+            {
+                "id": s.id,
+                "label": s.name,
+                "busy": busy,
+                "under_hours": left is not None and left > 0,
+                "still_to_make_up": left,
+            }
+        )
+    return out
+
+
+def _shortfall_by_lecturer(db: Session, timetable_session_id: int) -> dict[str, float]:
+    """Outstanding hours per lecturer for this session's global workspace.
+
+    A session that belongs to no workspace has no cover log and therefore no
+    ledger, so nobody is marked rather than the call failing.
+    """
+    from .cover_ledger import cover_hours_by_lecturer, ledger_for, normalize_staff_name
+    from .global_sessions import aggregated_staff, global_session_for_timetable
+
+    gs = global_session_for_timetable(db, timetable_session_id)
+    if gs is None:
+        return {}
+    covered = cover_hours_by_lecturer(db, gs.id)
+    out: dict[str, float] = {}
+    for row in aggregated_staff(db, gs.id):
+        key = normalize_staff_name(row.get("name"))
+        led = ledger_for(row.get("variance"), covered.get(key, 0.0))
+        if led["still_to_make_up"] is not None:
+            out[key] = led["still_to_make_up"]
+    return out
 
 
 def assign_cover_staff(

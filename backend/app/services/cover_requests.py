@@ -10,10 +10,12 @@ import datetime as _dt
 
 from sqlalchemy.orm import Session
 
+from timetable.core.models import Booking
 from timetable.core.tenancy_models import CoverRequest
 
 from .cover_log import create_cover_log_entry
 from .global_sessions import global_session_for_timetable
+from timetable.core.cover_hours import hours_from_slots
 
 
 def _parse_date(value: str | None) -> _dt.date | None:
@@ -168,8 +170,15 @@ def promote_cover_request(db: Session, *, timetable_session_id: int, request_id:
 
     from .export_filenames import timetable_session_name
 
+    # Exact length from the slot grid when the booking is still there.
+    booking = db.get(Booking, row.booking_id) if row.booking_id else None
+    hours = (
+        hours_from_slots(booking.start_slot, booking.end_slot) if booking else None
+    )
+
     entry = create_cover_log_entry(
         db,
+        hours=hours,
         global_session_id=gs.id,
         cover_date=row.cover_date.isoformat(),
         day_label=row.day_label,

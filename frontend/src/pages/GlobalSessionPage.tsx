@@ -16,6 +16,7 @@ import { AppShell } from "../components/AppShell";
 import { ClassCustodiansTable } from "../components/ClassCustodiansTable";
 import {
   formatGlobalVariance,
+  formatLedgerHours,
   GlobalFilteredAggregateTable,
   qualificationListFilter,
   sessionFilter,
@@ -455,6 +456,24 @@ export function GlobalSessionPage() {
                 return "variance-cell";
               },
             },
+            {
+              header: "Hours owed",
+              cell: (r) => formatLedgerHours(r.hours_owed),
+            },
+            {
+              header: "Cover hours done",
+              cell: (r) => formatLedgerHours(r.cover_hours_done),
+            },
+            {
+              header: "Still to make up",
+              cell: (r) => formatLedgerHours(r.still_to_make_up),
+              cellClassName: (r) =>
+                r.still_to_make_up != null && r.still_to_make_up > 0.001
+                  ? "variance-cell variance-full-fte-shortfall"
+                  : r.still_to_make_up != null
+                    ? "variance-cell"
+                    : undefined,
+            },
           ]}
         />
       )}
@@ -555,6 +574,7 @@ export function GlobalSessionPage() {
                   <tr>
                     <th>Date</th>
                     <th>Day / Time</th>
+                    <th>Hours</th>
                     <th>Group</th>
                     <th>Class</th>
                     <th>Room</th>
@@ -569,6 +589,7 @@ export function GlobalSessionPage() {
                     <tr key={e.id}>
                       <td>{e.cover_date ?? "—"}</td>
                       <td>{[e.day_label, e.time_label].filter(Boolean).join(" ")}</td>
+                      <td>{formatLedgerHours(e.hours)}</td>
                       <td>{e.group_name}</td>
                       <td>{e.unit_name}</td>
                       <td>{e.room_code}</td>

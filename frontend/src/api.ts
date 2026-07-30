@@ -169,6 +169,8 @@ export type CoverLogEntry = {
   away_staff_name: string;
   cover_staff_name: string;
   source_session_name: string;
+  /** Length of the job, credited to the cover lecturer's ledger. */
+  hours: number | null;
   created_at: string | null;
 };
 
@@ -262,6 +264,10 @@ export type CoverCandidate = {
   label: string;
   /** True when this lecturer is already teaching during the booking's slot. */
   busy: boolean;
+  /** True when this lecturer is under their contracted hours, so covering pays
+   * down what they owe. Marked but not reordered — availability still leads. */
+  under_hours?: boolean;
+  still_to_make_up?: number | null;
 };
 export type Room = {
   id: number;
@@ -304,6 +310,10 @@ export type GlobalAggregatedStaffRow = {
   non_teaching_day?: number | null | string;
   variance?: number | null | string;
   member_variances?: (number | null)[];
+  /** Ledger figures, present only for lecturers under their contracted hours. */
+  hours_owed?: number | null;
+  cover_hours_done?: number | null;
+  still_to_make_up?: number | null;
 };
 
 export type GlobalAggregatedRoomRow = {

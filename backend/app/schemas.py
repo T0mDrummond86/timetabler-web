@@ -777,6 +777,9 @@ class CoverCandidateOut(BaseModel):
     id: int
     label: str
     busy: bool = False
+    """True when this lecturer is under their contracted hours."""
+    under_hours: bool = False
+    still_to_make_up: float | None = None
 
 
 class CoverCandidatesOut(BaseModel):
@@ -860,6 +863,7 @@ class CoverLogEntryOut(BaseModel):
     away_staff_name: str = ""
     cover_staff_name: str = ""
     source_session_name: str = ""
+    hours: float | None = None
     created_at: str | None = None
 
 

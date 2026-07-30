@@ -6,6 +6,7 @@ import datetime as _dt
 from sqlalchemy.orm import Session
 
 from timetable.core.tenancy_models import CoverLogEntry
+from timetable.core.cover_hours import hours_from_time_label
 
 
 def _entry_out(e: CoverLogEntry) -> dict:
@@ -20,6 +21,7 @@ def _entry_out(e: CoverLogEntry) -> dict:
         "away_staff_name": e.away_staff_name,
         "cover_staff_name": e.cover_staff_name,
         "source_session_name": e.source_session_name,
+        "hours": e.hours,
         "created_at": e.created_at.isoformat() if e.created_at else None,
     }
 
@@ -47,14 +49,21 @@ def create_cover_log_entry(
     away_staff_name: str,
     cover_staff_name: str,
     source_session_name: str,
+    hours: float | None = None,
 ) -> dict:
     try:
         parsed_date = _dt.date.fromisoformat(cover_date)
     except (ValueError, TypeError) as exc:
         raise ValueError("Invalid cover date") from exc
 
+    # Prefer the exact figure from the booking; the label is only a fallback
+    # for callers that no longer have the booking to hand.
+    if hours is None:
+        hours = hours_from_time_label(time_label)
+
     entry = CoverLogEntry(
         global_session_id=global_session_id,
+        hours=hours,
         cover_date=parsed_date,
         day_label=day_label or "",
         time_label=time_label or "",

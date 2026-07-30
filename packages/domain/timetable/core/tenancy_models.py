@@ -3,7 +3,17 @@ from __future__ import annotations
 
 import datetime as _dt
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .models import Base
@@ -223,6 +233,9 @@ class CoverLogEntry(Base):
     away_staff_name: Mapped[str] = mapped_column(String(200), default="")
     cover_staff_name: Mapped[str] = mapped_column(String(200), default="")
     source_session_name: Mapped[str] = mapped_column(String(200), default="")
+    # How long the covered class ran. NULL on rows logged before hours were
+    # recorded whose label could not be read; treat as zero when totalling.
+    hours: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[_dt.datetime] = mapped_column(
         DateTime,
         default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),

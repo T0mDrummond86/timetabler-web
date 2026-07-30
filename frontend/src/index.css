@@ -2739,6 +2739,22 @@ body:has(.app-shell--fill) #root {
   font-size: 0.78rem;
 }
 
+/* Flags a cover lecturer who is under their contracted hours: covering this
+   class pays down what they owe, so they are the one to ask first. */
+.cover-under-hours-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+  border-radius: 999px;
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .lecturer-cover-log-send {
   display: flex;
   flex-wrap: wrap;

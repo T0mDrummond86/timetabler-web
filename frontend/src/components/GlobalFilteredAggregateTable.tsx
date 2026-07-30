@@ -138,6 +138,13 @@ export function formatGlobalVariance(
   return String(variance);
 }
 
+/** A cover-ledger figure. Only under-hours lecturers have one, so an absent
+ * value means "not tracked" — but a zero is meaningful and must read as 0. */
+export function formatLedgerHours(hours: number | null | undefined): string {
+  if (hours == null) return "—";
+  return formatHours(hours);
+}
+
 export function GlobalFilteredAggregateTable<TRow>({
   rows,
   columns,
