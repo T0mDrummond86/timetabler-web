@@ -1636,25 +1636,31 @@ export function TimetablePage() {
               </Link>
             )}
           </span>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => void undo()}
-            disabled={!undoStack.length || mutating}
-            title="Undo (⌘Z)"
-            data-tutorial-id="undo-button"
-          >
-            Undo
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => void redo()}
-            disabled={!redoStack.length || mutating}
-            title="Redo (⌘⇧Z)"
-          >
-            Redo
-          </button>
+          {/* Only shown once there is something to undo or redo — a permanently
+              greyed pair of buttons is just spent width. ⌘Z / ⌘⇧Z work regardless. */}
+          {!!undoStack.length && (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => void undo()}
+              disabled={mutating}
+              title="Undo (⌘Z)"
+              data-tutorial-id="undo-button"
+            >
+              Undo
+            </button>
+          )}
+          {!!redoStack.length && (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => void redo()}
+              disabled={mutating}
+              title="Redo (⌘⇧Z)"
+            >
+              Redo
+            </button>
+          )}
           {!isEmbedded && (
             <span className="tt-dropdown-wrap" ref={externalViewsMenu.wrapRef}>
               <button

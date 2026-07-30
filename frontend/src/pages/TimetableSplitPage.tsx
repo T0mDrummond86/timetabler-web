@@ -20,7 +20,6 @@ export function TimetableSplitPage() {
       wide
       fillViewport
       title="Split screen"
-      subtitle="Shared controls · click a pane to make it active"
       breadcrumb={
         <>
           <Link to="/dashboard">Dashboard</Link>

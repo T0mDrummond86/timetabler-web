@@ -638,25 +638,33 @@ export function TimetableSplitWorkspace({ sessionId, layout }: Props) {
           <button type="button" className="btn-secondary btn-xs" onClick={() => bumpRefresh()}>
             Reload all
           </button>
-          <span className="tt-toolbar-sep" aria-hidden />
-          <button
-            type="button"
-            className="btn-secondary btn-xs"
-            onClick={() => void undo()}
-            disabled={!undoStack.length || mutating}
-            title="Undo placecard change (⌘Z)"
-          >
-            Undo
-          </button>
-          <button
-            type="button"
-            className="btn-secondary btn-xs"
-            onClick={() => void redo()}
-            disabled={!redoStack.length || mutating}
-            title="Redo placecard change (⌘⇧Z)"
-          >
-            Redo
-          </button>
+          {/* Shown only once there is something to undo or redo, matching the
+              single-pane toolbar. The keyboard shortcuts work either way. */}
+          {(!!undoStack.length || !!redoStack.length) && (
+            <span className="tt-toolbar-sep" aria-hidden />
+          )}
+          {!!undoStack.length && (
+            <button
+              type="button"
+              className="btn-secondary btn-xs"
+              onClick={() => void undo()}
+              disabled={mutating}
+              title="Undo placecard change (⌘Z)"
+            >
+              Undo
+            </button>
+          )}
+          {!!redoStack.length && (
+            <button
+              type="button"
+              className="btn-secondary btn-xs"
+              onClick={() => void redo()}
+              disabled={mutating}
+              title="Redo placecard change (⌘⇧Z)"
+            >
+              Redo
+            </button>
+          )}
         </div>
 
         {error && <p className="error-banner">{error}</p>}
