@@ -75,6 +75,142 @@
   font-size: 11.5px;
 }
 
+/* ---------------- view switch ---------------- */
+
+.mv-modes {
+  display: inline-flex;
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 6px;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.mv-mode {
+  padding: 0.16rem 0.5rem;
+  border: none;
+  background: var(--panel-bg, #fff);
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mv-mode--on {
+  background: var(--accent, #2563eb);
+  color: #fff;
+}
+
+/* ---------------- free right now ---------------- */
+
+.fn-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  overflow: hidden;
+}
+
+.fn-clock {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  padding: 0 0.1rem;
+}
+
+/* Three columns in landscape so all three states are visible at once. */
+.fn-columns {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.fn-group {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-top-width: 3px;
+  border-radius: 5px;
+  background: var(--panel-bg, #fff);
+  overflow: hidden;
+}
+
+.fn-group--on {
+  border-top-color: #34d399;
+}
+
+.fn-group--off {
+  border-top-color: #94a3b8;
+}
+
+.fn-group--busy {
+  border-top-color: #f59e0b;
+}
+
+.fn-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.3rem;
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.fn-count {
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--zone-toolbar, #eef2f7);
+  font-size: 10px;
+}
+
+.fn-hint,
+.fn-none {
+  margin: 0.1rem 0 0.2rem;
+  font-size: 9.5px;
+  line-height: 1.25;
+}
+
+.fn-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+  -webkit-overflow-scrolling: touch;
+}
+
+.fn-row {
+  padding: 0.16rem 0;
+  border-bottom: 1px solid var(--border, #f1f5f9);
+}
+
+.fn-name {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.fn-meta {
+  display: block;
+  font-size: 9.5px;
+  line-height: 1.25;
+}
+
+/* Portrait: stack the three groups instead of squeezing three columns. */
+@media (orientation: portrait) {
+  .fn-columns {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+}
+
 /* ---------------- install prompt ---------------- */
 
 .mv-install {
@@ -160,6 +296,19 @@
   padding: 0;
   border-right: none;
 }
+
+/* Free-now needs the session picker but not the lecturer list, so the panel
+   shrinks to the picker instead of holding a column of empty space. */
+.mv-panel--sessions-only {
+  width: auto;
+  flex: 0 0 auto;
+  max-width: 45%;
+}
+
+.mv-panel--sessions-only .mv-sessions {
+  max-height: none;
+}
+
 
 .mv-select,
 .mv-search,

@@ -13,12 +13,16 @@ import {
   type LecturerWeek,
   type SessionChoice,
 } from "./lecturerWeek";
+import { FreeNowView } from "./FreeNowView";
 import { InstallBanner } from "./InstallBanner";
 import { MobileWeekGrid } from "./MobileWeekGrid";
 import "./mobile.css";
 
 const LAST_VIEW_KEY = "tafetabler-mobile-last";
 const SESSIONS_KEY = "tafetabler-mobile-sessions";
+const MODE_KEY = "tafetabler-mobile-mode";
+
+type ViewMode = "week" | "free";
 
 type Remembered = { lecturer: string };
 
@@ -48,6 +52,9 @@ export default function MobilePage() {
   const [sessionChoices, setSessionChoices] = useState<SessionChoice[]>([]);
   const [included, setIncluded] = useState<number[] | null>(() => readIncluded());
   const [showSessions, setShowSessions] = useState(false);
+  const [mode, setMode] = useState<ViewMode>(
+    () => (localStorage.getItem(MODE_KEY) === "free" ? "free" : "week"),
+  );
   const [selected, setSelected] = useState<string | null>(null);
   const [week, setWeek] = useState<LecturerWeek | null>(null);
   const [filter, setFilter] = useState("");
@@ -181,23 +188,51 @@ export default function MobilePage() {
         <button
           type="button"
           className="mv-panel-toggle"
+          hidden={mode === "free"}
           aria-expanded={panelOpen}
           onClick={() => setPanelOpen((v) => !v)}
           title={panelOpen ? "Hide the picker" : "Choose a lecturer"}
         >
           {panelOpen ? "‹" : "›"}
         </button>
-        <span className="mv-title">{week?.name ?? "TAFEtabler"}</span>
-        {week?.weekLabel && <span className="mv-sub">{week.weekLabel}</span>}
+        <span className="mv-title">
+          {mode === "free" ? "Free right now" : week?.name ?? "TAFEtabler"}
+        </span>
+        {mode === "week" && week?.weekLabel && (
+          <span className="mv-sub">{week.weekLabel}</span>
+        )}
         <span className="mv-spacer" />
-        {week && <StaleIndicator week={week} onRefresh={() => selected && void loadWeek(selected)} />}
+        <span className="mv-modes" role="tablist" aria-label="View">
+          {(["week", "free"] as ViewMode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="tab"
+              aria-selected={mode === m}
+              className={`mv-mode${mode === m ? " mv-mode--on" : ""}`}
+              onClick={() => {
+                setMode(m);
+                localStorage.setItem(MODE_KEY, m);
+              }}
+            >
+              {m === "week" ? "Week" : "Free now"}
+            </button>
+          ))}
+        </span>
+        {mode === "week" && week && (
+          <StaleIndicator week={week} onRefresh={() => selected && void loadWeek(selected)} />
+        )}
       </header>
 
       <InstallBanner />
       {error && <div className="mv-error">{error}</div>}
 
       <div className="mv-body">
-        <aside className={`mv-panel${panelOpen ? "" : " mv-panel--closed"}`}>
+        <aside
+          className={`mv-panel${panelOpen || mode === "free" ? "" : " mv-panel--closed"}${
+            mode === "free" ? " mv-panel--sessions-only" : ""
+          }`}
+        >
           {sessionChoices.length > 1 && (
             <button
               type="button"
@@ -227,14 +262,16 @@ export default function MobilePage() {
               ))}
             </ul>
           )}
-          <input
-            className="mv-search"
-            type="search"
-            placeholder="Find a lecturer…"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          />
-          <ul className="mv-list">
+          {mode === "week" && (
+            <input
+              className="mv-search"
+              type="search"
+              placeholder="Find a lecturer…"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            />
+          )}
+          <ul className="mv-list" hidden={mode === "free"}>
             {filtered.map((l) => (
               <li key={l.name}>
                 <button
@@ -254,9 +291,21 @@ export default function MobilePage() {
         </aside>
 
         <main className="mv-grid-wrap">
-          {loading && <p className="mv-empty">Loading…</p>}
-          {!loading && !week && <p className="mv-empty">Choose a lecturer to see their week.</p>}
-          {!loading && week && <MobileWeekGrid week={week} />}
+          {mode === "free" ? (
+            <FreeNowView
+              sessionIds={[...includedSet]}
+              lecturerNames={lecturers.map((l) => l.name)}
+              onError={setError}
+            />
+          ) : (
+            <>
+              {loading && <p className="mv-empty">Loading…</p>}
+              {!loading && !week && (
+                <p className="mv-empty">Choose a lecturer to see their week.</p>
+              )}
+              {!loading && week && <MobileWeekGrid week={week} />}
+            </>
+          )}
         </main>
       </div>
     </div>
