@@ -11,7 +11,7 @@ from timetable.core.tenancy_models import (
     User,
 )
 
-from ..auth.deps import ensure_password_changed, get_current_user
+from ..auth.deps import AuthContext, ensure_password_changed, get_auth_context, get_current_user
 from ..auth.rate_limit import auth_rate_limiter, client_ip
 from ..auth.security import create_access_token, hash_password, verify_password
 from ..config import settings
@@ -119,6 +119,24 @@ def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)):
     return user
+
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh(ctx: AuthContext = Depends(get_auth_context)):
+    """Re-issue a token for an already-authenticated caller.
+
+    Gives the phone app a sliding session: it refreshes on each launch, so
+    someone who opens it regularly never has to sign in again, while an
+    abandoned device still expires on the normal schedule.
+    """
+    return TokenResponse(
+        access_token=create_access_token(
+            user_id=ctx.user.id,
+            org_id=ctx.organization.id,
+            role=ctx.membership.role,
+        ),
+        token_type="bearer",
+    )
 
 
 @router.post("/change-password", response_model=UserOut)

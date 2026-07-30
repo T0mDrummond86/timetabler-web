@@ -18,6 +18,9 @@ import type { TutorialEntityMap } from "./tutorial/types";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
+/** Fired when a request is rejected as unauthenticated and the token is dropped. */
+export const SIGNED_OUT_EVENT = "tafetabler:signed-out";
+
 function filenameFromContentDisposition(header: string | null, fallback: string): string {
   const match = header?.match(/filename="([^"]+)"/);
   return match?.[1] ?? fallback;
@@ -388,7 +391,13 @@ async function apiFetch<T>(
       !window.location.pathname.startsWith("/register")
     ) {
       setToken(null);
-      window.location.replace("/login");
+      if (window.location.pathname.startsWith("/m")) {
+        // The phone app has its own sign-in screen; bouncing an installed PWA
+        // to the desktop login would dump the user out of the app entirely.
+        window.dispatchEvent(new Event(SIGNED_OUT_EVENT));
+      } else {
+        window.location.replace("/login");
+      }
     }
     throw new Error(detail);
   }
@@ -491,6 +500,9 @@ export const api = {
     }),
 
   me: () => apiFetch<User>("/auth/me"),
+
+  /** Slide the session forward; called when the phone app launches. */
+  refresh: () => apiFetch<TokenResponse>("/auth/refresh", { method: "POST" }),
 
   changePassword: (body: { current_password: string; new_password: string }) =>
     apiFetch<User>("/auth/change-password", { method: "POST", body: JSON.stringify(body) }),

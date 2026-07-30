@@ -406,3 +406,31 @@ def test_access_matrix_lists_users_and_levels(env):
     bob_row = next(u for u in body["users"] if u["user_id"] == env.bob.id)
     assert bob_row["global_level"] == ACCESS_READ_ONLY
     assert bob_row["session_levels"][str(env.sess_a.id)] == ACCESS_EDIT
+
+
+# ------------------------------------------------------------------ refresh
+
+
+def test_refresh_issues_a_usable_token(env):
+    """The phone app slides its session forward on each launch."""
+    res = env.client.post("/auth/refresh", headers=env.headers(env.alice))
+    assert res.status_code == 200, res.text
+    fresh = res.json()["access_token"]
+    assert fresh
+
+    # The reissued token must actually work.
+    follow = env.client.get(
+        f"/sessions/{env.sess_a.id}", headers={"Authorization": f"Bearer {fresh}"}
+    )
+    assert follow.status_code == 200, follow.text
+
+
+def test_refresh_rejects_an_unauthenticated_caller(env):
+    assert env.client.post("/auth/refresh").status_code == 401
+
+
+def test_refresh_rejects_a_garbage_token(env):
+    res = env.client.post(
+        "/auth/refresh", headers={"Authorization": "Bearer not-a-real-token"}
+    )
+    assert res.status_code == 401

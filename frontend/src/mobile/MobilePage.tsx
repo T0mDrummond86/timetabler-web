@@ -3,7 +3,13 @@
  * Deliberately narrow: sign in, pick a workspace, pick a lecturer, see their
  * week. It contains no mutating action of any kind. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, getToken, setToken, type GlobalAggregatedStaffRow } from "../api";
+import {
+  api,
+  getToken,
+  setToken,
+  SIGNED_OUT_EVENT,
+  type GlobalAggregatedStaffRow,
+} from "../api";
 import {
   lecturersFromStaffRows,
   loadLecturerWeek,
@@ -65,6 +71,36 @@ export default function MobilePage() {
     () => typeof window !== "undefined" && window.innerHeight > window.innerWidth,
   );
   const restored = useRef(false);
+
+  // A rejected token drops us to the sign-in screen instead of bouncing the
+  // installed app out to the desktop login.
+  useEffect(() => {
+    const onSignedOut = () => setAuthed(false);
+    window.addEventListener(SIGNED_OUT_EVENT, onSignedOut);
+    return () => window.removeEventListener(SIGNED_OUT_EVENT, onSignedOut);
+  }, []);
+
+  // Slide the session forward on every launch, and again whenever the app is
+  // brought back to the foreground, so regular use never expires.
+  useEffect(() => {
+    if (!authed) return;
+    const slide = () => {
+      void api
+        .refresh()
+        .then((r) => setToken(r.access_token))
+        .catch(() => {
+          /* an expired token surfaces via SIGNED_OUT_EVENT on the next call */
+        });
+    };
+    // Unconditionally on launch — the app is starting, whatever the tab state.
+    slide();
+    // Then again each time it comes back to the foreground.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") slide();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [authed]);
 
   useEffect(() => {
     const onResize = () => setPortrait(window.innerHeight > window.innerWidth);
@@ -222,6 +258,19 @@ export default function MobilePage() {
         {mode === "week" && week && (
           <StaleIndicator week={week} onRefresh={() => selected && void loadWeek(selected)} />
         )}
+        <button
+          type="button"
+          className="mv-signout"
+          title="Sign out of this device"
+          onClick={() => {
+            setToken(null);
+            setAuthed(false);
+            setWeek(null);
+            setSelected(null);
+          }}
+        >
+          Sign out
+        </button>
       </header>
 
       <InstallBanner />

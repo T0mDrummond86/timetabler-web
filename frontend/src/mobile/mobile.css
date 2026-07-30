@@ -75,6 +75,19 @@
   font-size: 11.5px;
 }
 
+.mv-signout {
+  padding: 0.14rem 0.45rem;
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 6px;
+  background: var(--panel-bg, #fff);
+  color: var(--muted, #64748b);
+  font: inherit;
+  font-size: 10.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
 /* ---------------- view switch ---------------- */
 
 .mv-modes {
