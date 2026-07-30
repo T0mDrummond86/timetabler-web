@@ -785,10 +785,6 @@ export function TimetablePage() {
     if (viewKind === "day" || viewKind === "room") await applyViewChange({ roomDay: id });
   }
 
-  function openAdditionalTab() {
-    window.open(window.location.href, "_blank", "noopener,noreferrer");
-  }
-
   function buildExternalViewUrl(kind: ViewKind): string {
     const params = new URLSearchParams();
     params.set("tab", "timetable");
@@ -1605,25 +1601,7 @@ export function TimetablePage() {
           )}
         </>
       }
-      title={pageTitle}
-      subtitle={
-        sessionTab === "timetable" && viewKind !== "block_overview" ? (
-          <>
-            {grid?.week_label ?? "Repeating week"}
-            {globalLink?.linked && viewKind === "staff" && (
-              <Link
-                to={`/global/${globalLink.global_session_id}`}
-                className="topbar-info"
-                title={`Dark grey = scheduled in linked session${
-                  globalLink.global_session_name ? ` (${globalLink.global_session_name})` : ""
-                }. Open the global group.`}
-              >
-                ⓘ
-              </Link>
-            )}
-          </>
-        ) : undefined
-      }
+      title={sessionTab === "timetable" ? undefined : pageTitle}
       actions={
         <>
           {sessionTab === "timetable" && grid && showAlerts && (
@@ -1644,7 +1622,20 @@ export function TimetablePage() {
       <div className="tt-toolbar">
         {sessionTab === "timetable" && (
         <div className="tt-toolbar-group">
-          <span className="tt-toolbar-label">Schedule</span>
+          <span className="tt-toolbar-title">
+            {pageTitle}
+            {globalLink?.linked && viewKind === "staff" && (
+              <Link
+                to={`/global/${globalLink.global_session_id}`}
+                className="topbar-info"
+                title={`Dark grey = scheduled in linked session${
+                  globalLink.global_session_name ? ` (${globalLink.global_session_name})` : ""
+                }. Open the global group.`}
+              >
+                ⓘ
+              </Link>
+            )}
+          </span>
           <button
             type="button"
             className="btn-secondary"
@@ -1689,17 +1680,6 @@ export function TimetablePage() {
                     }}
                   >
                     {gridCopied ? "Copied ✓" : "Copy for email"}
-                  </button>
-                  <button
-                    type="button"
-                    className="ctx-item"
-                    role="menuitem"
-                    onClick={() => {
-                      externalViewsMenu.close();
-                      openAdditionalTab();
-                    }}
-                  >
-                    New tab
                   </button>
                   <div className="ctx-divider" />
                   <span className="ctx-label">New browser tab</span>

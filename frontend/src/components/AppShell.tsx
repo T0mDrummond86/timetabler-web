@@ -42,6 +42,11 @@ export function AppShell({
             <img src={lockup} alt={APP_NAME} className="app-brand-lockup app-brand-lockup--sm" />
           </Link>
           {breadcrumb && <span className="topbar-crumb">{breadcrumb}</span>}
+          {breadcrumb && title && (
+            <span className="topbar-crumb-sep" aria-hidden>
+              /
+            </span>
+          )}
           {title && <span className="topbar-title">{title}</span>}
           {subtitle && <span className="topbar-subtitle">{subtitle}</span>}
           <span className="topbar-spacer" />

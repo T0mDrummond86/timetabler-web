@@ -303,8 +303,9 @@ code {
   text-overflow: ellipsis;
 }
 
-.topbar-crumb::after {
-  content: "/";
+/* Rendered by AppShell only when a title actually follows the breadcrumb —
+   the timetable tab moves its title into the toolbar, leaving none here. */
+.topbar-crumb-sep {
   color: var(--border);
 }
 
@@ -902,6 +903,29 @@ button.danger {
   letter-spacing: 0.04em;
   color: var(--text-muted);
   margin-right: 0.15rem;
+}
+
+/* The view's identity (course code / lecturer / room) sits at the head of the
+   toolbar, where the "Schedule" label used to be — next to the controls that
+   act on it, instead of on a row of its own. */
+.tt-toolbar-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-right: 0.5rem;
+  font-size: 0.98rem;
+  font-weight: 700;
+  white-space: nowrap;
+  max-width: 22rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tt-toolbar-title .page-title,
+.tt-toolbar-title h1 {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
 }
 
 .tt-toolbar-sep {
