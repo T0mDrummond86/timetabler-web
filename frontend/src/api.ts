@@ -246,7 +246,6 @@ export type Staff = {
   id: number;
   name: string;
   cost_centre?: string | null;
-  staff_identifier?: string | null;
   max_hours_per_week?: number | null;
   fte?: number | null;
   non_teaching_day?: number | null;

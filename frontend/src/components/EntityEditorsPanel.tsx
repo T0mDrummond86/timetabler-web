@@ -339,7 +339,6 @@ export function EntityEditorsPanel({
         await api.patchStaff(sessionId, selectedId, {
           name: String(form.get("name") || selectedStaff.name),
           cost_centre: String(form.get("cost_centre") || "") || null,
-          staff_identifier: String(form.get("staff_identifier") || "") || null,
           fte: (() => {
             const raw = form.get("fte");
             if (!raw) return null;
@@ -750,13 +749,6 @@ export function EntityEditorsPanel({
                 <input
                   name="development_project_description"
                   defaultValue={selectedStaff.development_project_description ?? ""}
-                />
-              </label>
-              <label>
-                Staff ID
-                <input
-                  name="staff_identifier"
-                  defaultValue={selectedStaff.staff_identifier ?? ""}
                 />
               </label>
               <label>

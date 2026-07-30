@@ -205,7 +205,6 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
     return rows.filter((r) => {
       const hay = [
         r.name,
-        r.staff_identifier,
         r.cost_centre,
         r.preferences_first,
         r.preferences_second,
@@ -281,7 +280,6 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
           <thead>
             <tr>
               <th className="staff-col-primary staff-col-sticky">Lecturer</th>
-              <th className="staff-col-staff-id">Staff ID</th>
               <th className="staff-col-meta">Cost centre</th>
               <th className="staff-col-metric staff-col-metric-group">Subst. FTE</th>
               <th
@@ -359,9 +357,6 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
                       {row.name}
                     </span>
                   </div>
-                </td>
-                <td className="staff-col-staff-id staff-hours-truncate" title={row.staff_identifier ?? undefined}>
-                  {row.staff_identifier ?? ""}
                 </td>
                 <td className="staff-col-meta staff-hours-wrap">{row.cost_centre ?? ""}</td>
                 <td className="staff-col-metric staff-col-metric-group">

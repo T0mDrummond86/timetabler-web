@@ -374,6 +374,25 @@ def _m29(conn: Connection) -> None:
         conn.exec_driver_sql("ALTER TABLE staff ADD COLUMN staff_identifier TEXT")
 
 
+@_migration(30, "Drop staff.staff_identifier — Staff ID is no longer used")
+def _m30(conn: Connection) -> None:
+    """Remove the column and its values from existing desktop files too.
+
+    Migration 29 added it; leaving it in place would keep personal identifiers
+    in files nothing reads them from. SQLite has supported DROP COLUMN since
+    3.35 (2021); on anything older the values are cleared instead, so the data
+    is gone either way.
+    """
+    if not _table_exists(conn, "staff"):
+        return
+    if "staff_identifier" not in _columns_of(conn, "staff"):
+        return
+    try:
+        conn.exec_driver_sql("ALTER TABLE staff DROP COLUMN staff_identifier")
+    except Exception:
+        conn.exec_driver_sql("UPDATE staff SET staff_identifier = NULL")
+
+
 @_migration(23, "Normalize room.room_type to on-campus / off-campus / online")
 def _m23(conn: Connection) -> None:
     if not _table_exists(conn, "room"):

@@ -111,7 +111,6 @@ class Staff(Base):
     )
     name: Mapped[str] = mapped_column(String)
     cost_centre: Mapped[str | None] = mapped_column(String(80), nullable=True)
-    staff_identifier: Mapped[str | None] = mapped_column(String(80), nullable=True)
     max_hours_per_week: Mapped[float | None] = mapped_column(nullable=True)
     non_teaching_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Full-time equivalent (input); lecturing load = fte × 21 hours per FTE.

@@ -210,7 +210,6 @@ def serialize(session: Session, *, timetable_session_id: int | None = None) -> d
             {
                 "id": s.id, "name": s.name,
                 "cost_centre": getattr(s, "cost_centre", None),
-                "staff_identifier": getattr(s, "staff_identifier", None),
                 "max_hours_per_week": s.max_hours_per_week,
                 "non_teaching_day": s.non_teaching_day,
                 "fte": getattr(s, "fte", None),
@@ -384,7 +383,6 @@ def deserialize(session: Session, payload: dict[str, Any]) -> None:
         session.add(Staff(
             id=s["id"], name=s["name"],
             cost_centre=s.get("cost_centre"),
-            staff_identifier=s.get("staff_identifier"),
             max_hours_per_week=s.get("max_hours_per_week"),
             non_teaching_day=s.get("non_teaching_day"),
             fte=s.get("fte"),
