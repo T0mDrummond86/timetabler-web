@@ -53,7 +53,7 @@ import { TimetableSidebar } from "../components/TimetableSidebar";
 import { UsageDashboard } from "../components/UsageDashboard";
 import { LapCreationPanel } from "../components/LapCreationPanel";
 import { LecturerCoverPanel } from "../components/LecturerCoverPanel";
-import { FreeNowView } from "../components/FreeNowView";
+import { NowPanel } from "../components/NowPanel";
 import { LoadingMark } from "../components/LoadingMark";
 import { WeekGridView } from "../components/WeekGridView";
 import { recordSessionOpen } from "../lib/recentSessions";
@@ -226,6 +226,7 @@ export function TimetablePage() {
   const [checkingClashes, setCheckingClashes] = useState(false);
   const [createDraft, setCreateDraft] = useState<CreateBookingDraft | null>(null);
   const externalViewsMenu = useDropdown();
+  const splitLayoutMenu = useDropdown();
   const { confirm, prompt, dialogs } = useConfirmPrompt();
   const [pendingEditBookingId, setPendingEditBookingId] = useState<number | null>(null);
   const [globalLink, setGlobalLink] = useState<TimetableGlobalLink | null>(null);
@@ -1665,116 +1666,95 @@ export function TimetablePage() {
             </button>
           )}
           {!isEmbedded && (
-            <span className="tt-dropdown-wrap" ref={externalViewsMenu.wrapRef}>
+            <>
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={externalViewsMenu.toggle}
-                aria-expanded={externalViewsMenu.open}
-                aria-haspopup="menu"
-                title="More schedule actions"
+                disabled={!grid || !grid.bookings.length || !showsWeekGrid(viewKind)}
+                onClick={() => void onCopyGridToClipboard()}
+                title="Copy this timetable as a table, ready to paste into an email"
               >
-                ⋯
+                {gridCopied ? "Copied ✓" : "Copy"}
               </button>
-              {externalViewsMenu.open && (
-                <div className="tt-dropdown-menu" role="menu">
-                  <button
-                    type="button"
-                    className="ctx-item"
-                    role="menuitem"
-                    disabled={!grid || !grid.bookings.length || !showsWeekGrid(viewKind)}
-                    onClick={() => {
-                      externalViewsMenu.close();
-                      void onCopyGridToClipboard();
-                    }}
-                  >
-                    {gridCopied ? "Copied ✓" : "Copy for email"}
-                  </button>
-                  <div className="ctx-divider" />
-                  <span className="ctx-label">New browser tab</span>
-                  {[...VIEW_KINDS_BY_MODE.regular, ...VIEW_KINDS_BY_MODE.block].map((opt) => (
+              <span className="tt-dropdown-wrap" ref={externalViewsMenu.wrapRef}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={externalViewsMenu.toggle}
+                  aria-expanded={externalViewsMenu.open}
+                  aria-haspopup="menu"
+                  title="Open a view in a new browser tab"
+                >
+                  New Tab ▾
+                </button>
+                {externalViewsMenu.open && (
+                  <div className="tt-dropdown-menu" role="menu">
+                    {[...VIEW_KINDS_BY_MODE.regular, ...VIEW_KINDS_BY_MODE.block].map((opt) => (
+                      <button
+                        key={`ext-${opt.value}`}
+                        type="button"
+                        className="ctx-item"
+                        role="menuitem"
+                        onClick={() => {
+                          externalViewsMenu.close();
+                          openViewInNewTab(opt.value);
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </span>
+              <span className="tt-dropdown-wrap" ref={splitLayoutMenu.wrapRef}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={splitLayoutMenu.toggle}
+                  aria-expanded={splitLayoutMenu.open}
+                  aria-haspopup="menu"
+                  title="Show several views of this session at once"
+                >
+                  Split Layout ▾
+                </button>
+                {splitLayoutMenu.open && (
+                  <div className="tt-dropdown-menu" role="menu">
                     <button
-                      key={`ext-${opt.value}`}
                       type="button"
                       className="ctx-item"
+                      role="menuitem"
                       onClick={() => {
-                        externalViewsMenu.close();
-                        openViewInNewTab(opt.value);
+                        splitLayoutMenu.close();
+                        openSplit("4");
                       }}
                     >
-                      {opt.label}
+                      4-way
                     </button>
-                  ))}
-                  <div className="ctx-divider" />
-                  <span className="ctx-label">Split layout (this session)</span>
-                  <button
-                    type="button"
-                    className="ctx-item"
-                    role="menuitem"
-                    onClick={() => {
-                      externalViewsMenu.close();
-                      openSplit("4");
-                    }}
-                  >
-                    4-way
-                  </button>
-                  <button
-                    type="button"
-                    className="ctx-item"
-                    role="menuitem"
-                    onClick={() => {
-                      externalViewsMenu.close();
-                      openSplit("2h");
-                    }}
-                  >
-                    2-way side-by-side
-                  </button>
-                  <button
-                    type="button"
-                    className="ctx-item"
-                    role="menuitem"
-                    onClick={() => {
-                      externalViewsMenu.close();
-                      openSplit("2v");
-                    }}
-                  >
-                    2-way stacked
-                  </button>
-                </div>
-              )}
-            </span>
-          )}
-          {showsWeekGrid(viewKind) && (
-            <>
-              <span className="tt-toolbar-sep" aria-hidden />
-              <button
-                type="button"
-                className="btn-secondary btn-xs"
-                onClick={() => setGridZoom((z) => zoomOut(z))}
-                aria-label="Zoom out"
-                title="Zoom out"
-              >
-                −
-              </button>
-              <span className="tt-zoom-label">{displayZoomPercent(gridZoom)}%</span>
-              <button
-                type="button"
-                className="btn-secondary btn-xs"
-                onClick={() => setGridZoom((z) => zoomIn(z))}
-                aria-label="Zoom in"
-                title="Zoom in"
-              >
-                +
-              </button>
-              <button
-                type="button"
-                className="btn-secondary btn-xs"
-                onClick={() => setGridZoom(resetGridZoom())}
-                aria-label="Reset zoom"
-                title="Reset zoom"
-              >
-                100%
-              </button>
+                    <button
+                      type="button"
+                      className="ctx-item"
+                      role="menuitem"
+                      onClick={() => {
+                        splitLayoutMenu.close();
+                        openSplit("2h");
+                      }}
+                    >
+                      2-way side-by-side
+                    </button>
+                    <button
+                      type="button"
+                      className="ctx-item"
+                      role="menuitem"
+                      onClick={() => {
+                        splitLayoutMenu.close();
+                        openSplit("2v");
+                      }}
+                    >
+                      2-way stacked
+                    </button>
+                  </div>
+                )}
+              </span>
             </>
           )}
         </div>
@@ -1802,6 +1782,10 @@ export function TimetablePage() {
           importing={importing}
           showDisplay={sessionTab === "timetable"}
           canEdit={canEditSession}
+          zoomPercent={showsWeekGrid(viewKind) ? displayZoomPercent(gridZoom) : null}
+          onZoomIn={() => setGridZoom((z) => zoomIn(z))}
+          onZoomOut={() => setGridZoom((z) => zoomOut(z))}
+          onZoomReset={() => setGridZoom(resetGridZoom())}
         />
       </div>
       </DropdownGroup>
@@ -2051,8 +2035,8 @@ export function TimetablePage() {
       )}
       {sessionTab === "now" && (
         <div className="tt-page tt-page--now">
-          <FreeNowView
-            sessionIds={[sessionId]}
+          <NowPanel
+            sessionId={sessionId}
             lecturerNames={staff.map((s) => s.name)}
             onError={setError}
           />

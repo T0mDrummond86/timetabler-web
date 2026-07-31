@@ -41,13 +41,13 @@ export function FreeNowView({ sessionIds, lecturerNames, onError }: Props) {
     return () => window.clearInterval(t);
   }, [load]);
 
-  if (loading) return <p className="fn-empty muted">Working out who's free…</p>;
-  if (!result) return <p className="fn-empty muted">Choose at least one timetable first.</p>;
+  if (loading) return <p className="mv-empty">Working out who's free…</p>;
+  if (!result) return <p className="mv-empty">Choose at least one timetable first.</p>;
 
   if (result.dayIndex < 0) {
     return (
       <div className="fn-wrap">
-        <p className="fn-empty muted">
+        <p className="mv-empty">
           It's {result.dayLabel} — timetables only cover Monday to Friday, so everyone is off
           campus.
         </p>

@@ -19,7 +19,7 @@ import {
   type LecturerWeek,
   type SessionChoice,
 } from "./lecturerWeek";
-import { FreeNowView } from "../components/FreeNowView";
+import { FreeNowView } from "./FreeNowView";
 import { InstallBanner } from "./InstallBanner";
 import { MobileWeekGrid } from "./MobileWeekGrid";
 import "./mobile.css";

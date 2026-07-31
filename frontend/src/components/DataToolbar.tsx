@@ -22,6 +22,11 @@ type Props = {
   showDisplay?: boolean;
   /** False when the user only has read access — imports write data. */
   canEdit?: boolean;
+  /** Grid zoom, shown inside Display. Omitted on views with no week grid. */
+  zoomPercent?: number | null;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onZoomReset?: () => void;
 };
 
 export function DataToolbar({
@@ -39,6 +44,10 @@ export function DataToolbar({
   importing,
   showDisplay = true,
   canEdit = true,
+  zoomPercent = null,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
 }: Props) {
   const exportMenu = useDropdown();
   const importMenu = useDropdown();
@@ -139,6 +148,41 @@ export function DataToolbar({
                   />
                   Auto-detect clashes
                 </label>
+                {zoomPercent != null && (
+                  <>
+                    <div className="ctx-divider" />
+                    <span className="ctx-label">Grid zoom</span>
+                    <div className="ctx-zoom">
+                      <button
+                        type="button"
+                        className="btn-secondary btn-xs"
+                        onClick={onZoomOut}
+                        aria-label="Zoom out"
+                        title="Zoom out"
+                      >
+                        −
+                      </button>
+                      <span className="ctx-zoom-value">{zoomPercent}%</span>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-xs"
+                        onClick={onZoomIn}
+                        aria-label="Zoom in"
+                        title="Zoom in"
+                      >
+                        +
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-xs"
+                        onClick={onZoomReset}
+                        title="Reset zoom"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </span>
