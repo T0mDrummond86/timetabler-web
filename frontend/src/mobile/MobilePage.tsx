@@ -19,7 +19,7 @@ import {
   type LecturerWeek,
   type SessionChoice,
 } from "./lecturerWeek";
-import { FreeNowView } from "./FreeNowView";
+import { FreeNowView } from "../components/FreeNowView";
 import { InstallBanner } from "./InstallBanner";
 import { MobileWeekGrid } from "./MobileWeekGrid";
 import "./mobile.css";
@@ -232,7 +232,7 @@ export default function MobilePage() {
           {panelOpen ? "‹" : "›"}
         </button>
         <span className="mv-title">
-          {mode === "free" ? "Free right now" : week?.name ?? "TAFEtabler"}
+          {mode === "free" ? "Now" : week?.name ?? "TAFEtabler"}
         </span>
         {mode === "week" && week?.weekLabel && (
           <span className="mv-sub">{week.weekLabel}</span>
@@ -251,7 +251,7 @@ export default function MobilePage() {
                 localStorage.setItem(MODE_KEY, m);
               }}
             >
-              {m === "week" ? "Week" : "Free now"}
+              {m === "week" ? "Week" : "Now"}
             </button>
           ))}
         </span>

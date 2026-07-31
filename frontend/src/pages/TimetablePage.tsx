@@ -53,6 +53,7 @@ import { TimetableSidebar } from "../components/TimetableSidebar";
 import { UsageDashboard } from "../components/UsageDashboard";
 import { LapCreationPanel } from "../components/LapCreationPanel";
 import { LecturerCoverPanel } from "../components/LecturerCoverPanel";
+import { FreeNowView } from "../components/FreeNowView";
 import { LoadingMark } from "../components/LoadingMark";
 import { WeekGridView } from "../components/WeekGridView";
 import { recordSessionOpen } from "../lib/recentSessions";
@@ -98,6 +99,7 @@ type SessionTab =
   | "usage"
   | "lap"
   | "lecturer_cover"
+  | "now"
   | "unit_mapper";
 
 type ViewState = {
@@ -117,6 +119,7 @@ const READ_ONLY_HINT =
 
 const SESSION_TABS: { id: SessionTab; label: string; secondary?: boolean }[] = [
   { id: "timetable", label: "Timetable" },
+  { id: "now", label: "Now" },
   { id: "warnings", label: "Warnings" },
   { id: "clash_settings", label: "Clash settings" },
   { id: "changelog", label: "Change log" },
@@ -2043,6 +2046,15 @@ export function TimetablePage() {
             globalSessionId={
               globalLink?.linked ? globalLink.global_session_id ?? null : null
             }
+          />
+        </div>
+      )}
+      {sessionTab === "now" && (
+        <div className="tt-page tt-page--now">
+          <FreeNowView
+            sessionIds={[sessionId]}
+            lecturerNames={staff.map((s) => s.name)}
+            onError={setError}
           />
         </div>
       )}
