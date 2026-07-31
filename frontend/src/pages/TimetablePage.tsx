@@ -117,22 +117,27 @@ type ViewState = {
 const READ_ONLY_HINT =
   "Read-only access to this session — you can view and export, but not make changes";
 
+// Ordered by how often they are opened: the daily working views lead, and a
+// divider marks where the reference and setup tabs start.
 const SESSION_TABS: { id: SessionTab; label: string; secondary?: boolean }[] = [
   { id: "timetable", label: "Timetable" },
   { id: "now", label: "Now" },
-  { id: "warnings", label: "Warnings" },
-  { id: "clash_settings", label: "Clash settings" },
   { id: "changelog", label: "Change log" },
+  { id: "lecturer_cover", label: "Lecturer cover" },
+  { id: "unit_mapper", label: "Unit-class mapper" },
+  { id: "warnings", label: "Warnings", secondary: true },
   { id: "staff", label: "Staff", secondary: true },
-  { id: "lecturer_cover", label: "Lecturer cover", secondary: true },
-  { id: "rooms", label: "Rooms", secondary: true },
   { id: "units", label: "Classes", secondary: true },
   { id: "qualifications", label: "Qualifications", secondary: true },
-  { id: "unit_mapper", label: "Unit-class mapper", secondary: true },
+  { id: "rooms", label: "Rooms", secondary: true },
+  { id: "clash_settings", label: "Clash settings", secondary: true },
   { id: "custodians", label: "Class custodians", secondary: true },
   { id: "usage", label: "Usage", secondary: true },
   { id: "lap", label: "LAP creation", secondary: true },
 ];
+
+/** Where the divider goes — derived, so reordering the list moves it too. */
+const FIRST_SECONDARY_TAB = SESSION_TABS.findIndex((t) => t.secondary);
 
 const ENTITY_SPLIT_TABS = new Set<SessionTab>(["staff", "rooms", "units", "qualifications"]);
 
@@ -1793,7 +1798,9 @@ export function TimetablePage() {
       <nav className="session-tabs" aria-label="Session views" data-tutorial-id="session-tabs">
         {SESSION_TABS.map((tab, index) => (
           <span key={tab.id} style={{ display: "contents" }}>
-            {index === 4 && <span className="session-tab-divider" aria-hidden />}
+            {index === FIRST_SECONDARY_TAB && (
+              <span className="session-tab-divider" aria-hidden />
+            )}
             <button
               type="button"
               className={`session-tab${sessionTab === tab.id ? " active" : ""}${
