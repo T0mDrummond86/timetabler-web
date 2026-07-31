@@ -4,14 +4,14 @@ import type { TutorialModule } from "../types";
 import { urlTab } from "../verifyHelpers";
 
 const SEEDED_STAFF = new Set([
-  "Priya Sharma",
-  "Tom Nguyen",
-  "Marcus Webb",
-  "David Chen",
-  "James Taylor",
-  "Elena Rodriguez",
-  "Sarah O'Brien",
-  "Aisha Khan",
+  "Freddie Mercury",
+  "Serena Williams",
+  "Steve Irwin",
+  "Keanu Reeves",
+  "Nelson Mandela",
+  "Cathy Freeman",
+  "Maya Angelou",
+  "Stephen Hawking",
 ]);
 
 export const m2DataEntities: TutorialModule = {
@@ -48,7 +48,7 @@ export const m2DataEntities: TutorialModule = {
       id: "competencies",
       title: "Competencies = who may teach what",
       body:
-        "Each class keeps an allowed-lecturers list (competencies). Assign someone outside the list and the timetable flags a warning rather than blocking you — you'll see one of those in the Clashes module.\n\nNotice Priya Sharma's variance: she's already over her part-time load. That's a job for the Staff hours module.",
+        "Each class keeps an allowed-lecturers list (competencies). Assign someone outside the list and the timetable flags a warning rather than blocking you — you'll see one of those in the Clashes module.\n\nNotice Freddie Mercury's variance: already over a part-time load. That's a job for the Staff hours module.",
       advance: "next",
     },
     {

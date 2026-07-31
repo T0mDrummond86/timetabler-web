@@ -48,14 +48,14 @@ export const m1Orientation: TutorialModule = {
       id: "staff-view",
       title: "Switch to a lecturer's week",
       body:
-        "The sidebar's View selector changes what the grid shows. Switch the view to Staff, then pick Tom Nguyen from the list — you're looking at one lecturer's whole week.",
+        "The sidebar's View selector changes what the grid shows. Switch the view to Staff, then pick Serena Williams from the list — you're looking at one lecturer's whole week.",
       advance: "verify",
       target: "sidebar",
       watch: { url: true },
       verify: (ctx) =>
         urlView(ctx) === "staff" &&
-        urlIntParam(ctx, "staff") === ctx.entities.staff["Tom Nguyen"],
-      hint: "Use the View dropdown in the left sidebar, choose Staff, then click Tom Nguyen in the list below it. (Spot anything odd about his Monday?)",
+        urlIntParam(ctx, "staff") === ctx.entities.staff["Serena Williams"],
+      hint: "Use the View dropdown in the left sidebar, choose Staff, then click Serena Williams in the list below it. (Spot anything odd about that Monday?)",
     },
     {
       id: "holding-area",

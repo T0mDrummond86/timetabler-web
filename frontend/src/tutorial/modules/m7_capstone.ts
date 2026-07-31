@@ -42,7 +42,7 @@ export const m7Capstone: TutorialModule = {
         const report = await api.violationsReport(ctx.sessionId, "hard");
         return !report.rows.some((row) => (row.group ?? "").includes("CYB-T"));
       },
-      hint: "Free CYB-T slots: Monday & Thursday afternoons, most of Tuesday/Thursday. Tom, Priya and James cover the cyber classes; Elena or James can take Workplace Communication. Check each room's column before dropping — or right-click → Alternate slots and let the app choose.",
+      hint: "Free CYB-T slots: Monday & Thursday afternoons, most of Tuesday/Thursday. Williams, Mercury and Mandela cover the cyber classes; Freeman or Mandela can take Workplace Communication. Check each room's column before dropping — or right-click → Alternate slots and let the app choose.",
     },
   ],
   recap: [

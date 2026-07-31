@@ -7,25 +7,25 @@ export const m4Clashes: TutorialModule = {
   title: "Clashes & warnings",
   goal: "Read the Warnings tab and fix a double-booking, a wrong room, and more.",
   startUrl: (ctx) =>
-    `/timetable/${ctx.sessionId}?tab=timetable&view=staff&staff=${ctx.entities.staff["Tom Nguyen"] ?? ""}`,
+    `/timetable/${ctx.sessionId}?tab=timetable&view=staff&staff=${ctx.entities.staff["Serena Williams"] ?? ""}`,
   steps: [
     {
       id: "see-clash",
-      title: "Look at Tom Nguyen's Monday",
+      title: "Look at Serena Williams's Monday",
       body:
-        "Switch to the Staff view and select Tom Nguyen. His Monday holds two overlapping classes — Network Security (10:00) and Linux Administration (11:00). One lecturer, two rooms, same time: a hard clash.",
+        "Switch to the Staff view and select Serena Williams. That Monday holds two overlapping classes — Network Security (10:00) and Linux Administration (11:00). One lecturer, two rooms, same time: a hard clash.",
       advance: "verify",
       target: "sidebar",
       watch: { url: true },
       verify: (ctx) =>
         urlView(ctx) === "staff" &&
-        urlIntParam(ctx, "staff") === ctx.entities.staff["Tom Nguyen"],
+        urlIntParam(ctx, "staff") === ctx.entities.staff["Serena Williams"],
     },
     {
       id: "open-warnings",
       title: "Check the Warnings tab",
       body:
-        "Open the Warnings tab. Every rule breach on the timetable is listed here — find the staff_double_booking row naming Tom. Clicking a row jumps to the offending booking.",
+        "Open the Warnings tab. Every rule breach on the timetable is listed here — find the staff_double_booking row naming Williams. Clicking a row jumps to the offending booking.",
       advance: "verify",
       target: "tab-warnings",
       watch: { url: true },
@@ -35,11 +35,11 @@ export const m4Clashes: TutorialModule = {
       id: "fix-clash",
       title: "Fix the double-booking",
       body:
-        "Back on the timetable, move CYB-B's Linux Administration off Tom's Monday overlap — drag it to a time when Tom is free (Tuesday morning, say). The warning disappears the moment the clash is gone.",
+        "Back on the timetable, move CYB-B's Linux Administration off the Monday overlap — drag it to a time when Williams is free (Tuesday morning, say). The warning disappears the moment the clash is gone.",
       advance: "verify",
       watch: { api: /\/bookings/ },
       verify: (ctx) => noViolation(ctx, "staff_double_booking"),
-      hint: "In Staff view for Tom (or Course view for CYB-B), drag the Linux Administration card to Tuesday 09:00 — Tom's Tuesday is free until 13:00.",
+      hint: "In Staff view for Williams (or Course view for CYB-B), drag the Linux Administration card to Tuesday 09:00 — that Tuesday is free until 13:00.",
     },
     {
       id: "fix-room-type",
@@ -65,11 +65,11 @@ export const m4Clashes: TutorialModule = {
       id: "fix-competency",
       title: "Lecturer not on the allowed list",
       body:
-        "David Chen is teaching Secure Programming Basics (CYB-B, Wednesday) but isn't on its allowed-lecturers list — a soft warning. Soft warnings can be dismissed when they're acceptable, but here, reassign the class to James Taylor, who is allowed and lightly loaded.",
+        "Keanu Reeves is teaching Secure Programming Basics (CYB-B, Wednesday) but isn't on its allowed-lecturers list — a soft warning. Soft warnings can be dismissed when they're acceptable, but here, reassign the class to Nelson Mandela, who is allowed and lightly loaded.",
       advance: "verify",
       watch: { api: /\/bookings/ },
       verify: (ctx) => noViolation(ctx, "lecturer_not_allowed"),
-      hint: "Course view → CYB-B → double-click Secure Programming Basics (Wednesday) → Lecturer → James Taylor → Save.",
+      hint: "Course view → CYB-B → double-click Secure Programming Basics (Wednesday) → Lecturer → Nelson Mandela → Save.",
     },
     {
       id: "merge-note",

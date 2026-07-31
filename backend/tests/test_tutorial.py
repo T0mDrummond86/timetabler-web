@@ -214,7 +214,7 @@ def test_start_tutorial_idempotent_and_private(client):
     assert body["created"] is True
     assert body["session"]["name"] == "Tutorial sandbox — alice"
     assert body["entities"]["courses"].keys() >= {"CYB-A", "CYB-B", "CHC-A", "CYB-T"}
-    assert "Tom Nguyen" in body["entities"]["staff"]
+    assert "Serena Williams" in body["entities"]["staff"]
 
     second = client.post(f"/orgs/{org_id}/tutorial-session", headers=headers)
     assert second.status_code == 201
@@ -236,7 +236,7 @@ def test_reset_restores_pristine_and_guards_real_sessions(client):
     headers, org_id = _register(client, "carol", "Org C")
     started = client.post(f"/orgs/{org_id}/tutorial-session", headers=headers).json()
     sid = started["session"]["id"]
-    tom = started["entities"]["staff"]["Tom Nguyen"]
+    tom = started["entities"]["staff"]["Serena Williams"]
     course = started["entities"]["courses"]["CYB-T"]
     unit = started["entities"]["units"]["Network Security Fundamentals — VU23217"]
 

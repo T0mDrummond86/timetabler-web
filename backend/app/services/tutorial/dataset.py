@@ -7,14 +7,14 @@ it byte-for-byte. Local ids are 1..n; restore remaps them to fresh ids.
 The data is a small "Coastal TAFE" semester with deliberate teaching traps,
 each targeted by one tutorial module:
 
-- Tom Nguyen double-booked on Monday            -> staff_double_booking (M4)
+- Serena Williams double-booked on Monday       -> staff_double_booking (M4)
 - Linux Admin (needs on-campus) in ONL-1        -> room_type            (M4)
 - First Aid (needs 25 seats) in 12-seat A1.10   -> room_capacity        (M4)
-- David Chen teaching outside his competencies  -> lecturer_not_allowed (M4)
-- Marcus Webb (Mon-Wed only) booked Thursday    -> staff_unavailable    (M5)
-- Priya Sharma over her 10.5h weekly cap        -> staff_hour_cap x2    (M5)
+- Keanu Reeves outside their competencies       -> lecturer_not_allowed (M4)
+- Steve Irwin (Mon-Wed only) booked Thursday    -> staff_unavailable    (M5)
+- Freddie Mercury over the 10.5h weekly cap     -> staff_hour_cap x2    (M5)
 - CYB-A "Cyber Threat Intelligence" unplaced    -> holding area target  (M3)
-- CYB-T mostly unscheduled (incl. double-session pair) -> capstone      (M7)
+- CYB-T mostly unscheduled (double-session pair)-> capstone             (M7)
 
 Slots are half-hours from 08:00 (slot 4 = 10:00). Days 0=Mon .. 4=Fri.
 """
@@ -45,12 +45,12 @@ TUTORIAL_DISABLED_CLASH_CODES: tuple[str, ...] = (
 # tutorial clash settings are applied. Tests assert this so the data can't
 # silently drift.
 EXPECTED_VIOLATION_CODES: dict[str, int] = {
-    "staff_double_booking": 1,   # Tom Nguyen, Monday
+    "staff_double_booking": 1,   # Serena Williams, Monday
     "room_type": 1,              # Linux Admin (CYB-B) in ONL-1
     "room_capacity": 1,          # First Aid in A1.10
-    "staff_unavailable": 1,      # Marcus Webb, Thursday
-    "lecturer_not_allowed": 1,   # David Chen on Secure Programming
-    "staff_hour_cap": 2,         # Priya Sharma, T1 and T2
+    "staff_unavailable": 1,      # Steve Irwin, Thursday
+    "lecturer_not_allowed": 1,   # Keanu Reeves on Secure Programming
+    "staff_hour_cap": 2,         # Freddie Mercury, T1 and T2
 }
 
 # Unplaced (course code -> unit names) the holding area must show pristine.
@@ -200,7 +200,7 @@ Q_CYBER, Q_COMMUNITY = 1, 2
 CYB_A, CYB_B, CHC_A, CYB_T = 1, 2, 3, 4
 (U_NETSEC, U_THREAT, U_SECPROG, U_LINUX, U_INCIDENT, U_WEBSEC,
  U_WORKCOM, U_FIRSTAID, U_CASEMGMT, U_LEGAL, U_COUNSEL, U_DIGLIT) = range(1, 13)
-(S_PRIYA, S_TOM, S_MARCUS, S_DAVID, S_JAMES, S_ELENA, S_SARAH, S_AISHA) = range(1, 9)
+(S_MERCURY, S_WILLIAMS, S_IRWIN, S_REEVES, S_MANDELA, S_FREEMAN, S_ANGELOU, S_HAWKING) = range(1, 9)
 (R_B104, R_B105, R_A201, R_A202, R_A110, R_W101, R_ONL1) = range(1, 8)
 
 
@@ -273,51 +273,51 @@ def build_tutorial_payload() -> dict[str, Any]:
         "unit_allowed_rooms": [],
         "course_units": [],
         "staff": [
-            _staff(S_PRIYA, "Priya Sharma", fte=0.5, cap=10.5, order=0),
-            _staff(S_TOM, "Tom Nguyen", fte=1.0, order=1),
-            _staff(S_MARCUS, "Marcus Webb", fte=0.6, order=2),
-            _staff(S_DAVID, "David Chen", fte=0.8, order=3),
-            _staff(S_JAMES, "James Taylor", fte=1.0, order=4),
+            _staff(S_MERCURY, "Freddie Mercury", fte=0.5, cap=10.5, order=0),
+            _staff(S_WILLIAMS, "Serena Williams", fte=1.0, order=1),
+            _staff(S_IRWIN, "Steve Irwin", fte=0.6, order=2),
+            _staff(S_REEVES, "Keanu Reeves", fte=0.8, order=3),
+            _staff(S_MANDELA, "Nelson Mandela", fte=1.0, order=4),
             _staff(
-                S_ELENA,
-                "Elena Rodriguez",
+                S_FREEMAN,
+                "Cathy Freeman",
                 fte=1.0,
                 non_teaching_day=4,
                 cost_centre="Community Services",
                 order=5,
             ),
-            _staff(S_SARAH, "Sarah O'Brien", fte=0.5, cost_centre="Community Services", order=6),
-            _staff(S_AISHA, "Aisha Khan", fte=0.4, order=7),
+            _staff(S_ANGELOU, "Maya Angelou", fte=0.5, cost_centre="Community Services", order=6),
+            _staff(S_HAWKING, "Stephen Hawking", fte=0.4, order=7),
         ],
         "staff_qualification_online_students": [],
         "staff_unit_online_students": [],
         "staff_preferences": [],
         # Allowed-lecturer lists. Every booked lecturer is on their unit's list
-        # EXCEPT David Chen on Secure Programming (the M4 soft violation).
-        # James Taylor is on every list — the tutorial's reassignment target.
+        # EXCEPT Keanu Reeves on Secure Programming (the M4 soft violation).
+        # Nelson Mandela is on every list — the tutorial's reassignment target.
         "staff_competencies": [
             {"staff_id": s, "unit_id": u}
             for u, staff_ids in {
-                U_NETSEC: (S_TOM, S_JAMES),
-                U_THREAT: (S_TOM, S_JAMES),
-                U_SECPROG: (S_PRIYA, S_JAMES),          # David deliberately absent
-                U_LINUX: (S_MARCUS, S_TOM, S_JAMES),
-                U_INCIDENT: (S_TOM, S_PRIYA, S_JAMES),
-                U_WEBSEC: (S_AISHA, S_JAMES),
-                U_WORKCOM: (S_ELENA, S_JAMES),          # M2 adds the user's new staff here
-                U_FIRSTAID: (S_SARAH, S_JAMES),
-                U_CASEMGMT: (S_MARCUS, S_ELENA, S_JAMES),
-                U_LEGAL: (S_ELENA, S_JAMES),
-                U_COUNSEL: (S_SARAH, S_JAMES),
-                U_DIGLIT: (S_PRIYA, S_JAMES),
+                U_NETSEC: (S_WILLIAMS, S_MANDELA),
+                U_THREAT: (S_WILLIAMS, S_MANDELA),
+                U_SECPROG: (S_MERCURY, S_MANDELA),          # Reeves deliberately absent
+                U_LINUX: (S_IRWIN, S_WILLIAMS, S_MANDELA),
+                U_INCIDENT: (S_WILLIAMS, S_MERCURY, S_MANDELA),
+                U_WEBSEC: (S_HAWKING, S_MANDELA),
+                U_WORKCOM: (S_FREEMAN, S_MANDELA),          # M2 adds the user's new staff here
+                U_FIRSTAID: (S_ANGELOU, S_MANDELA),
+                U_CASEMGMT: (S_IRWIN, S_FREEMAN, S_MANDELA),
+                U_LEGAL: (S_FREEMAN, S_MANDELA),
+                U_COUNSEL: (S_ANGELOU, S_MANDELA),
+                U_DIGLIT: (S_MERCURY, S_MANDELA),
             }.items()
             for s in staff_ids
         ],
-        # Marcus Webb works Monday-Wednesday only (full days).
+        # Steve Irwin works Monday-Wednesday only (full days).
         "staff_availability": [
-            {"id": 1, "staff_id": S_MARCUS, "day": 0, "start_slot": 0, "end_slot": 28},
-            {"id": 2, "staff_id": S_MARCUS, "day": 1, "start_slot": 0, "end_slot": 28},
-            {"id": 3, "staff_id": S_MARCUS, "day": 2, "start_slot": 0, "end_slot": 28},
+            {"id": 1, "staff_id": S_IRWIN, "day": 0, "start_slot": 0, "end_slot": 28},
+            {"id": 2, "staff_id": S_IRWIN, "day": 1, "start_slot": 0, "end_slot": 28},
+            {"id": 3, "staff_id": S_IRWIN, "day": 2, "start_slot": 0, "end_slot": 28},
         ],
         "rooms": [
             _room(R_B104, "B1.04", "Cyber Lab 1", "on-campus", 20),
@@ -332,32 +332,32 @@ def build_tutorial_payload() -> dict[str, Any]:
         # 10=13:00, 12=14:00, 14=15:00, 16=16:00.
         "bookings": [
             # --- CYB-A (Cyber Threat Intelligence left unplaced for M3) ---
-            _booking(1, CYB_A, U_NETSEC, S_TOM, R_B104, 0, 4, 8),      # Mon 10-12 (clash pair)
-            _booking(2, CYB_A, U_SECPROG, S_PRIYA, R_B105, 1, 2, 8),   # Tue 09-12
-            _booking(3, CYB_A, U_LINUX, S_MARCUS, R_B104, 2, 12, 16),  # Wed 14-16
-            _booking(4, CYB_A, U_INCIDENT, S_TOM, R_B104, 2, 2, 6, part=1),   # Wed 09-11
-            _booking(5, CYB_A, U_INCIDENT, S_TOM, R_B104, 3, 2, 6, part=2),   # Thu 09-11
-            _booking(6, CYB_A, U_WEBSEC, S_AISHA, R_B105, 0, 10, 14),  # Mon 13-15
-            _booking(7, CYB_A, U_WORKCOM, S_ELENA, R_A201, 1, 10, 14), # Tue 13-15
+            _booking(1, CYB_A, U_NETSEC, S_WILLIAMS, R_B104, 0, 4, 8),      # Mon 10-12 (clash pair)
+            _booking(2, CYB_A, U_SECPROG, S_MERCURY, R_B105, 1, 2, 8),   # Tue 09-12
+            _booking(3, CYB_A, U_LINUX, S_IRWIN, R_B104, 2, 12, 16),  # Wed 14-16
+            _booking(4, CYB_A, U_INCIDENT, S_WILLIAMS, R_B104, 2, 2, 6, part=1),   # Wed 09-11
+            _booking(5, CYB_A, U_INCIDENT, S_WILLIAMS, R_B104, 3, 2, 6, part=2),   # Thu 09-11
+            _booking(6, CYB_A, U_WEBSEC, S_HAWKING, R_B105, 0, 10, 14),  # Mon 13-15
+            _booking(7, CYB_A, U_WORKCOM, S_FREEMAN, R_A201, 1, 10, 14), # Tue 13-15
             # --- CYB-B (fully scheduled; carries the M4 traps) ---
-            _booking(8, CYB_B, U_NETSEC, S_JAMES, R_B104, 3, 8, 12, lock_time=1),  # Thu 12-14
-            _booking(9, CYB_B, U_THREAT, S_TOM, R_B105, 1, 10, 14),    # Tue 13-15
-            _booking(10, CYB_B, U_SECPROG, S_DAVID, R_B105, 2, 8, 14), # Wed 12-15 (David: soft)
-            _booking(11, CYB_B, U_LINUX, S_TOM, R_ONL1, 0, 6, 10),     # Mon 11-13 (clash + room_type)
-            _booking(12, CYB_B, U_INCIDENT, S_PRIYA, R_B104, 4, 2, 6, part=1),   # Fri 09-11
-            _booking(13, CYB_B, U_INCIDENT, S_PRIYA, R_B104, 4, 8, 12, part=2),  # Fri 12-14
-            _booking(14, CYB_B, U_WEBSEC, S_AISHA, R_B105, 3, 2, 6),   # Thu 09-11
-            _booking(15, CYB_B, U_WORKCOM, S_ELENA, R_A202, 2, 2, 6),  # Wed 09-11
+            _booking(8, CYB_B, U_NETSEC, S_MANDELA, R_B104, 3, 8, 12, lock_time=1),  # Thu 12-14
+            _booking(9, CYB_B, U_THREAT, S_WILLIAMS, R_B105, 1, 10, 14),    # Tue 13-15
+            _booking(10, CYB_B, U_SECPROG, S_REEVES, R_B105, 2, 8, 14), # Wed 12-15 (Reeves: soft)
+            _booking(11, CYB_B, U_LINUX, S_WILLIAMS, R_ONL1, 0, 6, 10),     # Mon 11-13 (clash + room_type)
+            _booking(12, CYB_B, U_INCIDENT, S_MERCURY, R_B104, 4, 2, 6, part=1),   # Fri 09-11
+            _booking(13, CYB_B, U_INCIDENT, S_MERCURY, R_B104, 4, 8, 12, part=2),  # Fri 12-14
+            _booking(14, CYB_B, U_WEBSEC, S_HAWKING, R_B105, 3, 2, 6),   # Thu 09-11
+            _booking(15, CYB_B, U_WORKCOM, S_FREEMAN, R_A202, 2, 2, 6),  # Wed 09-11
             # --- CHC-A (Community Services; capacity + availability traps) ---
-            _booking(16, CHC_A, U_FIRSTAID, S_SARAH, R_A110, 1, 2, 10),  # Tue 09-13 (12 seats!)
-            _booking(17, CHC_A, U_CASEMGMT, S_MARCUS, R_A201, 3, 4, 8),  # Thu 10-12 (unavailable)
-            _booking(18, CHC_A, U_LEGAL, S_ELENA, R_A201, 0, 10, 14),    # Mon 13-15 (M5 cover)
-            _booking(19, CHC_A, U_COUNSEL, S_SARAH, R_A202, 0, 4, 10, lock_time=1),  # Mon 10-13
-            _booking(20, CHC_A, U_DIGLIT, S_PRIYA, R_ONL1, 2, 2, 6),     # Wed 09-11 (M5 reassign)
+            _booking(16, CHC_A, U_FIRSTAID, S_ANGELOU, R_A110, 1, 2, 10),  # Tue 09-13 (12 seats!)
+            _booking(17, CHC_A, U_CASEMGMT, S_IRWIN, R_A201, 3, 4, 8),  # Thu 10-12 (unavailable)
+            _booking(18, CHC_A, U_LEGAL, S_FREEMAN, R_A201, 0, 10, 14),    # Mon 13-15 (M5 cover)
+            _booking(19, CHC_A, U_COUNSEL, S_ANGELOU, R_A202, 0, 4, 10, lock_time=1),  # Mon 10-13
+            _booking(20, CHC_A, U_DIGLIT, S_MERCURY, R_ONL1, 2, 2, 6),     # Wed 09-11 (M5 reassign)
             # --- CYB-T (capstone group; most classes left in holding) ---
-            _booking(21, CYB_T, U_THREAT, S_JAMES, R_B105, 4, 2, 6),   # Fri 09-11
-            _booking(22, CYB_T, U_SECPROG, S_PRIYA, R_B105, 0, 4, 10), # Mon 10-13
-            _booking(23, CYB_T, U_LINUX, S_MARCUS, R_B104, 2, 8, 12),  # Wed 12-14
-            _booking(24, CYB_T, U_WEBSEC, S_AISHA, R_A202, 1, 4, 8),   # Tue 10-12
+            _booking(21, CYB_T, U_THREAT, S_MANDELA, R_B105, 4, 2, 6),   # Fri 09-11
+            _booking(22, CYB_T, U_SECPROG, S_MERCURY, R_B105, 0, 4, 10), # Mon 10-13
+            _booking(23, CYB_T, U_LINUX, S_IRWIN, R_B104, 2, 8, 12),  # Wed 12-14
+            _booking(24, CYB_T, U_WEBSEC, S_HAWKING, R_A202, 1, 4, 8),   # Tue 10-12
         ],
     }
