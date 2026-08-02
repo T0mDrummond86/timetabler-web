@@ -20,6 +20,7 @@ import {
   type SessionChoice,
 } from "./lecturerWeek";
 import { FreeNowView } from "./FreeNowView";
+import { MobileCoverView } from "./MobileCoverView";
 import { InstallBanner } from "./InstallBanner";
 import { MobileWeekGrid } from "./MobileWeekGrid";
 import "./mobile.css";
@@ -28,7 +29,7 @@ const LAST_VIEW_KEY = "tafetabler-mobile-last";
 const SESSIONS_KEY = "tafetabler-mobile-sessions";
 const MODE_KEY = "tafetabler-mobile-mode";
 
-type ViewMode = "week" | "free";
+type ViewMode = "week" | "free" | "cover";
 
 type Remembered = { lecturer: string };
 
@@ -53,7 +54,7 @@ function readRemembered(): Remembered | null {
 export default function MobilePage() {
   const [authed, setAuthed] = useState(() => !!getToken());
   const [staffRows, setStaffRows] = useState<
-    { name: string; rows: GlobalAggregatedStaffRow[] }[]
+    { id: number; name: string; rows: GlobalAggregatedStaffRow[] }[]
   >([]);
   const [sessionChoices, setSessionChoices] = useState<SessionChoice[]>([]);
   const [included, setIncluded] = useState<number[] | null>(() => readIncluded());
@@ -127,9 +128,9 @@ export default function MobilePage() {
           workspaces.map(async (w) => {
             try {
               const data = await api.globalSessionStaff(w.id);
-              return { name: w.name, rows: data.rows };
+              return { id: w.id, name: w.name, rows: data.rows };
             } catch {
-              return { name: w.name, rows: [] };
+              return { id: w.id, name: w.name, rows: [] };
             }
           }),
         );
@@ -144,6 +145,13 @@ export default function MobilePage() {
       cancelled = true;
     };
   }, [authed]);
+
+  /** Which workspace a session belongs to — its cover log lives there. */
+  const globalSessionIdFor = useCallback(
+    (sessionId: number) =>
+      sessionChoices.find((c) => c.sessionId === sessionId)?.globalSessionId ?? null,
+    [sessionChoices],
+  );
 
   // Default to every session until the viewer narrows it down.
   const includedSet = useMemo(
@@ -239,7 +247,7 @@ export default function MobilePage() {
         )}
         <span className="mv-spacer" />
         <span className="mv-modes" role="tablist" aria-label="View">
-          {(["week", "free"] as ViewMode[]).map((m) => (
+          {(["week", "free", "cover"] as ViewMode[]).map((m) => (
             <button
               key={m}
               type="button"
@@ -251,7 +259,7 @@ export default function MobilePage() {
                 localStorage.setItem(MODE_KEY, m);
               }}
             >
-              {m === "week" ? "Week" : "Now"}
+              {m === "week" ? "Week" : m === "free" ? "Now" : "Cover"}
             </button>
           ))}
         </span>
@@ -311,7 +319,7 @@ export default function MobilePage() {
               ))}
             </ul>
           )}
-          {mode === "week" && (
+          {mode !== "free" && (
             <input
               className="mv-search"
               type="search"
@@ -344,6 +352,13 @@ export default function MobilePage() {
             <FreeNowView
               sessionIds={[...includedSet]}
               lecturerNames={lecturers.map((l) => l.name)}
+              onError={setError}
+            />
+          ) : mode === "cover" ? (
+            <MobileCoverView
+              week={week}
+              loading={loading}
+              globalSessionIdFor={globalSessionIdFor}
               onError={setError}
             />
           ) : (

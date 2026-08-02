@@ -22,7 +22,7 @@ export type LecturerWeek = {
   firstSlotTime: string;
   weekLabel: string | null;
   /** Bookings from every session, tagged with where they came from. */
-  bookings: (BookingCard & { sessionName: string })[];
+  bookings: (BookingCard & { sessionId: number; sessionName: string })[];
   /** True when at least one grid came from the offline cache. */
   fromCache: boolean;
   cachedAt: string | null;
@@ -33,6 +33,8 @@ export type SessionChoice = {
   sessionId: number;
   sessionName: string;
   workspaceName: string;
+  /** Workspace the session belongs to — where its cover log lives. */
+  globalSessionId: number;
 };
 
 /**
@@ -74,7 +76,7 @@ export function lecturersFromStaffRows(
 
 /** Every session reachable through the workspaces the viewer can see. */
 export function sessionChoicesFromWorkspaces(
-  workspaces: { name: string; rows: GlobalAggregatedStaffRow[] }[],
+  workspaces: { id: number; name: string; rows: GlobalAggregatedStaffRow[] }[],
 ): SessionChoice[] {
   const seen = new Map<number, SessionChoice>();
   for (const ws of workspaces) {
@@ -85,6 +87,7 @@ export function sessionChoicesFromWorkspaces(
             sessionId: m.session_id,
             sessionName: m.session_name,
             workspaceName: ws.name,
+            globalSessionId: ws.id,
           });
         }
       }
@@ -119,7 +122,11 @@ export async function loadLecturerWeek(ref: LecturerRef): Promise<LecturerWeek> 
   }[];
 
   const bookings = grids.flatMap(({ place, grid }) =>
-    grid.bookings.map((b) => ({ ...b, sessionName: place.sessionName })),
+    grid.bookings.map((b) => ({
+      ...b,
+      sessionId: place.sessionId,
+      sessionName: place.sessionName,
+    })),
   );
   bookings.sort((a, b) => a.day - b.day || a.start_slot - b.start_slot);
 

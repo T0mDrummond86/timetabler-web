@@ -7,7 +7,15 @@ import { minutesToLabel, slotToMinutes, type LecturerWeek } from "./lecturerWeek
 
 type Card = LecturerWeek["bookings"][number];
 
-export function MobileWeekGrid({ week }: { week: LecturerWeek }) {
+type Props = {
+  week: LecturerWeek;
+  /** Cover mode hands the tapped class back instead of showing its detail. */
+  onSelectBooking?: (booking: Card) => void;
+  /** Highlighted while its cover is being arranged. */
+  selectedBookingId?: number | null;
+};
+
+export function MobileWeekGrid({ week, onSelectBooking, selectedBookingId }: Props) {
   const [detail, setDetail] = useState<Card | null>(null);
 
   const { firstSlot, lastSlot } = useMemo(() => {
@@ -79,10 +87,12 @@ export function MobileWeekGrid({ week }: { week: LecturerWeek }) {
                   <button
                     key={`${b.id}-${b.sessionName}`}
                     type="button"
-                    className="mv-card"
+                    className={`mv-card${
+                      selectedBookingId === b.id ? " mv-card--picked" : ""
+                    }`}
                     style={{ top: `${top}%`, height: `${height}%` }}
-                    onClick={() => setDetail(b)}
-                    title="Tap for full detail"
+                    onClick={() => (onSelectBooking ? onSelectBooking(b) : setDetail(b))}
+                    title={onSelectBooking ? "Tap to arrange cover" : "Tap for full detail"}
                   >
                     <span className="mv-card-name">
                       {b.unit_name ?? b.course_code ?? "Class"}
