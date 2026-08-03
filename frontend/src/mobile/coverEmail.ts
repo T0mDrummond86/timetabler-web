@@ -31,28 +31,49 @@ export function longDate(iso: string, dayLabel: string): string {
   });
 }
 
+function firstNameOf(full: string): string {
+  return full.trim().split(/\s+/)[0] ?? full.trim();
+}
+
+/**
+ * How to address the two of them: first names, since the note is between
+ * colleagues — unless they share one, where first names alone would leave the
+ * reader guessing which of them is being asked for the session plan. Both
+ * revert together, so the message never mixes the two forms.
+ */
+export function displayNames(f: CoverEmailFacts): { cover: string; away: string } {
+  const cover = firstNameOf(f.coverStaffName);
+  const away = firstNameOf(f.awayStaffName);
+  if (cover.toLocaleLowerCase() === away.toLocaleLowerCase()) {
+    return { cover: f.coverStaffName.trim(), away: f.awayStaffName.trim() };
+  }
+  return { cover, away };
+}
+
 /** The block of class details quoted in the middle of the email. */
 export function coverDetailLines(f: CoverEmailFacts): string[] {
+  const who = displayNames(f);
   return [
     `Date: ${longDate(f.date, f.dayLabel)}`,
     `Time: ${f.timeLabel}`,
     `Group: ${f.groupName}`,
     `Class: ${f.unitName}`,
     `Room: ${f.roomCode || "—"}`,
-    `Lecturer being covered: ${f.awayStaffName}`,
-    `Covering lecturer: ${f.coverStaffName}`,
+    `Lecturer being covered: ${who.away}`,
+    `Covering lecturer: ${who.cover}`,
   ];
 }
 
 export function buildCoverEmail(f: CoverEmailFacts): string {
+  const who = displayNames(f);
   return [
-    `Hi ${f.coverStaffName} and ${f.awayStaffName},`,
+    `Hi ${who.cover} and ${who.away},`,
     "",
     "As discussed, details for the cover session are as follows:",
     "",
     ...coverDetailLines(f),
     "",
-    `${f.awayStaffName}, please ensure ${f.coverStaffName} has access to the shell and provide a session plan.`,
+    `${who.away}, please ensure ${who.cover} has access to the shell and provide a session plan.`,
     "",
     "Thanks",
   ].join("\n");
