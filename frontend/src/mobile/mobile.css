@@ -794,18 +794,26 @@
   }
 }
 
-/* The class being handed over, drawn on the cover lecturer's own week. Dashed
-   and unfilled so it never reads as something they are already teaching, and
-   held to the right half of the column so anything it clashes with stays
-   readable underneath — the overlap is the whole point of showing it. */
+/* The class being handed over, drawn over the cover lecturer's own week at the
+   full width of the slot it would occupy. The fill stays transparent and its
+   label sits at the top, so a class it clashes with is still readable through
+   it — seeing the overlap is the whole point of drawing it. */
 .mv-card--proposed {
-  left: 45%;
-  right: 1px;
+  justify-content: flex-start;
   border: 2px dashed var(--accent, #2563eb);
-  background: color-mix(in srgb, var(--accent, #2563eb) 14%, var(--panel-bg, #fff));
-  color: inherit;
+  background: transparent;
+  color: var(--accent, #2563eb);
+  font-weight: 700;
   pointer-events: none;
   z-index: 2;
+}
+
+.mv-card--proposed .mv-card-name,
+.mv-card--proposed .mv-card-meta {
+  text-align: right;
+  text-shadow:
+    0 0 3px var(--panel-bg, #fff),
+    0 0 3px var(--panel-bg, #fff);
 }
 
 /* Whose week the grid is showing. */

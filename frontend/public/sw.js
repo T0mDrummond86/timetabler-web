@@ -6,7 +6,7 @@
  *     opened, replayed from cache when offline. The page decides how to
  *     present staleness; the worker just records when it stored the copy.
  */
-const SHELL_CACHE = "tafetabler-shell-v1";
+const SHELL_CACHE = "tafetabler-shell-v2";
 const DATA_CACHE = "tafetabler-data-v1";
 const SHELL_ASSETS = ["/", "/m", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 
@@ -92,11 +92,22 @@ self.addEventListener("fetch", (event) => {
   }
 
   // Navigations: serve the shell so a cold offline launch still boots.
+  //
+  // The stored copy is refreshed on every successful navigation. Without that
+  // it would only ever be written at install, and since this file rarely
+  // changes there is no reinstall — so the offline fallback would stay pinned
+  // to the asset hashes of whichever build was live the first time the viewer
+  // was opened, and a slow launch would boot a months-old app.
   if (request.mode === "navigate") {
     event.respondWith(
       (async () => {
         try {
-          return await fetch(request);
+          const fresh = await fetch(request);
+          if (fresh.ok) {
+            const cache = await caches.open(SHELL_CACHE);
+            await cache.put(url.pathname.startsWith("/m") ? "/m" : "/", fresh.clone());
+          }
+          return fresh;
         } catch {
           const cache = await caches.open(SHELL_CACHE);
           return (await cache.match("/m")) ?? (await cache.match("/")) ?? Response.error();
