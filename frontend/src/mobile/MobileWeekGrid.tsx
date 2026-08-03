@@ -13,25 +13,32 @@ type Props = {
   onSelectBooking?: (booking: Card) => void;
   /** Highlighted while its cover is being arranged. */
   selectedBookingId?: number | null;
+  /** A slot drawn over the week that is not (yet) one of its bookings — the
+   *  class being handed to this lecturer, so the fit can be judged. */
+  proposed?: { day: number; startSlot: number; endSlot: number; label: string } | null;
 };
 
-export function MobileWeekGrid({ week, onSelectBooking, selectedBookingId }: Props) {
+export function MobileWeekGrid({ week, onSelectBooking, selectedBookingId, proposed }: Props) {
   const [detail, setDetail] = useState<Card | null>(null);
 
   const { firstSlot, lastSlot } = useMemo(() => {
-    if (!week.bookings.length) return { firstSlot: 0, lastSlot: week.numSlots };
+    if (!week.bookings.length && !proposed) return { firstSlot: 0, lastSlot: week.numSlots };
     let lo = Number.POSITIVE_INFINITY;
     let hi = 0;
     for (const b of week.bookings) {
       lo = Math.min(lo, b.start_slot);
       hi = Math.max(hi, b.end_slot);
     }
+    if (proposed) {
+      lo = Math.min(lo, proposed.startSlot);
+      hi = Math.max(hi, proposed.endSlot);
+    }
     // A little air above and below so cards aren't flush to the frame.
     return {
       firstSlot: Math.max(0, lo - 1),
       lastSlot: Math.min(week.numSlots, hi + 1),
     };
-  }, [week]);
+  }, [week, proposed]);
 
   const span = Math.max(1, lastSlot - firstSlot);
   const byDay = useMemo(() => {
@@ -50,7 +57,7 @@ export function MobileWeekGrid({ week, onSelectBooking, selectedBookingId }: Pro
     return marks;
   }, [firstSlot, lastSlot, week]);
 
-  if (!week.bookings.length) {
+  if (!week.bookings.length && !proposed) {
     return <p className="mv-empty">No classes timetabled for {week.name}.</p>;
   }
 
@@ -106,6 +113,18 @@ export function MobileWeekGrid({ week, onSelectBooking, selectedBookingId }: Pro
                   </button>
                 );
               })}
+              {proposed?.day === i && (
+                <div
+                  className="mv-card mv-card--proposed"
+                  style={{
+                    top: `${((proposed.startSlot - firstSlot) / span) * 100}%`,
+                    height: `${((proposed.endSlot - proposed.startSlot) / span) * 100}%`,
+                  }}
+                >
+                  <span className="mv-card-name">{proposed.label}</span>
+                  <span className="mv-card-meta">cover</span>
+                </div>
+              )}
             </div>
           </div>
         ))}

@@ -9,8 +9,10 @@ import { api, type CoverCandidate } from "../api";
 import { MobileWeekGrid } from "./MobileWeekGrid";
 import { buildCoverEmail, coverDetailLines, type CoverEmailFacts } from "./coverEmail";
 import {
+  loadLecturerWeek,
   minutesToLabel,
   slotToMinutes,
+  type LecturerRef,
   type LecturerWeek,
 } from "./lecturerWeek";
 
@@ -19,6 +21,9 @@ type Card = LecturerWeek["bookings"][number];
 type Props = {
   week: LecturerWeek | null;
   loading: boolean;
+  /** Every lecturer the viewer can see, so a candidate's own week can be
+   *  loaded across all the sessions they teach in — not just this one. */
+  lecturers: LecturerRef[];
   /** Workspace a session belongs to; null when it is linked to none. */
   globalSessionIdFor: (sessionId: number) => number | null;
   onError?: (message: string) => void;
@@ -33,11 +38,14 @@ function nextDateFor(dayIndex: number, from: Date = new Date()): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-export function MobileCoverView({ week, loading, globalSessionIdFor, onError }: Props) {
+export function MobileCoverView({ week, loading, lecturers, globalSessionIdFor, onError }: Props) {
   const [picked, setPicked] = useState<Card | null>(null);
   const [candidates, setCandidates] = useState<CoverCandidate[] | null>(null);
   const [coverId, setCoverId] = useState<number | null>(null);
   const [date, setDate] = useState("");
+  const [coverWeek, setCoverWeek] = useState<LecturerWeek | null>(null);
+  const [coverWeekLoading, setCoverWeekLoading] = useState(false);
+  const [showing, setShowing] = useState<"away" | "cover">("away");
   const [copied, setCopied] = useState(false);
   const [logged, setLogged] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -46,6 +54,8 @@ export function MobileCoverView({ week, loading, globalSessionIdFor, onError }: 
   useEffect(() => {
     setCandidates(null);
     setCoverId(null);
+    setCoverWeek(null);
+    setShowing("away");
     setCopied(false);
     setLogged(false);
     if (!picked) return;
@@ -66,6 +76,47 @@ export function MobileCoverView({ week, loading, globalSessionIdFor, onError }: 
       cancelled = true;
     };
   }, [picked, onError]);
+
+  // Choosing a cover lecturer pulls up their week, so the slot can be checked
+  // against what they are already teaching.
+  const coverName = candidates?.find((c) => c.id === coverId)?.label ?? null;
+  useEffect(() => {
+    setCoverWeek(null);
+    if (!coverName || !picked) {
+      setShowing("away");
+      return;
+    }
+    // Prefer the full cross-session reference; fall back to just this session
+    // when the candidate is outside the viewer's chosen timetables.
+    const ref: LecturerRef = lecturers.find((l) => l.name === coverName) ?? {
+      name: coverName,
+      places: [
+        {
+          sessionId: picked.sessionId,
+          sessionName: picked.sessionName,
+          staffId: coverId as number,
+        },
+      ],
+    };
+    let cancelled = false;
+    setCoverWeekLoading(true);
+    setShowing("cover");
+    void (async () => {
+      try {
+        const w = await loadLecturerWeek(ref);
+        if (!cancelled) setCoverWeek(w);
+      } catch (err) {
+        if (!cancelled) {
+          onError?.(err instanceof Error ? err.message : "Could not load that week");
+        }
+      } finally {
+        if (!cancelled) setCoverWeekLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [coverName, coverId, picked, lecturers, onError]);
 
   const facts = useCallback((): CoverEmailFacts | null => {
     if (!picked || !week) return null;
@@ -142,11 +193,30 @@ export function MobileCoverView({ week, loading, globalSessionIdFor, onError }: 
   return (
     <div className="mv-cover">
       <div className="mv-cover-grid">
-        <MobileWeekGrid
-          week={week}
-          onSelectBooking={setPicked}
-          selectedBookingId={picked?.id ?? null}
-        />
+        {showing === "cover" && coverWeekLoading && (
+          <p className="mv-empty">Loading {coverName}'s week…</p>
+        )}
+        {showing === "cover" && !coverWeekLoading && coverWeek ? (
+          <MobileWeekGrid
+            week={coverWeek}
+            proposed={
+              picked
+                ? {
+                    day: picked.day,
+                    startSlot: picked.start_slot,
+                    endSlot: picked.end_slot,
+                    label: picked.unit_name ?? picked.course_code ?? "Cover",
+                  }
+                : null
+            }
+          />
+        ) : showing === "away" ? (
+          <MobileWeekGrid
+            week={week}
+            onSelectBooking={setPicked}
+            selectedBookingId={picked?.id ?? null}
+          />
+        ) : null}
       </div>
 
       {!picked ? (
@@ -197,6 +267,25 @@ export function MobileCoverView({ week, loading, globalSessionIdFor, onError }: 
               ))}
             </select>
           </label>
+
+          {coverName && (
+            <div className="mv-cover-toggle" role="group" aria-label="Whose week to show">
+              <button
+                type="button"
+                className={`mv-cover-tab${showing === "away" ? " mv-cover-tab--on" : ""}`}
+                onClick={() => setShowing("away")}
+              >
+                {week.name.split(/\s+/)[0]}
+              </button>
+              <button
+                type="button"
+                className={`mv-cover-tab${showing === "cover" ? " mv-cover-tab--on" : ""}`}
+                onClick={() => setShowing("cover")}
+              >
+                {coverName.split(/\s+/)[0]}
+              </button>
+            </div>
+          )}
 
           {f && (
             <ul className="mv-cover-detail">

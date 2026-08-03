@@ -793,3 +793,45 @@
     align-self: stretch;
   }
 }
+
+/* The class being handed over, drawn on the cover lecturer's own week. Dashed
+   and unfilled so it never reads as something they are already teaching, and
+   held to the right half of the column so anything it clashes with stays
+   readable underneath — the overlap is the whole point of showing it. */
+.mv-card--proposed {
+  left: 45%;
+  right: 1px;
+  border: 2px dashed var(--accent, #2563eb);
+  background: color-mix(in srgb, var(--accent, #2563eb) 14%, var(--panel-bg, #fff));
+  color: inherit;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Whose week the grid is showing. */
+.mv-cover-toggle {
+  display: flex;
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.mv-cover-tab {
+  flex: 1;
+  padding: 0.22rem 0.3rem;
+  border: none;
+  background: var(--panel-bg, #fff);
+  color: inherit;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mv-cover-tab--on {
+  background: var(--accent, #2563eb);
+  color: #fff;
+}

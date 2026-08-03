@@ -240,7 +240,13 @@ export default function MobilePage() {
           {panelOpen ? "‹" : "›"}
         </button>
         <span className="mv-title">
-          {mode === "free" ? "Now" : week?.name ?? "TAFEtabler"}
+          {mode === "free"
+            ? "Now"
+            : mode === "cover"
+              ? week
+                ? `Cover for ${week.name}`
+                : "Cover"
+              : week?.name ?? "TAFEtabler"}
         </span>
         {mode === "week" && week?.weekLabel && (
           <span className="mv-sub">{week.weekLabel}</span>
@@ -358,6 +364,7 @@ export default function MobilePage() {
             <MobileCoverView
               week={week}
               loading={loading}
+              lecturers={lecturers}
               globalSessionIdFor={globalSessionIdFor}
               onError={setError}
             />
