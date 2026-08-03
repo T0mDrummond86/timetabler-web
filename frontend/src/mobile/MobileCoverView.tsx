@@ -26,6 +26,9 @@ type Props = {
   lecturers: LecturerRef[];
   /** Workspace a session belongs to; null when it is linked to none. */
   globalSessionIdFor: (sessionId: number) => number | null;
+  /** Raised while a class is being arranged, so the lecturer list can be
+   *  frozen — the away lecturer is settled at that point. */
+  onLockedChange?: (locked: boolean) => void;
   onError?: (message: string) => void;
 };
 
@@ -38,8 +41,16 @@ function nextDateFor(dayIndex: number, from: Date = new Date()): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-export function MobileCoverView({ week, loading, lecturers, globalSessionIdFor, onError }: Props) {
+export function MobileCoverView({
+  week,
+  loading,
+  lecturers,
+  globalSessionIdFor,
+  onLockedChange,
+  onError,
+}: Props) {
   const [picked, setPicked] = useState<Card | null>(null);
+  const [awayName, setAwayName] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<CoverCandidate[] | null>(null);
   const [coverId, setCoverId] = useState<number | null>(null);
   const [date, setDate] = useState("");
@@ -49,6 +60,22 @@ export function MobileCoverView({ week, loading, lecturers, globalSessionIdFor, 
   const [copied, setCopied] = useState(false);
   const [logged, setLogged] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  /** Taking a class locks in whose class it is. */
+  const pickClass = useCallback(
+    (card: Card | null) => {
+      setPicked(card);
+      setAwayName(card ? week?.name ?? null : null);
+    },
+    [week],
+  );
+
+  // Freeze the lecturer list while a class is being arranged.
+  useEffect(() => {
+    onLockedChange?.(picked != null);
+  }, [picked, onLockedChange]);
+
+  useEffect(() => () => onLockedChange?.(false), [onLockedChange]);
 
   // A new class means a new set of candidates and a fresh outcome.
   useEffect(() => {
@@ -135,10 +162,10 @@ export function MobileCoverView({ week, loading, lecturers, globalSessionIdFor, 
       groupName: picked.course_code ?? "",
       unitName: picked.unit_name ?? picked.course_code ?? "Class",
       roomCode: picked.room_code ?? "",
-      awayStaffName: week.name,
+      awayStaffName: awayName ?? week.name,
       coverStaffName: cover.label,
     };
-  }, [picked, week, candidates, coverId, date]);
+  }, [picked, week, candidates, coverId, date, awayName]);
 
   async function copyEmail() {
     const f = facts();
@@ -213,7 +240,7 @@ export function MobileCoverView({ week, loading, lecturers, globalSessionIdFor, 
         ) : showing === "away" ? (
           <MobileWeekGrid
             week={week}
-            onSelectBooking={setPicked}
+            onSelectBooking={pickClass}
             selectedBookingId={picked?.id ?? null}
           />
         ) : null}
@@ -224,11 +251,14 @@ export function MobileCoverView({ week, loading, lecturers, globalSessionIdFor, 
       ) : (
         <aside className="mv-cover-panel" aria-label="Arrange cover">
           <header className="mv-cover-head">
-            <strong>{picked.unit_name ?? picked.course_code ?? "Class"}</strong>
+            <strong>
+              {picked.unit_name ?? picked.course_code ?? "Class"}
+              {awayName && <span className="mv-cover-away"> · {awayName}</span>}
+            </strong>
             <button
               type="button"
               className="mv-cover-clear"
-              onClick={() => setPicked(null)}
+              onClick={() => pickClass(null)}
               aria-label="Choose a different class"
             >
               ✕

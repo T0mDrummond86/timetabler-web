@@ -66,6 +66,8 @@ export default function MobilePage() {
   const [week, setWeek] = useState<LecturerWeek | null>(null);
   const [filter, setFilter] = useState("");
   const [panelOpen, setPanelOpen] = useState(true);
+  // Cover mode settles on one lecturer once their class is taken.
+  const [coverLocked, setCoverLocked] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [portrait, setPortrait] = useState(
@@ -325,12 +327,16 @@ export default function MobilePage() {
               ))}
             </ul>
           )}
+          {mode === "cover" && coverLocked && (
+            <p className="mv-locked-note">Arranging cover — clear it with ✕ to pick someone else.</p>
+          )}
           {mode !== "free" && (
             <input
               className="mv-search"
               type="search"
               placeholder="Find a lecturer…"
               value={filter}
+              disabled={mode === "cover" && coverLocked}
               onChange={(e) => setFilter(e.target.value)}
             />
           )}
@@ -340,6 +346,12 @@ export default function MobilePage() {
                 <button
                   type="button"
                   className={`mv-list-item${selected === l.name ? " mv-list-item--on" : ""}`}
+                  disabled={coverLocked && selected !== l.name}
+                  title={
+                    coverLocked && selected !== l.name
+                      ? "Finish or clear the cover you are arranging first"
+                      : undefined
+                  }
                   onClick={() => {
                     setSelected(l.name);
                     setPanelOpen(false);
@@ -365,6 +377,7 @@ export default function MobilePage() {
               week={week}
               loading={loading}
               lecturers={lecturers}
+              onLockedChange={setCoverLocked}
               globalSessionIdFor={globalSessionIdFor}
               onError={setError}
             />
