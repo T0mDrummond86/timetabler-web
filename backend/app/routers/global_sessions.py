@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 
 from timetable.core.tenancy_models import GlobalSession, GlobalSessionMember, User
@@ -25,6 +26,8 @@ from ..schemas import (
     LinkedImportResultOut,
     TimetableSessionLinkOut,
 )
+from ..services.custodians_export import export_class_custodians_xlsx
+from ..services.export_filenames import session_export_filename
 from ..services.cover_log import (
     create_cover_log_entry,
     delete_cover_log_entry,
@@ -276,6 +279,27 @@ def global_class_custodians(
         db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
     )
     return aggregated_class_custodians(db, global_session_id)
+
+
+@router.get("/global-sessions/{global_session_id}/class-custodians/export")
+def export_global_class_custodians(
+    global_session_id: int,
+    ctx: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    """The custodian list as a workbook. A read, so viewers get it too."""
+    gs = assert_global_in_org(db, global_session_id, ctx.organization.id)
+    assert_global_user_access(
+        db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
+    )
+    path = export_class_custodians_xlsx(
+        db, global_session_id=global_session_id, title=gs.name
+    )
+    return FileResponse(
+        path,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=session_export_filename(gs.name, ".xlsx", label="class custodians"),
+    )
 
 
 @router.get("/global-sessions/{global_session_id}/cover-log", response_model=CoverLogOut)

@@ -22,8 +22,19 @@ const API_BASE = import.meta.env.VITE_API_URL ?? "";
 export const SIGNED_OUT_EVENT = "tafetabler:signed-out";
 
 function filenameFromContentDisposition(header: string | null, fallback: string): string {
-  const match = header?.match(/filename="([^"]+)"/);
-  return match?.[1] ?? fallback;
+  if (!header) return fallback;
+  // filename* wins when present: it is the only form that survives non-ASCII
+  // names, and Starlette emits it alone whenever the name is not plain ASCII.
+  const extended = header.match(/filename\*=(?:UTF-8|utf-8)''([^;]+)/i);
+  if (extended?.[1]) {
+    try {
+      return decodeURIComponent(extended[1].trim());
+    } catch {
+      /* fall through to the plain form */
+    }
+  }
+  const plain = header.match(/filename="([^"]+)"/);
+  return plain?.[1] ?? fallback;
 }
 
 function triggerBlobDownload(blob: Blob, filename: string): void {
@@ -1137,6 +1148,32 @@ export const api = {
 
   classCustodians: (sessionId: number) =>
     apiFetch<import("./types").ClassCustodians>(`/sessions/${sessionId}/class-custodians`),
+
+  /** Pin a custodian for one class; null returns it to the derived one. */
+  setUnitCustodian: (sessionId: number, unitId: number, staffId: number | null) =>
+    apiFetch<import("./types").ClassCustodians>(
+      `/sessions/${sessionId}/units/${unitId}/custodian`,
+      { method: "PATCH", body: JSON.stringify({ staff_id: staffId }) },
+    ),
+
+  async exportClassCustodians(globalSessionId: number): Promise<void> {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(
+      `${API_BASE}/global-sessions/${globalSessionId}/class-custodians/export`,
+      { headers },
+    );
+    if (!res.ok) throw new Error("Export failed");
+    const blob = await res.blob();
+    triggerBlobDownload(
+      blob,
+      filenameFromContentDisposition(
+        res.headers.get("Content-Disposition"),
+        "class custodians.xlsx",
+      ),
+    );
+  },
 
   staffAvailability: (sessionId: number, staffId: number) =>
     apiFetch<import("./types").StaffAvailability>(

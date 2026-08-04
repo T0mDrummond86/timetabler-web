@@ -72,6 +72,11 @@ def class_custodians_for_session(db: Session, *, timetable_session_id: int) -> d
     staff_ids: set[int] = set()
     for counts in by_unit_staff.values():
         staff_ids.update(counts.keys())
+    # Overrides may name someone who never delivers the class, so their names
+    # have to be fetched too or the column would read "#42".
+    staff_ids.update(
+        int(u.custodian_staff_id) for u in units if u.custodian_staff_id is not None
+    )
     staff_name: dict[int, str] = {}
     if staff_ids:
         for s in db.query(Staff).filter(Staff.id.in_(staff_ids)).all():
@@ -87,7 +92,25 @@ def class_custodians_for_session(db: Session, *, timetable_session_id: int) -> d
             ],
             key=lambda r: (-r["deliveries"], r["name"].lower(), r["staff_id"]),
         )
-        custodian = lecturers[0] if lecturers else None
+        derived = lecturers[0] if lecturers else None
+
+        # A hand-set custodian wins over the delivery count. It is dropped only
+        # if the lecturer no longer exists in the session, which can happen
+        # after a restore replaces the staff list.
+        override_id = int(u.custodian_staff_id) if u.custodian_staff_id is not None else None
+        override_name = staff_name.get(override_id) if override_id is not None else None
+        if override_id is not None and override_name is None:
+            override_id = None
+
+        if override_id is not None:
+            custodian_name = override_name or "—"
+            custodian_id = override_id
+            custodian_deliveries = counts.get(override_id, 0)
+        else:
+            custodian_name = derived["name"] if derived else "—"
+            custodian_id = derived["staff_id"] if derived else None
+            custodian_deliveries = derived["deliveries"] if derived else 0
+
         unassigned_n = unassigned_by_unit.get(u.id, 0)
         lecturer_parts = [f"{d['name']} ({d['deliveries']})" for d in lecturers]
         if unassigned_n:
@@ -98,9 +121,15 @@ def class_custodians_for_session(db: Session, *, timetable_session_id: int) -> d
                 "unit_name": u.name or "(unnamed)",
                 "qualifications": qual_by_unit.get(u.id) or "—",
                 "lecturers": ", ".join(lecturer_parts) if lecturer_parts else "—",
-                "custodian": custodian["name"] if custodian else "—",
-                "custodian_deliveries": custodian["deliveries"] if custodian else 0,
+                "custodian": custodian_name,
+                "custodian_staff_id": custodian_id,
+                "custodian_deliveries": custodian_deliveries,
+                "custodian_is_manual": override_id is not None,
                 "unassigned_deliveries": unassigned_n,
+                "candidates": [
+                    {"staff_id": d["staff_id"], "name": d["name"], "deliveries": d["deliveries"]}
+                    for d in lecturers
+                ],
             }
         )
 

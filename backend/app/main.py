@@ -66,6 +66,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Downloads carry their filename here. CORS hides every non-simple response
+    # header from script unless it is named, so without this every export saves
+    # under the client's fallback name instead of the one the server chose.
+    expose_headers=["Content-Disposition"],
 )
 
 

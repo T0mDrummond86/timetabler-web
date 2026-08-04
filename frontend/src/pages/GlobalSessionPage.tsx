@@ -108,6 +108,19 @@ export function GlobalSessionPage() {
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  async function exportCustodians() {
+    setExporting(true);
+    setError(null);
+    try {
+      await api.exportClassCustodians(globalSessionId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not export the custodian list");
+    } finally {
+      setExporting(false);
+    }
+  }
   const [canLinkSessions, setCanLinkSessions] = useState(false);
   const [updatePrompt, setUpdatePrompt] = useState(false);
   const [tabSyncToken, setTabSyncToken] = useState(0);
@@ -537,6 +550,17 @@ export function GlobalSessionPage() {
 
       {tab === "custodians" && (
         <section className="card class-custodians-panel">
+          <div className="global-tab-actions">
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={exporting || !custodians?.rows.length}
+              onClick={() => void exportCustodians()}
+              title="Download the custodian list as an Excel workbook"
+            >
+              {exporting ? "Preparing…" : "Export to Excel"}
+            </button>
+          </div>
           {loading && !custodians ? (
             <LoadingMark label="Loading…" />
           ) : (

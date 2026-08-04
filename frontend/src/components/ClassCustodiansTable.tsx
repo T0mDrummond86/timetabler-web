@@ -6,7 +6,10 @@ export type ClassCustodianTableRow = {
   qualifications: string;
   lecturers: string;
   custodian: string;
+  custodian_staff_id?: number | null;
   custodian_deliveries?: number;
+  custodian_is_manual?: boolean;
+  candidates?: { staff_id: number; name: string; deliveries: number }[];
   session_name?: string;
   session_names?: string[];
 };
@@ -19,6 +22,12 @@ type Props = {
   showSessionColumn?: boolean;
   /** Global view: one row per class with session_names list */
   amalgamatedSessions?: boolean;
+  /** Reassign the custodian for one class. Absent means read-only. */
+  onReassign?: (unitId: number, staffId: number | null) => void;
+  /** Every lecturer in the session, so a custodian need not already deliver
+   *  the class — the person who owns a class may not be teaching it now. */
+  allStaff?: { id: number; name: string }[];
+  saving?: boolean;
 };
 
 const ALL = "";
@@ -78,6 +87,9 @@ export function ClassCustodiansTable({
   emptyMessage = "No classes match the current filters.",
   showSessionColumn = false,
   amalgamatedSessions = false,
+  onReassign,
+  allStaff,
+  saving = false,
 }: Props) {
   const [sessionFilter, setSessionFilter] = useState(ALL);
   const [classFilter, setClassFilter] = useState(ALL);
@@ -248,12 +260,23 @@ export function ClassCustodiansTable({
                   <td>{row.qualifications || "—"}</td>
                   <td>{row.lecturers}</td>
                   <td>
-                    {row.custodian}
-                    {row.custodian !== "—" &&
-                      row.custodian_deliveries != null &&
-                      row.custodian_deliveries > 0 && (
-                        <span className="muted"> ({row.custodian_deliveries})</span>
-                      )}
+                    {onReassign ? (
+                      <CustodianPicker
+                        row={row}
+                        allStaff={allStaff ?? []}
+                        disabled={saving}
+                        onReassign={onReassign}
+                      />
+                    ) : (
+                      <>
+                        {row.custodian}
+                        {row.custodian !== "—" &&
+                          row.custodian_deliveries != null &&
+                          row.custodian_deliveries > 0 && (
+                            <span className="muted"> ({row.custodian_deliveries})</span>
+                          )}
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -262,5 +285,74 @@ export function ClassCustodiansTable({
         </div>
       )}
     </>
+  );
+}
+
+
+/** The custodian cell when reassignment is allowed.
+ *
+ * Lecturers who deliver the class lead the list, since they are almost always
+ * the answer; everyone else follows, because a class can be owned by someone
+ * not currently timetabled on it. */
+function CustodianPicker({
+  row,
+  allStaff,
+  disabled,
+  onReassign,
+}: {
+  row: ClassCustodianTableRow;
+  allStaff: { id: number; name: string }[];
+  disabled: boolean;
+  onReassign: (unitId: number, staffId: number | null) => void;
+}) {
+  const delivering = row.candidates ?? [];
+  const deliveringIds = new Set(delivering.map((c) => c.staff_id));
+  const others = allStaff
+    .filter((s) => !deliveringIds.has(s.id))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return (
+    <div className="custodian-cell">
+      <select
+        className="field-select custodian-select"
+        value={row.custodian_staff_id ?? ""}
+        disabled={disabled}
+        aria-label={`Custodian for ${row.unit_name}`}
+        onChange={(e) =>
+          onReassign(row.unit_id, e.target.value === "" ? null : Number(e.target.value))
+        }
+      >
+        <option value="">— none —</option>
+        {delivering.length > 0 && (
+          <optgroup label="Delivers this class">
+            {delivering.map((c) => (
+              <option key={c.staff_id} value={c.staff_id}>
+                {c.name} ({c.deliveries})
+              </option>
+            ))}
+          </optgroup>
+        )}
+        {others.length > 0 && (
+          <optgroup label="Other lecturers">
+            {others.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </optgroup>
+        )}
+      </select>
+      {row.custodian_is_manual && (
+        <button
+          type="button"
+          className="btn-secondary btn-xs"
+          disabled={disabled}
+          title="Go back to the lecturer who delivers this class most"
+          onClick={() => onReassign(row.unit_id, null)}
+        >
+          Auto
+        </button>
+      )}
+    </div>
   );
 }

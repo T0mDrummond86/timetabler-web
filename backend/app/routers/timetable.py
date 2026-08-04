@@ -8,6 +8,7 @@ from ..auth.deps import AuthContext, get_auth_context, require_session_editor
 from ..config import settings
 from ..database import get_db
 from ..schemas import (
+    UnitCustodianPatch,
     BlockDeliveryPanelOut,
     BlockGroupDuplicateRequest,
     BlockOverviewOut,
@@ -40,7 +41,7 @@ from timetable.core.block_delivery import (
     duplicate_block_group,
     next_block_group_code,
 )
-from timetable.core.models import Course, Qualification
+from timetable.core.models import Course, Qualification, Staff, Unit
 from ..services.timetable_grid import (
     VALID_VIEWS,
     assert_session_in_org,
@@ -241,6 +242,41 @@ def session_class_custodians(
     db: Session = Depends(get_db),
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
+    return class_custodians_for_session(db, timetable_session_id=session_id)
+
+
+@router.patch(
+    "/sessions/{session_id}/units/{unit_id}/custodian",
+    response_model=ClassCustodiansOut,
+)
+def set_unit_custodian(
+    session_id: int,
+    unit_id: int,
+    body: UnitCustodianPatch,
+    ctx: AuthContext = Depends(require_session_editor),
+    db: Session = Depends(get_db),
+):
+    """Pin the custodian for one class, or clear it back to the derived one."""
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    unit = (
+        db.query(Unit)
+        .filter(Unit.id == unit_id, Unit.timetable_session_id == session_id)
+        .one_or_none()
+    )
+    if unit is None:
+        raise HTTPException(status_code=404, detail="Class not found in this session")
+    if body.staff_id is not None:
+        staff = (
+            db.query(Staff)
+            .filter(Staff.id == body.staff_id, Staff.timetable_session_id == session_id)
+            .one_or_none()
+        )
+        if staff is None:
+            raise HTTPException(
+                status_code=422, detail="That lecturer is not in this session"
+            )
+    unit.custodian_staff_id = body.staff_id
+    db.commit()
     return class_custodians_for_session(db, timetable_session_id=session_id)
 
 

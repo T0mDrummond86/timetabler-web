@@ -185,6 +185,9 @@ class Unit(Base):
     double_session_first_slots: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Optional manual placecard fill (#RRGGBB). Border is derived automatically.
     screen_fill_colour: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    # Set by hand to override the derived custodian (who delivers it most).
+    # Null means "whoever the deliveries say", which is the usual case.
+    custodian_staff_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     lap: Mapped["UnitLap | None"] = relationship(back_populates="unit", uselist=False)
 

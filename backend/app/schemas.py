@@ -887,19 +887,35 @@ class CalendarImportOut(BaseModel):
     weeks: list[CalendarWeekOut]
 
 
+class CustodianCandidateOut(BaseModel):
+    staff_id: int
+    name: str
+    deliveries: int
+
+
 class ClassCustodianRowOut(BaseModel):
     unit_id: int
     unit_name: str
     qualifications: str = "—"
     lecturers: str
     custodian: str
+    custodian_staff_id: int | None = None
     custodian_deliveries: int
+    #: True when someone set this custodian by hand rather than it being derived.
+    custodian_is_manual: bool = False
     unassigned_deliveries: int
+    #: Lecturers who deliver this class, for the reassignment picker.
+    candidates: list[CustodianCandidateOut] = []
 
 
 class ClassCustodiansOut(BaseModel):
     summary: str
     rows: list[ClassCustodianRowOut]
+
+
+class UnitCustodianPatch(BaseModel):
+    #: Null clears the override and returns to the derived custodian.
+    staff_id: int | None = None
 
 
 class BlockedSlotOut(BaseModel):

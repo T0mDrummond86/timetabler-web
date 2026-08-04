@@ -2142,7 +2142,12 @@ export function TimetablePage() {
         />
       )}
       {sessionTab === "custodians" && courses.length > 0 && (
-        <ClassCustodiansPanel sessionId={sessionId} refreshKey={changeLogKey} />
+        <ClassCustodiansPanel
+          sessionId={sessionId}
+          refreshKey={changeLogKey}
+          staff={staff}
+          canEdit={canEditSession}
+        />
       )}
       {sessionTab === "usage" && courses.length > 0 && (
         <UsageDashboard sessionId={sessionId} refreshKey={changeLogKey} />

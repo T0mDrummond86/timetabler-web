@@ -285,8 +285,12 @@ export type ClassCustodians = {
     qualifications: string;
     lecturers: string;
     custodian: string;
+    custodian_staff_id?: number | null;
     custodian_deliveries: number;
+    /** True when someone pinned this custodian rather than it being derived. */
+    custodian_is_manual?: boolean;
     unassigned_deliveries: number;
+    candidates?: { staff_id: number; name: string; deliveries: number }[];
   }[];
 };
 

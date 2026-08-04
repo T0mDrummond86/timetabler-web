@@ -5895,3 +5895,24 @@ body.staff-editor-resizing {
 [data-theme="dark"] .now-status--busy {
   color: #fcd34d;
 }
+
+/* ---------------- class custodians ---------------- */
+
+/* Actions that belong to one global tab rather than the page. */
+.global-tab-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.custodian-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.custodian-select {
+  min-width: 11rem;
+  max-width: 16rem;
+}
