@@ -97,6 +97,7 @@ export function ClassCustodiansTable({
   const [classFilter, setClassFilter] = useState(ALL);
   const [staffFilter, setStaffFilter] = useState(ALL);
   const [qualFilter, setQualFilter] = useState(ALL);
+  const [orderBy, setOrderBy] = useState<"class" | "qualification">("class");
 
   const hasSession = amalgamatedSessions || showSessionColumn || rows.some((r) => rowSessionNames(r).length > 0);
 
@@ -130,14 +131,29 @@ export function ClassCustodiansTable({
   }, [rows]);
 
   const filtered = useMemo(() => {
-    return rows.filter((row) => {
+    const kept = rows.filter((row) => {
       if (sessionFilter && !rowSessionNames(row).includes(sessionFilter)) return false;
       if (classFilter && row.unit_name !== classFilter) return false;
       if (staffFilter && !rowMatchesStaff(row, staffFilter)) return false;
       if (qualFilter && !rowMatchesQual(row, qualFilter)) return false;
       return true;
     });
-  }, [rows, sessionFilter, classFilter, staffFilter, qualFilter]);
+    if (orderBy !== "qualification") return kept;
+    // Sort on the first qualification, so classes belonging to the same one
+    // sit together; classes linked to none fall to the bottom rather than
+    // sorting under an em dash. Class name breaks ties.
+    const byName = (a: ClassCustodianTableRow, b: ClassCustodianTableRow) =>
+      a.unit_name.localeCompare(b.unit_name, undefined, { sensitivity: "base" });
+    return [...kept].sort((a, b) => {
+      const qa = parseQualificationNames(a.qualifications)[0] ?? "";
+      const qb = parseQualificationNames(b.qualifications)[0] ?? "";
+      if (!qa && !qb) return byName(a, b);
+      if (!qa) return 1;
+      if (!qb) return -1;
+      const cmp = qa.localeCompare(qb, undefined, { sensitivity: "base" });
+      return cmp !== 0 ? cmp : byName(a, b);
+    });
+  }, [rows, sessionFilter, classFilter, staffFilter, qualFilter, orderBy]);
 
   const filtersActive = Boolean(sessionFilter || classFilter || staffFilter || qualFilter);
 
@@ -220,6 +236,17 @@ export function ClassCustodiansTable({
                 {name}
               </option>
             ))}
+          </select>
+        </label>
+        <label>
+          Order by
+          <select
+            className="field-select"
+            value={orderBy}
+            onChange={(e) => setOrderBy(e.target.value as "class" | "qualification")}
+          >
+            <option value="class">Class</option>
+            <option value="qualification">Qualification</option>
           </select>
         </label>
         {filtersActive && (
