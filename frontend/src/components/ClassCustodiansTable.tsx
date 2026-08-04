@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 export type ClassCustodianTableRow = {
   unit_id: number;
   unit_name: string;
+  /** Component codes the class covers. */
+  units?: string;
   qualifications: string;
   lecturers: string;
   custodian: string;
@@ -241,6 +243,7 @@ export function ClassCustodiansTable({
               <tr>
                 {hasSession && <th>{sessionColumnLabel}</th>}
                 <th>Class</th>
+                <th>Units</th>
                 <th>Linked qualifications</th>
                 <th>Lecturers (deliveries)</th>
                 <th>Custodian</th>
@@ -257,6 +260,7 @@ export function ClassCustodiansTable({
                 >
                   {hasSession && <td>{rowSessionNames(row).join(", ") || "—"}</td>}
                   <td>{row.unit_name}</td>
+                  <td>{row.units || "—"}</td>
                   <td>{row.qualifications || "—"}</td>
                   <td>{row.lecturers}</td>
                   <td>

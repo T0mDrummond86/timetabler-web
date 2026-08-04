@@ -571,6 +571,7 @@ export function GlobalSessionPage() {
               rows={(custodians?.rows ?? []).map((r) => ({
                 unit_id: r.unit_id,
                 unit_name: r.unit_name,
+                units: r.units ?? "—",
                 qualifications: r.qualifications ?? "—",
                 lecturers: r.lecturers,
                 custodian: r.custodian,

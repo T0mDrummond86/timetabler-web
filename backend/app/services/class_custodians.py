@@ -119,6 +119,8 @@ def class_custodians_for_session(db: Session, *, timetable_session_id: int) -> d
             {
                 "unit_id": u.id,
                 "unit_name": u.name or "(unnamed)",
+                # The component codes a class covers — labelled "Units" in the UI.
+                "units": (u.component_codes or "").strip() or "—",
                 "qualifications": qual_by_unit.get(u.id) or "—",
                 "lecturers": ", ".join(lecturer_parts) if lecturer_parts else "—",
                 "custodian": custodian_name,

@@ -896,6 +896,8 @@ class CustodianCandidateOut(BaseModel):
 class ClassCustodianRowOut(BaseModel):
     unit_id: int
     unit_name: str
+    #: Component codes the class covers — the UI calls these "Units".
+    units: str = "—"
     qualifications: str = "—"
     lecturers: str
     custodian: str

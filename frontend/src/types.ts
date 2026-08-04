@@ -98,6 +98,8 @@ export type GlobalClassCustodians = {
   rows: {
     unit_id: number;
     unit_name: string;
+    /** Component codes the class covers. */
+    units?: string;
     qualifications: string;
     lecturers: string;
     custodian: string;
@@ -282,6 +284,8 @@ export type ClassCustodians = {
   rows: {
     unit_id: number;
     unit_name: string;
+    /** Component codes the class covers. */
+    units?: string;
     qualifications: string;
     lecturers: string;
     custodian: string;

@@ -438,15 +438,20 @@ def aggregated_qualifications(db: Session, global_session_id: int) -> list[dict]
     )
 
 
-def _merge_qualification_labels(rows: list[dict]) -> str:
+def _merge_comma_list(rows: list[dict], field: str) -> str:
+    """Union of comma-separated labels across sessions, de-duplicated."""
     parts: list[str] = []
     for row in rows:
-        raw = (row.get("qualifications") or "").strip()
+        raw = (row.get(field) or "").strip()
         if raw and raw != "—":
             parts.extend(p.strip() for p in raw.split(",") if p.strip())
     if not parts:
         return "—"
     return ", ".join(sorted(set(parts), key=str.casefold))
+
+
+def _merge_qualification_labels(rows: list[dict]) -> str:
+    return _merge_comma_list(rows, "qualifications")
 
 
 def _merge_custodian_detail(rows: list[dict], field: str) -> str:
@@ -493,6 +498,7 @@ def aggregated_class_custodians(db: Session, global_session_id: int) -> dict:
                 "unit_name": (members[0].get("unit_name") or "").strip(),
                 "session_names": session_names,
                 "session_count": len(session_names),
+                "units": _merge_comma_list(members, "units"),
                 "qualifications": _merge_qualification_labels(members),
                 "lecturers": _merge_custodian_detail(members, "lecturers"),
                 "custodian": _merge_custodian_detail(members, "custodian"),

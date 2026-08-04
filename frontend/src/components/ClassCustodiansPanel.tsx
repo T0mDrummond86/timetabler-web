@@ -60,6 +60,7 @@ export function ClassCustodiansPanel({
     data?.rows.map((row) => ({
       unit_id: row.unit_id,
       unit_name: row.unit_name,
+      units: row.units ?? "—",
       qualifications: row.qualifications ?? "—",
       lecturers: row.lecturers,
       custodian: row.custodian,

@@ -11,10 +11,17 @@ from sqlalchemy.orm import Session
 
 from .global_sessions import aggregated_class_custodians
 
-HEADERS = ["Class", "Used in sessions", "Linked qualifications", "Lecturers (deliveries)", "Custodian"]
+HEADERS = [
+    "Class",
+    "Units",
+    "Used in sessions",
+    "Linked qualifications",
+    "Lecturers (deliveries)",
+    "Custodian",
+]
 
 # Roughly the width each column needs; the lecturers column carries a list.
-COLUMN_WIDTHS = [38, 26, 34, 46, 24]
+COLUMN_WIDTHS = [38, 30, 26, 34, 46, 24]
 
 
 def write_custodians_xlsx(path: str | Path, rows: list[dict], *, title: str) -> Path:
@@ -39,6 +46,7 @@ def write_custodians_xlsx(path: str | Path, rows: list[dict], *, title: str) -> 
         sessions = row.get("session_names") or []
         values = [
             row.get("unit_name") or "",
+            row.get("units") or "",
             ", ".join(sessions) if isinstance(sessions, list) else str(sessions),
             row.get("qualifications") or "",
             row.get("lecturers") or "",
