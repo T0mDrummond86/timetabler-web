@@ -1156,12 +1156,15 @@ export const api = {
       { method: "PATCH", body: JSON.stringify({ staff_id: staffId }) },
     ),
 
-  async exportClassCustodians(globalSessionId: number): Promise<void> {
+  async exportClassCustodians(
+    globalSessionId: number,
+    orderBy: "class" | "qualification" = "class",
+  ): Promise<void> {
     const token = getToken();
     const headers: Record<string, string> = {};
     if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(
-      `${API_BASE}/global-sessions/${globalSessionId}/class-custodians/export`,
+      `${API_BASE}/global-sessions/${globalSessionId}/class-custodians/export?order_by=${orderBy}`,
       { headers },
     );
     if (!res.ok) throw new Error("Export failed");

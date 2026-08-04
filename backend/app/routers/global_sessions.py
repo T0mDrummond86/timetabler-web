@@ -1,7 +1,7 @@
 """Global session CRUD and aggregated entity views."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 
@@ -284,6 +284,7 @@ def global_class_custodians(
 @router.get("/global-sessions/{global_session_id}/class-custodians/export")
 def export_global_class_custodians(
     global_session_id: int,
+    order_by: str = Query("class", pattern="^(class|qualification)$"),
     ctx: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
@@ -293,7 +294,7 @@ def export_global_class_custodians(
         db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
     )
     path = export_class_custodians_xlsx(
-        db, global_session_id=global_session_id, title=gs.name
+        db, global_session_id=global_session_id, title=gs.name, order_by=order_by
     )
     return FileResponse(
         path,

@@ -30,6 +30,8 @@ type Props = {
    *  the class — the person who owns a class may not be teaching it now. */
   allStaff?: { id: number; name: string }[];
   saving?: boolean;
+  /** Raised when the order changes, so an export can match what is on screen. */
+  onOrderByChange?: (orderBy: "class" | "qualification") => void;
 };
 
 const ALL = "";
@@ -92,6 +94,7 @@ export function ClassCustodiansTable({
   onReassign,
   allStaff,
   saving = false,
+  onOrderByChange,
 }: Props) {
   const [sessionFilter, setSessionFilter] = useState(ALL);
   const [classFilter, setClassFilter] = useState(ALL);
@@ -243,7 +246,11 @@ export function ClassCustodiansTable({
           <select
             className="field-select"
             value={orderBy}
-            onChange={(e) => setOrderBy(e.target.value as "class" | "qualification")}
+            onChange={(e) => {
+              const next = e.target.value as "class" | "qualification";
+              setOrderBy(next);
+              onOrderByChange?.(next);
+            }}
           >
             <option value="class">Class</option>
             <option value="qualification">Qualification</option>

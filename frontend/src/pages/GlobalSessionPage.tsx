@@ -109,12 +109,13 @@ export function GlobalSessionPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [custodianOrder, setCustodianOrder] = useState<"class" | "qualification">("class");
 
   async function exportCustodians() {
     setExporting(true);
     setError(null);
     try {
-      await api.exportClassCustodians(globalSessionId);
+      await api.exportClassCustodians(globalSessionId, custodianOrder);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not export the custodian list");
     } finally {
@@ -566,6 +567,7 @@ export function GlobalSessionPage() {
           ) : (
             <ClassCustodiansTable
               amalgamatedSessions
+              onOrderByChange={setCustodianOrder}
               summary={custodians?.summary}
               emptyMessage="No class custodian rows match the current filters."
               rows={(custodians?.rows ?? []).map((r) => ({
