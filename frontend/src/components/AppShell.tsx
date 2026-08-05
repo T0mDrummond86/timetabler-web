@@ -1,10 +1,12 @@
 import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
 import { APP_NAME } from "../branding";
-import { useTheme } from "../lib/theme";
-import lockupLight from "../assets/brand/lockup-light.svg";
-import lockupDark from "../assets/brand/lockup-dark.svg";
 import { ThemeToggle } from "./ThemeToggle";
+
+// The same file the browser tab and the installed app use, referenced rather
+// than copied so the three can never drift apart. Its squares sit on a
+// transparent ground, so one asset serves both themes.
+const BRAND_MARK = "/favicon.svg";
 
 type Props = {
   children: ReactNode;
@@ -32,14 +34,12 @@ export function AppShell({
   fillViewport = false,
   compact = false,
 }: Props) {
-  const theme = useTheme();
-  const lockup = theme === "dark" ? lockupDark : lockupLight;
   return (
     <div className={`app-shell${fillViewport ? " app-shell--fill" : ""}`}>
       {!minimal && compact && (
         <header className="app-topbar app-topbar--compact">
           <Link to="/dashboard" className="app-brand" aria-label={`${APP_NAME} — dashboard`}>
-            <img src={lockup} alt={APP_NAME} className="app-brand-lockup app-brand-lockup--sm" />
+            <img src={BRAND_MARK} alt={APP_NAME} className="app-brand-mark app-brand-mark--sm" />
           </Link>
           {breadcrumb && <span className="topbar-crumb">{breadcrumb}</span>}
           {breadcrumb && title && (
@@ -58,7 +58,7 @@ export function AppShell({
         <header className="app-topbar">
           <div className="app-topbar-start">
             <Link to="/dashboard" className="app-brand" aria-label={APP_NAME}>
-              <img src={lockup} alt={APP_NAME} className="app-brand-lockup" />
+              <img src={BRAND_MARK} alt={APP_NAME} className="app-brand-mark" />
             </Link>
           </div>
           <div className="app-topbar-end">

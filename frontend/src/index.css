@@ -240,10 +240,12 @@ code {
   color: var(--text);
 }
 
-.app-brand-lockup {
+/* The square brand mark. Sized by height with a matching width so it stays a
+   square whatever the row height. */
+.app-brand-mark {
   display: block;
   height: 28px;
-  width: auto;
+  width: 28px;
 }
 
 .app-brand:hover {
@@ -282,8 +284,9 @@ code {
   padding: 0 0.9rem;
 }
 
-.app-brand-lockup--sm {
-  height: 17px;
+.app-brand-mark--sm {
+  height: 22px;
+  width: 22px;
   display: block;
 }
 
