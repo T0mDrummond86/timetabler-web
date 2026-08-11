@@ -11,7 +11,9 @@ export function getStoredTheme(): Theme {
   } catch {
     /* ignore */
   }
-  return "light";
+  // Dark is the default for anyone who has not chosen. A stored preference
+  // always wins, so this only affects a first visit.
+  return "dark";
 }
 
 export function applyTheme(theme: Theme): void {
@@ -34,13 +36,12 @@ export function toggleTheme(current: Theme): Theme {
 }
 
 function currentTheme(): Theme {
-  const attr = document.documentElement.getAttribute("data-theme");
-  return attr === "dark" ? "dark" : "light";
+  return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
 }
 
 export function useTheme(): Theme {
   const [theme, setLocal] = useState<Theme>(() =>
-    typeof document === "undefined" ? "light" : currentTheme(),
+    typeof document === "undefined" ? "dark" : currentTheme(),
   );
   useEffect(() => {
     setLocal(currentTheme());

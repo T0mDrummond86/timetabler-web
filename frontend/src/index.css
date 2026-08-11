@@ -5,32 +5,34 @@
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 
-  /* Soft mist — tinted neutrals, gentle contrast */
+  /* Soft mist — near-neutral greys, low glare. Kept deliberately flat:
+     the panels sit close together in tone so the page reads as one surface
+     rather than a stack of competing bands. */
   --tint-cool: #b8cce4;
   --tint-warm: #e4ddd2;
   --tint-sage: #c4dcd0;
 
-  --bg: #d4dae6;
-  --bg-elevated: #e2e8f2;
-  --bg-subtle: #c6d4e4;
-  --bg-muted: #b0c0d4;
-  --bg-hover: #bac8dc;
-  --surface: #e2e8f2;
+  --bg: #e3e6ec;
+  --bg-elevated: #eef0f5;
+  --bg-subtle: #dcdfe7;
+  --bg-muted: #ccd1db;
+  --bg-hover: #d7dbe3;
+  --surface: #eef0f5;
 
   /* Zone tints — sidebar, grid, chrome */
-  --zone-topbar: #e0e6f0;
-  --zone-sidebar: #c0d2e6;
-  --zone-main: #d6e2ee;
-  --zone-grid-header: #ccd8e8;
-  --zone-tabs: #e0e8f2;
-  --zone-toolbar: #dae6f2;
+  --zone-topbar: #eaecf1;
+  --zone-sidebar: #e0e3ea;
+  --zone-main: #e7eaf0;
+  --zone-grid-header: #e2e5ec;
+  --zone-tabs: #eaedf2;
+  --zone-toolbar: #e6e9ef;
 
-  --text: #1a2234;
-  --text-secondary: #3e4d62;
-  --text-muted: #566678;
+  --text: #2c3542;
+  --text-secondary: #4f5b6b;
+  --text-muted: #6c7889;
 
-  --border: rgba(70, 90, 120, 0.18);
-  --border-strong: rgba(70, 90, 120, 0.3);
+  --border: rgba(80, 95, 120, 0.13);
+  --border-strong: rgba(80, 95, 120, 0.22);
 
   --primary: #1d4ed8;
   --primary-hover: #1e40af;
@@ -57,13 +59,13 @@
   --radius-md: 10px;
   --radius-lg: 14px;
 
-  --shadow-sm: 0 1px 3px rgba(40, 55, 80, 0.06);
-  --shadow-md: 0 4px 16px rgba(40, 55, 80, 0.08);
+  --shadow-sm: 0 1px 3px rgba(40, 55, 80, 0.05);
+  --shadow-md: 0 4px 16px rgba(40, 55, 80, 0.06);
 
-  --grid-gutter-bg: #ccd6e4;
-  --grid-body-bg: #e0e8f4;
-  --grid-slot-line: rgba(80, 100, 130, 0.09);
-  --grid-slot-line-hour: rgba(80, 100, 130, 0.16);
+  --grid-gutter-bg: #e2e5ec;
+  --grid-body-bg: #eff1f6;
+  --grid-slot-line: rgba(80, 100, 130, 0.07);
+  --grid-slot-line-hour: rgba(80, 100, 130, 0.12);
   --booking-card-text: rgba(15, 23, 42, 0.75);
   --booking-card-meta: rgba(15, 23, 42, 0.65);
   --booking-card-notes: rgba(15, 23, 42, 0.55);
