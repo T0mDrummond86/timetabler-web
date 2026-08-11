@@ -1719,6 +1719,7 @@ export function TimetablePage() {
                   aria-expanded={splitLayoutMenu.open}
                   aria-haspopup="menu"
                   title="Show several views of this session at once"
+                  data-tutorial-id="split-layout"
                 >
                   Split Layout ▾
                 </button>

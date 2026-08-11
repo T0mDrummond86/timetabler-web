@@ -38,6 +38,16 @@ export function TutorialHost({ sessionId }: { sessionId: number }) {
   const orgId = progress.orgId ?? 0;
   const [collapsed, setCollapsed] = useState(false);
   const [flash, setFlash] = useState(0);
+
+  /** Bring the step's target into view, then flash the ring on it. Scrolling
+   *  first matters: the ring is not drawn while the target is off-screen, so
+   *  flashing alone did nothing at all in exactly the case you need it. */
+  const showMe = useCallback((target?: string) => {
+    if (!target) return;
+    const el = document.querySelector(`[data-tutorial-id="${target}"]`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    setFlash((n) => n + 1);
+  }, []);
   const [showHint, setShowHint] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -96,7 +106,6 @@ export function TutorialHost({ sessionId }: { sessionId: number }) {
     sessionId,
     orgId,
     entities,
-    onAdvance,
   });
 
   if (!active) return null;
@@ -322,7 +331,7 @@ export function TutorialHost({ sessionId }: { sessionId: number }) {
           {engine.step.advance === "verify" && (
             <p className={`tutorial-verify tutorial-verify-${engine.phase}`} aria-live="polite">
               {engine.phase === "passed"
-                ? "✓ Done!"
+                ? "✓ Done! Read on, then press Next when you're ready."
                 : engine.phase === "checking"
                   ? "Checking…"
                   : "Waiting for you — have a go."}
@@ -334,20 +343,24 @@ export function TutorialHost({ sessionId }: { sessionId: number }) {
           )}
 
           <div className="tutorial-actions">
-            {engine.step.advance === "next" && (
-              <button
-                type="button"
-                className="btn-primary btn-xs"
-                onClick={() => onAdvance(engine.stepIndex + 1)}
-              >
-                Next
-              </button>
-            )}
+            <button
+              type="button"
+              className="btn-primary btn-xs"
+              disabled={engine.step.advance === "verify" && engine.phase !== "passed"}
+              title={
+                engine.step.advance === "verify" && engine.phase !== "passed"
+                  ? "Have a go at this step first"
+                  : undefined
+              }
+              onClick={() => onAdvance(engine.stepIndex + 1)}
+            >
+              Next
+            </button>
             {engine.step.target && (
               <button
                 type="button"
                 className="btn-secondary btn-xs"
-                onClick={() => setFlash((n) => n + 1)}
+                onClick={() => showMe(engine.step?.target)}
               >
                 Show me
               </button>

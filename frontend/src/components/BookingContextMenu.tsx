@@ -179,6 +179,17 @@ export function BookingContextMenu({
           ))}
         </>
       )}
+      {/* Everything above here is known the moment the menu opens. The rooms
+          and alternate slots below arrive from a request that lands a moment
+          later, so anything placed after them jumps down as they appear —
+          which is how Lock ended up out of reach under the room list. */}
+      <div className="ctx-divider" />
+      <button type="button" className="ctx-item" onClick={() => { onToggleLock("lock_time"); onClose(); }}>
+        {booking.lock_time ? "Unlock time" : "Lock time"}
+      </button>
+      <button type="button" className="ctx-item" onClick={() => { onToggleLock("lock_staff"); onClose(); }}>
+        {booking.lock_staff ? "Unlock lecturer" : "Lock lecturer"}
+      </button>
       {slots && slots.available_rooms.length > 0 && (
         <>
           <div className="ctx-divider" />
@@ -260,13 +271,6 @@ export function BookingContextMenu({
           )}
         </>
       )}
-      <div className="ctx-divider" />
-      <button type="button" className="ctx-item" onClick={() => { onToggleLock("lock_time"); onClose(); }}>
-        {booking.lock_time ? "Unlock time" : "Lock time"}
-      </button>
-      <button type="button" className="ctx-item" onClick={() => { onToggleLock("lock_staff"); onClose(); }}>
-        {booking.lock_staff ? "Unlock lecturer" : "Lock lecturer"}
-      </button>
       {onLogManualChange && (
         <>
           <div className="ctx-divider" />

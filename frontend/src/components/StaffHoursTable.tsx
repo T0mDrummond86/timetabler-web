@@ -29,19 +29,21 @@ function staffInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-function varianceTone(category: string): VarianceTone {
-  switch (category) {
-    case "full_fte_overtime":
-    case "part_fte_variation_overtime":
-      return "positive";
-    case "full_fte_shortfall":
-    case "part_fte_variation":
-      return "negative";
-    case "on_target":
-      return "neutral";
-    default:
-      return "unknown";
+/** Colour follows the sign of the number on the badge.
+ *
+ * The category alone cannot decide it: for a part-time lecturer the backend
+ * sorts on total hours against a *full-time* 21, so someone on 0.5 FTE
+ * carrying 12 hours is "part_fte_variation" — the same category as one
+ * carrying 8 — even though the first is over their own load and the second
+ * under it. Reading the sign keeps "+1.5" from being painted as a shortfall.
+ */
+function varianceTone(category: string, value: number | null | undefined): VarianceTone {
+  if (category === "unknown" || !category) return "unknown";
+  if (value == null || Number.isNaN(value)) {
+    return category === "on_target" ? "neutral" : "unknown";
   }
+  if (Math.abs(value) < 0.05) return "neutral";
+  return value > 0 ? "positive" : "negative";
 }
 
 function formatVarianceDisplay(v: number | null | undefined): string {
@@ -85,16 +87,14 @@ function StaffSummaryCards({ rows }: { rows: StaffHoursRow[] }) {
     let underloaded = 0;
     let balanced = 0;
     for (const row of rows) {
-      switch (row.variance_category) {
-        case "on_target":
+      switch (varianceTone(row.variance_category, row.variance)) {
+        case "neutral":
           balanced += 1;
           break;
-        case "full_fte_overtime":
-        case "part_fte_variation_overtime":
+        case "positive":
           overloaded += 1;
           break;
-        case "full_fte_shortfall":
-        case "part_fte_variation":
+        case "negative":
           underloaded += 1;
           break;
         default:
@@ -133,7 +133,7 @@ function VarianceBadge({
   value: number | null;
   category: string;
 }) {
-  const tone = varianceTone(category);
+  const tone = varianceTone(category, value);
   return (
     <span
       className={`variance-badge variance-badge--${tone}`}

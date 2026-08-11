@@ -10,7 +10,6 @@ each targeted by one tutorial module:
 - Serena Williams double-booked on Monday       -> staff_double_booking (M4)
 - Linux Admin (needs on-campus) in ONL-1        -> room_type            (M4)
 - First Aid (needs 25 seats) in 12-seat A1.10   -> room_capacity        (M4)
-- Keanu Reeves outside their competencies       -> lecturer_not_allowed (M4)
 - Steve Irwin (Mon-Wed only) booked Thursday    -> staff_unavailable    (M5)
 - Freddie Mercury over the 10.5h weekly cap     -> staff_hour_cap x2    (M5)
 - CYB-A "Cyber Threat Intelligence" unplaced    -> holding area target  (M3)
@@ -49,7 +48,6 @@ EXPECTED_VIOLATION_CODES: dict[str, int] = {
     "room_type": 1,              # Linux Admin (CYB-B) in ONL-1
     "room_capacity": 1,          # First Aid in A1.10
     "staff_unavailable": 1,      # Steve Irwin, Thursday
-    "lecturer_not_allowed": 1,   # Keanu Reeves on Secure Programming
     "staff_hour_cap": 2,         # Freddie Mercury, T1 and T2
 }
 
@@ -293,14 +291,15 @@ def build_tutorial_payload() -> dict[str, Any]:
         "staff_unit_online_students": [],
         "staff_preferences": [],
         # Allowed-lecturer lists. Every booked lecturer is on their unit's list
-        # EXCEPT Keanu Reeves on Secure Programming (the M4 soft violation).
+        # Everyone who teaches a class is on its list: competencies are not
+        # part of the tutorial, so a warning about them would be unexplained.
         # Nelson Mandela is on every list — the tutorial's reassignment target.
         "staff_competencies": [
             {"staff_id": s, "unit_id": u}
             for u, staff_ids in {
                 U_NETSEC: (S_WILLIAMS, S_MANDELA),
                 U_THREAT: (S_WILLIAMS, S_MANDELA),
-                U_SECPROG: (S_MERCURY, S_MANDELA),          # Reeves deliberately absent
+                U_SECPROG: (S_MERCURY, S_MANDELA, S_REEVES),
                 U_LINUX: (S_IRWIN, S_WILLIAMS, S_MANDELA),
                 U_INCIDENT: (S_WILLIAMS, S_MERCURY, S_MANDELA),
                 U_WEBSEC: (S_HAWKING, S_MANDELA),
@@ -342,7 +341,7 @@ def build_tutorial_payload() -> dict[str, Any]:
             # --- CYB-B (fully scheduled; carries the M4 traps) ---
             _booking(8, CYB_B, U_NETSEC, S_MANDELA, R_B104, 3, 8, 12, lock_time=1),  # Thu 12-14
             _booking(9, CYB_B, U_THREAT, S_WILLIAMS, R_B105, 1, 10, 14),    # Tue 13-15
-            _booking(10, CYB_B, U_SECPROG, S_REEVES, R_B105, 2, 8, 14), # Wed 12-15 (Reeves: soft)
+            _booking(10, CYB_B, U_SECPROG, S_REEVES, R_B105, 2, 8, 14), # Wed 12-15
             _booking(11, CYB_B, U_LINUX, S_WILLIAMS, R_ONL1, 0, 6, 10),     # Mon 11-13 (clash + room_type)
             _booking(12, CYB_B, U_INCIDENT, S_MERCURY, R_B104, 4, 2, 6, part=1),   # Fri 09-11
             _booking(13, CYB_B, U_INCIDENT, S_MERCURY, R_B104, 4, 8, 12, part=2),  # Fri 12-14

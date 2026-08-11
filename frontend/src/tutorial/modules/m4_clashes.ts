@@ -62,16 +62,6 @@ export const m4Clashes: TutorialModule = {
       hint: "Switch the sidebar to Courses → CHC-A, double-click Provide First Aid, set Room to A2.02, Save. (A2.02 is free Tuesday morning.)",
     },
     {
-      id: "fix-competency",
-      title: "Lecturer not on the allowed list",
-      body:
-        "Keanu Reeves is teaching Secure Programming Basics (CYB-B, Wednesday) but isn't on its allowed-lecturers list — a soft warning. Soft warnings can be dismissed when they're acceptable, but here, reassign the class to Nelson Mandela, who is allowed and lightly loaded.",
-      advance: "verify",
-      watch: { api: /\/bookings/ },
-      verify: (ctx) => noViolation(ctx, "lecturer_not_allowed"),
-      hint: "Course view → CYB-B → double-click Secure Programming Basics (Wednesday) → Lecturer → Nelson Mandela → Save.",
-    },
-    {
       id: "merge-note",
       title: "When a clash is intentional",
       body:
@@ -81,7 +71,7 @@ export const m4Clashes: TutorialModule = {
   ],
   recap: [
     "The Warnings tab lists every breach; rows jump to the booking.",
-    "Hard warnings (clashes, wrong rooms) need fixing; soft ones can be dismissed.",
-    "Fix by moving cards, changing rooms/lecturers — or merge genuinely shared classes.",
+    "Hard warnings (clashes, wrong rooms) block a valid timetable; soft ones are advisory and can be dismissed.",
+    "Fix by moving cards or changing rooms — or merge genuinely shared classes.",
   ],
 };

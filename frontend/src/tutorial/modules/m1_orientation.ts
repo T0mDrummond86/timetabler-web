@@ -58,6 +58,15 @@ export const m1Orientation: TutorialModule = {
       hint: "Use the View dropdown in the left sidebar, choose Staff, then click Serena Williams in the list below it. (Spot anything odd about that Monday?)",
     },
     {
+      id: "split-view",
+      title: "Watch two views at once",
+      body:
+        "Split Layout opens the same session several times side by side — say this course in one pane and a lecturer's week in another.\n\nThe panes share one timetable: move a card in one and every other pane redraws immediately. Most scheduling mistakes come from not seeing the other side of a change, so the more you can watch at once, the less backtracking you do.\n\nOpen Split Layout ▾ and take a look. Close the split tab when you're done and come back here.",
+      advance: "next",
+      target: "split-layout",
+      hint: "Split Layout ▾ sits in the top toolbar, beside New Tab. 2-way side-by-side is the easiest to read.",
+    },
+    {
       id: "holding-area",
       title: "The holding area",
       body:
@@ -70,5 +79,6 @@ export const m1Orientation: TutorialModule = {
     "Tabs along the top switch between work areas.",
     "The sidebar picks the view: by course, lecturer, room, or day.",
     "Unscheduled classes wait in the holding area under the grid.",
+    "Split Layout shows several views at once, all updating together.",
   ],
 };

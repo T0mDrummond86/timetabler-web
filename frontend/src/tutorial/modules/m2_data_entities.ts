@@ -45,10 +45,10 @@ export const m2DataEntities: TutorialModule = {
       hint: "Scroll the Staff tab to its add-staff form, type your name, and save. The list should grow to nine.",
     },
     {
-      id: "competencies",
-      title: "Competencies = who may teach what",
+      id: "variance-preview",
+      title: "Variance tells you who is over or under",
       body:
-        "Each class keeps an allowed-lecturers list (competencies). Assign someone outside the list and the timetable flags a warning rather than blocking you — you'll see one of those in the Clashes module.\n\nNotice Freddie Mercury's variance: already over a part-time load. That's a job for the Staff hours module.",
+        "Each lecturer's variance is their workload minus what their FTE calls for. Green is over, red is under, and it moves as you schedule.\n\nNotice Freddie Mercury: already over a part-time load. That's a job for the Staff hours module.",
       advance: "next",
     },
     {
@@ -75,6 +75,5 @@ export const m2DataEntities: TutorialModule = {
   recap: [
     "Staff carry FTE → load; variance shows over/under-allocation.",
     "Rooms have a type and capacity; classes can demand both.",
-    "Competency lists warn when the wrong lecturer is assigned.",
   ],
 };

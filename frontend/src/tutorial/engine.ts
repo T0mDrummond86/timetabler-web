@@ -12,7 +12,6 @@ import type { TutorialEntityMap, TutorialModule, TutorialStep, VerifyCtx } from 
 
 const FALLBACK_POLL_MS = 5000;
 const HINT_OFFER_MS = 25000;
-const PASS_FLASH_MS = 700;
 
 export type StepPhase = "waiting" | "checking" | "passed";
 
@@ -31,9 +30,8 @@ export function useTutorialEngine(opts: {
   sessionId: number;
   orgId: number;
   entities: TutorialEntityMap | null;
-  onAdvance: (nextIndex: number) => void;
 }) {
-  const { module, stepIndex, sessionId, orgId, entities, onAdvance } = opts;
+  const { module, stepIndex, sessionId, orgId, entities } = opts;
   const location = useLocation();
   const [phase, setPhase] = useState<StepPhase>("waiting");
   const [hintOffered, setHintOffered] = useState(false);
@@ -82,15 +80,10 @@ export function useTutorialEngine(opts: {
       verifyBusy.current = false;
     }
     if (stepKeyRef.current !== keyAtStart) return; // step changed mid-check
-    if (ok) {
-      setPhase("passed");
-      window.setTimeout(() => {
-        if (stepKeyRef.current === keyAtStart) onAdvance(stepIndex + 1);
-      }, PASS_FLASH_MS);
-    } else {
-      setPhase("waiting");
-    }
-  }, [step, ctx, stepIndex, onAdvance]);
+    // Passing unlocks Next but does not move on: the reader decides when they
+    // are done with the step, which may be after they have re-read it.
+    setPhase(ok ? "passed" : "waiting");
+  }, [step, ctx]);
 
   const runVerifyRef = useRef(runVerify);
   runVerifyRef.current = runVerify;
@@ -113,11 +106,14 @@ export function useTutorialEngine(opts: {
   }, [step, location.pathname, location.search]);
 
   // Trigger 3: slow fallback poll (covers undo, second-tab edits, misses).
+  // Stops once the step has passed — there is nothing left to detect, and
+  // polling on would let a later undo take the Next button away again.
   useEffect(() => {
     if (!step || step.advance !== "verify" || step.eventOnly) return;
+    if (phase === "passed") return;
     const id = window.setInterval(() => void runVerifyRef.current(), FALLBACK_POLL_MS);
     return () => window.clearInterval(id);
-  }, [step]);
+  }, [step, phase]);
 
   // Offer the hint after idling on a verify step.
   useEffect(() => {

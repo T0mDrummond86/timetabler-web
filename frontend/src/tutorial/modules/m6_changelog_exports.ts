@@ -20,10 +20,10 @@ export const m6ChangelogExports: TutorialModule = {
     },
     {
       id: "resolved-view",
-      title: "Full log vs Resolved",
+      title: "Resolved vs the full log",
       body:
-        "The Full log shows every individual edit (including undos). Switch to Resolved to see only the net result per class — what actually changed since the start. Resolved rows take notes for your records, can be exported to Excel, and offer per-booking rollback.",
-      advance: "next",
+        "It opens on Resolved, which is the view you want nearly always: one row per class showing the net result — what actually changed since the start, however many times you nudged it. Resolved rows take notes for your records, export to Excel, and offer per-booking rollback.\n\nSwitch to Full log if you need the blow-by-blow instead: every individual edit, undos included.",
+      advance: "next"
     },
     {
       id: "run-export",
