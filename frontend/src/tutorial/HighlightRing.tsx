@@ -9,7 +9,7 @@ import { createPortal } from "react-dom";
 
 type Rect = { top: number; left: number; width: number; height: number };
 
-export function HighlightRing({ target, flash }: { target?: string; flash: number }) {
+export function HighlightRing({ target }: { target?: string }) {
   const [rect, setRect] = useState<Rect | null>(null);
 
   useEffect(() => {
@@ -49,9 +49,7 @@ export function HighlightRing({ target, flash }: { target?: string; flash: numbe
   if (!rect) return null;
   return createPortal(
     <div
-      className={`tutorial-ring${flash > 0 ? " tutorial-ring-flash" : ""}`}
-      // key on flash so re-clicking "Show me" restarts the animation
-      key={flash}
+      className="tutorial-ring"
       style={{
         top: rect.top - 5,
         left: rect.left - 5,

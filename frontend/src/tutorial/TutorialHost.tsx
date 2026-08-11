@@ -37,17 +37,6 @@ export function TutorialHost({ sessionId }: { sessionId: number }) {
   const [entities, setEntities] = useState<TutorialEntityMap | null>(null);
   const orgId = progress.orgId ?? 0;
   const [collapsed, setCollapsed] = useState(false);
-  const [flash, setFlash] = useState(0);
-
-  /** Bring the step's target into view, then flash the ring on it. Scrolling
-   *  first matters: the ring is not drawn while the target is off-screen, so
-   *  flashing alone did nothing at all in exactly the case you need it. */
-  const showMe = useCallback((target?: string) => {
-    if (!target) return;
-    const el = document.querySelector(`[data-tutorial-id="${target}"]`);
-    el?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-    setFlash((n) => n + 1);
-  }, []);
   const [showHint, setShowHint] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -356,15 +345,6 @@ export function TutorialHost({ sessionId }: { sessionId: number }) {
             >
               Next
             </button>
-            {engine.step.target && (
-              <button
-                type="button"
-                className="btn-secondary btn-xs"
-                onClick={() => showMe(engine.step?.target)}
-              >
-                Show me
-              </button>
-            )}
             {engine.step.hint && !showHint && (
               <button
                 type="button"
@@ -413,7 +393,7 @@ export function TutorialHost({ sessionId }: { sessionId: number }) {
   return createPortal(
     <>
       {panel}
-      {!collapsed && <HighlightRing target={engine.step?.target} flash={flash} />}
+      {!collapsed && <HighlightRing target={engine.step?.target} />}
       {dialogs}
     </>,
     document.body,
