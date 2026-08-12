@@ -8,6 +8,7 @@ import {
   StaffAvailabilityGrid,
 } from "./StaffAvailabilityGrid";
 import { StaffHoursTable } from "./StaffHoursTable";
+import { StageSplitDialog } from "./StageSplitDialog";
 import { LinkedSessionImportPanel } from "./LinkedSessionImportPanel";
 import { useConfirmPrompt } from "../hooks/useConfirmPrompt";
 
@@ -96,6 +97,7 @@ export function EntityEditorsPanel({
   const [tab, setTab] = useState<Tab>(fixedTab ?? "staff");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [stageSplitFor, setStageSplitFor] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [blockedSlots, setBlockedSlots] = useState<Set<string>>(new Set());
@@ -1182,6 +1184,15 @@ export function EntityEditorsPanel({
                 >
                   Create block
                 </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={saving}
+                  title="Split this qualification's classes into a stage each"
+                  onClick={() => setStageSplitFor(selectedQual.id)}
+                >
+                  Stage split
+                </button>
               </div>
             </form>
           )}
@@ -1190,6 +1201,20 @@ export function EntityEditorsPanel({
         </div>
       </div>
       {dialogs}
+      {stageSplitFor != null && (
+        <StageSplitDialog
+          sessionId={sessionId}
+          qualificationId={stageSplitFor}
+          onClose={() => setStageSplitFor(null)}
+          onSplit={(summary) => {
+            setStageSplitFor(null);
+            setMessage(summary);
+            // Stages are new qualifications with new courses — the sidebar and
+            // every list of qualifications is stale until the caller reloads.
+            onUpdated({ qualificationId: stageSplitFor });
+          }}
+        />
+      )}
     </section>
   );
 }

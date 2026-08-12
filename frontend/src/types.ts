@@ -418,3 +418,18 @@ export type CreateBookingDraft = {
   startSlot: number;
   endSlot: number;
 };
+
+export type StageSplitPreview = {
+  qualification_id: number;
+  name: string;
+  num_groups: number;
+  can_split: boolean;
+  blocked_reason: string;
+  classes: { id: number; name: string }[];
+};
+
+export type StageSplitResult = {
+  stage_qualification_ids: number[];
+  unassigned_classes_kept_on_first_stage: number;
+  summary: string;
+};

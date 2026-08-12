@@ -5917,3 +5917,125 @@ body.staff-editor-resizing {
   min-width: 11rem;
   max-width: 16rem;
 }
+
+/* ---------------- stage split ---------------- */
+
+.stage-split-card {
+  width: min(920px, 94vw);
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.stage-split-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+}
+
+.stage-split-count {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.88rem;
+}
+
+/* One column per stage, wrapping rather than shrinking past readability. */
+.stage-split-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+}
+
+.stage-split-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+}
+
+.stage-split-name {
+  width: 100%;
+  font-weight: 600;
+}
+
+.stage-split-groups {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.stage-split-groups input {
+  width: 4rem;
+}
+
+.stage-split-classes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-height: 2.5rem;
+}
+
+.stage-split-chip {
+  width: 100%;
+  text-align: left;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: inherit;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.stage-split-empty {
+  font-size: 0.75rem;
+}
+
+.stage-split-pool-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+}
+
+.stage-split-pool-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 34vh;
+  overflow-y: auto;
+}
+
+.stage-split-pool-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.stage-split-pool-name {
+  flex: 1;
+  min-width: 10rem;
+  font-size: 0.85rem;
+}
+
+.stage-split-note,
+.stage-split-blocked {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+}
+
+.stage-split-actions {
+  margin-top: 1rem;
+}

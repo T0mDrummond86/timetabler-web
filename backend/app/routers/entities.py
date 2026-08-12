@@ -7,8 +7,17 @@ from sqlalchemy.orm import Session
 from timetable.core.models import Course, Qualification, Room, Staff, Unit
 
 from ..auth.deps import AuthContext, get_auth_context, require_session_editor
+from ..services.qualification_stages import (
+    StagePlan,
+    StageSplitError,
+    split_qualification_into_stages,
+    stage_split_preview,
+)
 from ..database import get_db
 from ..schemas import (
+    StageSplitPreviewOut,
+    StageSplitRequest,
+    StageSplitResultOut,
     CourseCreate,
     CourseDuplicateRequest,
     CourseOut,
@@ -669,6 +678,58 @@ def get_qualification_detail(
         )
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get(
+    "/sessions/{session_id}/qualifications/{qualification_id}/stage-split",
+    response_model=StageSplitPreviewOut,
+)
+def qualification_stage_split_preview(
+    session_id: int,
+    qualification_id: int,
+    ctx: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    """Classes available to deal out, and whether the split can run at all."""
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        return stage_split_preview(
+            db, timetable_session_id=session_id, qualification_id=qualification_id
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post(
+    "/sessions/{session_id}/qualifications/{qualification_id}/stage-split",
+    response_model=StageSplitResultOut,
+)
+def qualification_stage_split(
+    session_id: int,
+    qualification_id: int,
+    body: StageSplitRequest,
+    ctx: AuthContext = Depends(require_session_editor),
+    db: Session = Depends(get_db),
+):
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    plans = [
+        StagePlan(name=s.name, num_groups=s.num_groups, unit_ids=tuple(s.unit_ids))
+        for s in body.stages
+    ]
+    try:
+        return split_qualification_into_stages(
+            db,
+            timetable_session_id=session_id,
+            qualification_id=qualification_id,
+            stages=plans,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except StageSplitError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
 
 @router.patch("/sessions/{session_id}/qualifications/{qualification_id}", response_model=QualificationOut)

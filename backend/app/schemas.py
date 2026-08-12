@@ -915,6 +915,31 @@ class ClassCustodiansOut(BaseModel):
     rows: list[ClassCustodianRowOut]
 
 
+class StagePlanIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    num_groups: int = Field(default=1, ge=1, le=26)
+    unit_ids: list[int] = Field(default_factory=list)
+
+
+class StageSplitRequest(BaseModel):
+    stages: list[StagePlanIn] = Field(min_length=2, max_length=12)
+
+
+class StageSplitPreviewOut(BaseModel):
+    qualification_id: int
+    name: str
+    num_groups: int
+    can_split: bool
+    blocked_reason: str = ""
+    classes: list[dict] = Field(default_factory=list)
+
+
+class StageSplitResultOut(BaseModel):
+    stage_qualification_ids: list[int]
+    unassigned_classes_kept_on_first_stage: int
+    summary: str
+
+
 class UnitCustodianPatch(BaseModel):
     #: Null clears the override and returns to the derived custodian.
     staff_id: int | None = None

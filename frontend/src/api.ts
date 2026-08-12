@@ -1146,6 +1146,21 @@ export const api = {
     return res.json() as Promise<{ imported: number; weeks: CalendarWeek[] }>;
   },
 
+  stageSplitPreview: (sessionId: number, qualificationId: number) =>
+    apiFetch<import("./types").StageSplitPreview>(
+      `/sessions/${sessionId}/qualifications/${qualificationId}/stage-split`,
+    ),
+
+  stageSplit: (
+    sessionId: number,
+    qualificationId: number,
+    body: { stages: { name: string; num_groups: number; unit_ids: number[] }[] },
+  ) =>
+    apiFetch<import("./types").StageSplitResult>(
+      `/sessions/${sessionId}/qualifications/${qualificationId}/stage-split`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+
   classCustodians: (sessionId: number) =>
     apiFetch<import("./types").ClassCustodians>(`/sessions/${sessionId}/class-custodians`),
 
