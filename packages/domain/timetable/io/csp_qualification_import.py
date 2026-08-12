@@ -171,6 +171,59 @@ def _stage_qualification_name(base_title: str, stage_label: str | None, stage_in
     return base_title
 
 
+def base_title_from_stages(stages: list[CspStage]) -> str:
+    """Recover the document's qualification title from its per-stage names.
+
+    Stage names are built as "{base} – {label}", so stripping the label back off
+    gives the title the document itself carried.
+    """
+    for stage in stages:
+        name = stage.qualification_name
+        if stage.stage_label:
+            suffix = f" – {stage.stage_label}"
+            if name.endswith(suffix):
+                return name[: -len(suffix)].strip()
+        else:
+            return name.strip()
+    return stages[0].qualification_name.strip() if stages else "Imported qualification"
+
+
+def flatten_stages(stages: list[CspStage]) -> list[CspStage]:
+    """Collapse every parsed stage into one qualification holding all classes.
+
+    A CSP document lays its classes out per stage, but the stage boundaries
+    printed on the page are the *curriculum's* view, not a timetabling
+    decision — stages are split by hand afterwards, and a document's stages
+    rarely match how the year is actually run. Importing them as separate
+    qualifications pre-empted that choice, so the whole document now lands as
+    one qualification and the split is left to the user.
+
+    A class listed under more than one stage becomes a single class carrying
+    the union of its unit codes; the first stated hours win, since a repeat
+    listing is the same delivery appearing twice, not a second one.
+    """
+    if not stages:
+        return []
+    base = base_title_from_stages(stages)
+    merged: list[CspClass] = []
+    by_name: dict[str, CspClass] = {}
+    for stage in stages:
+        for cls in stage.classes:
+            key = cls.name.strip().casefold()
+            existing = by_name.get(key)
+            if existing is None:
+                copy = CspClass(name=cls.name, hours=cls.hours, unit_codes=list(cls.unit_codes))
+                by_name[key] = copy
+                merged.append(copy)
+                continue
+            if existing.hours is None:
+                existing.hours = cls.hours
+            for code in cls.unit_codes:
+                if code not in existing.unit_codes:
+                    existing.unit_codes.append(code)
+    return [CspStage(qualification_name=base, stage_label=None, classes=merged)]
+
+
 def extract_csp_qualification_stages(
     source: bytes | Path | str | Document,
     *,
@@ -235,6 +288,10 @@ def import_qualifications_from_csp(
     if not stages:
         rep.warnings.append(f"No CSP qualification tables found in {path.name}")
         return rep
+
+    # The document's stage tables are a curriculum layout, not a timetabling
+    # one — everything lands in a single qualification and the user splits it.
+    stages = flatten_stages(stages)
 
     for stage in stages:
         qual_name = stage.qualification_name

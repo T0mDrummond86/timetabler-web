@@ -63,9 +63,27 @@ def qualification_detail(
         .all()
     )
 
+    # Sibling stages: everything sharing this family's root, including itself.
+    root_id = q.parent_qualification_id or q.id
+    family = (
+        db.query(Qualification)
+        .filter(
+            Qualification.timetable_session_id == timetable_session_id,
+            Qualification.parent_qualification_id == root_id,
+        )
+        .order_by(Qualification.name)
+        .all()
+        if q.parent_qualification_id
+        else []
+    )
+
     return {
         "id": q.id,
         "name": q.name,
+        "parent_qualification_id": q.parent_qualification_id,
+        "stage_siblings": [
+            {"id": s.id, "name": s.name, "is_current": s.id == q.id} for s in family
+        ],
         "num_groups": max(max(1, getattr(q, "num_groups", 1) or 1), len(regular)),
         "schedule_period": getattr(q, "schedule_period", None) or "day",
         "delivery_mode": getattr(q, "delivery_mode", None) or "regular",

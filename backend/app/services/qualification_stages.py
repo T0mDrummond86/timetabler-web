@@ -152,6 +152,10 @@ def split_qualification_into_stages(
         if index == 0:
             target = qual
             target.name = stage.name.strip()
+            # Stage one points at itself, so every member of the family shares
+            # one parent id and the family is a single equality test. A split
+            # of an already-split stage keeps pointing at the original root.
+            target.parent_qualification_id = qual.parent_qualification_id or qual.id
         else:
             target = Qualification(
                 timetable_session_id=timetable_session_id,
@@ -161,6 +165,7 @@ def split_qualification_into_stages(
                 delivery_mode=getattr(qual, "delivery_mode", None) or "regular",
                 block_week_count=getattr(qual, "block_week_count", None),
                 block_start_semester_week=getattr(qual, "block_start_semester_week", None),
+                parent_qualification_id=qual.parent_qualification_id or qual.id,
             )
             db.add(target)
             db.flush()

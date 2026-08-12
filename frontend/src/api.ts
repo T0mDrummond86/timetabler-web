@@ -1146,6 +1146,22 @@ export const api = {
     return res.json() as Promise<{ imported: number; weeks: CalendarWeek[] }>;
   },
 
+  async exportQualificationCsp(sessionId: number, qualificationId: number): Promise<void> {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(
+      `${API_BASE}/sessions/${sessionId}/qualifications/${qualificationId}/csp-export`,
+      { headers },
+    );
+    if (!res.ok) throw new Error("Export failed");
+    const blob = await res.blob();
+    triggerBlobDownload(
+      blob,
+      filenameFromContentDisposition(res.headers.get("Content-Disposition"), "CSP.docx"),
+    );
+  },
+
   stageSplitPreview: (sessionId: number, qualificationId: number) =>
     apiFetch<import("./types").StageSplitPreview>(
       `/sessions/${sessionId}/qualifications/${qualificationId}/stage-split`,

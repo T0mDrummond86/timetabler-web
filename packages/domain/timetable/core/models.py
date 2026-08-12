@@ -235,6 +235,10 @@ class Qualification(Base):
     delivery_mode: Mapped[str] = mapped_column(String, default="regular")
     block_week_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     block_start_semester_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # The qualification this one is a stage of. Stage split sets it on every
+    # stage it makes, including the first, which points at itself — so the
+    # family is found with a single equality test. Null = never split.
+    parent_qualification_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("timetable_session_id", "name", name="qualification_session_name_uk"),

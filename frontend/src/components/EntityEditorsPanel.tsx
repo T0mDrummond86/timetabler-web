@@ -1134,6 +1134,31 @@ export function EntityEditorsPanel({
                   <option value="night">Night (17:30–21:30)</option>
                 </select>
               </label>
+              {qualDetail && (qualDetail.stage_siblings?.length ?? 0) > 1 && (
+                <fieldset className="qual-link-fieldset">
+                  <legend>Stages of this qualification</legend>
+                  <p className="muted entity-hint">
+                    Split from one qualification — each stage timetables separately.
+                  </p>
+                  <ul className="entity-linked-list">
+                    {qualDetail.stage_siblings!.map((s) => (
+                      <li key={s.id}>
+                        {s.is_current ? (
+                          <strong>{s.name} (this one)</strong>
+                        ) : (
+                          <button
+                            type="button"
+                            className="entity-link-btn"
+                            onClick={() => setSelectedId(s.id)}
+                          >
+                            {s.name}
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </fieldset>
+              )}
               {qualDetail && qualDetail.linked_classes.length > 0 && (
                 <fieldset className="qual-link-fieldset">
                   <legend>Linked classes</legend>
@@ -1192,6 +1217,25 @@ export function EntityEditorsPanel({
                   onClick={() => setStageSplitFor(selectedQual.id)}
                 >
                   Stage split
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={saving}
+                  title="Download this qualification as a CSP document, one table per stage"
+                  onClick={async () => {
+                    setSaving(true);
+                    setError(null);
+                    try {
+                      await api.exportQualificationCsp(sessionId, selectedQual.id);
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "CSP export failed");
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                >
+                  Export CSP
                 </button>
               </div>
             </form>

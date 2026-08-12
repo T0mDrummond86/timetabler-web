@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from timetable.core.models import Course, Qualification, Room, Staff, Unit
 
 from ..auth.deps import AuthContext, get_auth_context, require_session_editor
+from ..services.csp_export import build_csp_export
+from ..services.export_filenames import session_export_filename
 from ..services.qualification_stages import (
     StagePlan,
     StageSplitError,
@@ -678,6 +681,33 @@ def get_qualification_detail(
         )
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/sessions/{session_id}/qualifications/{qualification_id}/csp-export")
+def qualification_csp_export(
+    session_id: int,
+    qualification_id: int,
+    ctx: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    """The whole qualification family as a CSP .docx, one table per stage.
+
+    A read, so viewers get it too — same as every other export.
+    """
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        path, title = build_csp_export(
+            db, timetable_session_id=session_id, qualification_id=qualification_id
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return FileResponse(
+        path,
+        media_type=(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ),
+        filename=session_export_filename(title, ".docx", label="CSP"),
+    )
 
 
 @router.get(

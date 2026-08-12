@@ -624,9 +624,18 @@ class QualificationLinkedClassOut(BaseModel):
     name: str
 
 
+class QualificationStageSiblingOut(BaseModel):
+    id: int
+    name: str
+    is_current: bool = False
+
+
 class QualificationDetailOut(BaseModel):
     id: int
     name: str
+    #: Root of the stage family; null when this qualification was never split.
+    parent_qualification_id: int | None = None
+    stage_siblings: list[QualificationStageSiblingOut] = Field(default_factory=list)
     num_groups: int
     schedule_period: str
     delivery_mode: str

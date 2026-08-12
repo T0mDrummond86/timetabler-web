@@ -24,7 +24,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 from sqlalchemy.orm import Session
 
-from .csp_qualification_import import CspClass, CspStage
+from .csp_qualification_import import CspClass, CspStage, flatten_stages
 from .qualification_import import (
     QualImportReport,
     _create_kwargs,
@@ -231,6 +231,10 @@ def import_qualifications_from_ep_nb_csp(
     if not stages:
         rep.warnings.append(f"No EP-NB CSP semester data found in {path.name}")
         return rep
+
+    # Same reasoning as the .docx importer: the workbook's Semester bands are
+    # the curriculum's shape, not the timetable's. One qualification in.
+    stages = flatten_stages(stages)
 
     for stage in stages:
         qual_name = stage.qualification_name

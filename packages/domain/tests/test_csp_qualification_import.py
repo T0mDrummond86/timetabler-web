@@ -8,8 +8,12 @@ import pytest
 from docx import Document
 from sqlalchemy.orm import sessionmaker
 
-from timetable.core.storage import init_db, make_engine
-from timetable.core.models import Qualification, Unit, UnitQualification
+from timetable.core.storage import make_engine
+from timetable.core.models import Base, Qualification, Unit, UnitQualification
+
+# Core tables carry a foreign key to timetable_session, so create_all cannot
+# resolve them unless the tenancy models are registered on the same metadata.
+from timetable.core.tenancy_models import Organization, TimetableSession
 from timetable.io.csp_qualification_import import (
     extract_csp_qualification_stages,
     import_qualifications_from_csp,
@@ -20,12 +24,23 @@ _CSP_SAMPLE = Path(
 )
 
 
+# Every imported row is scoped to a timetable session, so the import needs one.
+SID = 1
+
+
 @pytest.fixture
 def session(tmp_path):
     eng = make_engine(tmp_path / "csp.db")
-    init_db(eng)
+    # create_all rather than init_db: init_db still seeds a desktop-era default
+    # semester with no timetable session, which this schema rejects.
+    Base.metadata.create_all(eng)
     S = sessionmaker(bind=eng, expire_on_commit=False)
     with S() as s:
+        org = Organization(name="T", slug="t")
+        s.add(org)
+        s.flush()
+        s.add(TimetableSession(id=SID, organization_id=org.id, name="S"))
+        s.commit()
         yield s
 
 
@@ -50,18 +65,35 @@ def test_extract_ict50220_csp_sample():
     assert len(s2["Incident Response Planning"].unit_codes) == 3
 
 
-def test_import_csp_creates_two_qualifications_and_multi_unit_classes(session, tmp_path):
+def test_import_csp_creates_one_qualification_with_every_class(session, tmp_path):
+    """The document's semester tables are a curriculum layout, not a timetable.
+
+    Everything lands in one qualification; splitting into stages is the user's
+    decision, made afterwards with the Stage split tool.
+    """
     if not _CSP_SAMPLE.is_file():
         pytest.skip("CSP sample not available")
 
-    rep = import_qualifications_from_csp(session, _CSP_SAMPLE)
-    assert rep.qualifications_created == 2
+    rep = import_qualifications_from_csp(
+        session, _CSP_SAMPLE, timetable_session_id=SID
+    )
+    assert rep.qualifications_created == 1
     assert rep.classes_created >= 10
 
-    quals = session.query(Qualification).order_by(Qualification.name).all()
-    assert len(quals) == 2
-    assert any("Semester 1" in q.name for q in quals)
-    assert any("Semester 2" in q.name for q in quals)
+    quals = session.query(Qualification).all()
+    assert len(quals) == 1
+    assert "Semester" not in quals[0].name
+
+    # Both semesters' classes are present under the single qualification.
+    linked = {
+        u.name
+        for u in session.query(Unit)
+        .join(UnitQualification, UnitQualification.unit_id == Unit.id)
+        .filter(UnitQualification.qualification_id == quals[0].id)
+        .all()
+    }
+    assert "Cyber Support" in linked                 # semester 1
+    assert "Incident Response Planning" in linked    # semester 2
 
     cyber = session.query(Unit).filter_by(name="Cyber Support").one()
     assert "BSBXCS402" in (cyber.component_codes or "")

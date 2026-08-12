@@ -381,6 +381,9 @@ export type StaffOnlineStudentRow = {
 export type QualificationDetail = {
   id: number;
   name: string;
+  /** Root of the stage family; null when this qualification was never split. */
+  parent_qualification_id?: number | null;
+  stage_siblings?: { id: number; name: string; is_current: boolean }[];
   num_groups: number;
   schedule_period: string;
   delivery_mode: string;
