@@ -5939,22 +5939,45 @@ body.staff-editor-resizing {
   font-size: 0.88rem;
 }
 
-/* One column per stage, wrapping rather than shrinking past readability. */
-.stage-split-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.6rem;
-  margin-bottom: 0.9rem;
+/* Two plain tables — stages, then classes — so six stages read as calmly as
+   two. The old design put one button per stage on every class row, which grew
+   as classes x stages and became unreadable. */
+.stage-split-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
 }
 
-.stage-split-col {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-subtle);
+.stage-split-table th {
+  text-align: left;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.stage-split-table td {
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.stage-split-table .stage-split-num {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.stage-split-stages {
+  margin-bottom: 1rem;
+}
+
+.stage-split-index {
+  width: 1%;
+  white-space: nowrap;
+  color: var(--text-secondary);
 }
 
 .stage-split-name {
@@ -5962,72 +5985,39 @@ body.staff-editor-resizing {
   font-weight: 600;
 }
 
-.stage-split-groups {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
+.stage-split-groups-input {
+  width: 4.5rem;
+  text-align: right;
 }
 
-.stage-split-groups input {
-  width: 4rem;
+.stage-split-classes-table {
+  display: block;
+  max-height: 38vh;
+  overflow-y: auto;
 }
 
-.stage-split-classes {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  min-height: 2.5rem;
-}
-
-.stage-split-chip {
+.stage-split-classes-table tbody {
+  display: table;
   width: 100%;
-  text-align: left;
-  padding: 0.2rem 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
-  color: inherit;
-  font: inherit;
-  font-size: 0.78rem;
-  cursor: pointer;
 }
 
-.stage-split-empty {
-  font-size: 0.75rem;
+.stage-split-class-name {
+  width: 100%;
+}
+
+.stage-split-pick {
+  width: 8rem;
+  font-size: 0.82rem;
+}
+
+/* Unassigned rows stay visible without shouting — they are a valid state. */
+.stage-split-row--unassigned .stage-split-class-name {
+  color: var(--text-secondary);
 }
 
 .stage-split-pool-title {
   margin: 0 0 0.4rem;
   font-size: 0.9rem;
-}
-
-.stage-split-pool-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  max-height: 34vh;
-  overflow-y: auto;
-}
-
-.stage-split-pool-row {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-}
-
-.stage-split-pool-name {
-  flex: 1;
-  min-width: 10rem;
-  font-size: 0.85rem;
 }
 
 .stage-split-note,
@@ -6038,4 +6028,40 @@ body.staff-editor-resizing {
 
 .stage-split-actions {
   margin-top: 1rem;
+}
+
+/* ---------------- qualification stage tabs ---------------- */
+
+/* A split qualification is one entry in the list, so the editor needs its own
+   switch between stages. Numbered, because the full stage names are long and
+   already shown in the Name field below. */
+.qual-stage-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.qual-stage-tab {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.qual-stage-tab:hover {
+  color: var(--text);
+}
+
+.qual-stage-tab--active {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--text);
+  font-weight: 600;
 }

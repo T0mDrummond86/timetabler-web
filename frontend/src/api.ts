@@ -301,6 +301,8 @@ export type Unit = {
 export type Qualification = {
   id: number;
   name: string;
+  /** Root of the stage family; null when this qualification was never split. */
+  parent_qualification_id?: number | null;
   num_groups?: number;
   schedule_period?: string;
 };
@@ -354,6 +356,8 @@ export type GlobalAggregatedQualRow = {
   session_names: string[];
   session_count: number;
   members?: GlobalAmalgamatedMember[];
+  /** Stage names when this qualification was split; "—" when it never was. */
+  stages?: string;
   num_groups?: number | string;
   schedule_period?: string;
   delivery_mode?: string;
@@ -1144,22 +1148,6 @@ export const api = {
       throw new Error(detail);
     }
     return res.json() as Promise<{ imported: number; weeks: CalendarWeek[] }>;
-  },
-
-  async exportQualificationCsp(sessionId: number, qualificationId: number): Promise<void> {
-    const token = getToken();
-    const headers: Record<string, string> = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await fetch(
-      `${API_BASE}/sessions/${sessionId}/qualifications/${qualificationId}/csp-export`,
-      { headers },
-    );
-    if (!res.ok) throw new Error("Export failed");
-    const blob = await res.blob();
-    triggerBlobDownload(
-      blob,
-      filenameFromContentDisposition(res.headers.get("Content-Disposition"), "CSP.docx"),
-    );
   },
 
   stageSplitPreview: (sessionId: number, qualificationId: number) =>

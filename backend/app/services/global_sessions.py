@@ -11,6 +11,7 @@ from timetable.core.models import Booking, Course, Qualification, Room, Semester
 from timetable.core.tenancy_models import GlobalSession, GlobalSessionMember, TimetableSession
 
 from .class_custodians import class_custodians_for_session, qualification_names_by_unit
+from .qualification_stages import family_title
 from .timetable_grid import get_repeating_week
 
 
@@ -405,18 +406,27 @@ def aggregated_qualifications(db: Session, global_session_id: int) -> list[dict]
     names = _session_name_map(db, member_session_ids(db, global_session_id))
     flat: list[dict] = []
     for sid in names:
-        for q in (
+        rows = (
             db.query(Qualification)
             .filter(Qualification.timetable_session_id == sid)
             .order_by(Qualification.name)
             .all()
-        ):
+        )
+        # A split qualification lists under the one name it was split from; its
+        # stages are a column, not separate qualifications.
+        by_family: dict[int, list[Qualification]] = {}
+        for q in rows:
+            by_family.setdefault(q.parent_qualification_id or q.id, []).append(q)
+        for q in rows:
+            family = by_family[q.parent_qualification_id or q.id]
+            is_split = len(family) > 1
             flat.append(
                 {
                     "id": q.id,
                     "session_id": sid,
                     "session_name": names[sid],
-                    "name": q.name,
+                    "name": family_title(family) if is_split else q.name,
+                    "stage_name": q.name if is_split else "",
                     "num_groups": q.num_groups,
                     "schedule_period": q.schedule_period,
                     "delivery_mode": getattr(q, "delivery_mode", "regular"),
@@ -424,7 +434,9 @@ def aggregated_qualifications(db: Session, global_session_id: int) -> list[dict]
             )
 
     def enrich(members: list[dict]) -> dict:
+        stages = sorted({(m.get("stage_name") or "").strip() for m in members} - {""})
         return {
+            "stages": ", ".join(stages) if stages else "—",
             "num_groups": _sum_int_field(members, "num_groups"),
             "schedule_period": _merge_field(members, "schedule_period"),
             "delivery_mode": _merge_field(members, "delivery_mode"),

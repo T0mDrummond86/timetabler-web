@@ -11,6 +11,7 @@ import { StaffHoursTable } from "./StaffHoursTable";
 import { StageSplitDialog } from "./StageSplitDialog";
 import { LinkedSessionImportPanel } from "./LinkedSessionImportPanel";
 import { useConfirmPrompt } from "../hooks/useConfirmPrompt";
+import { familyOf, groupIntoFamilies } from "../stageFamily";
 
 type Tab = "staff" | "rooms" | "units" | "courses" | "qualifications";
 
@@ -98,6 +99,10 @@ export function EntityEditorsPanel({
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [stageSplitFor, setStageSplitFor] = useState<number | null>(null);
+  // Bumped after a split so the open editor refetches: the split renames the
+  // qualification and moves its classes without changing the selected id, so
+  // nothing else would tell this panel its data went stale.
+  const [qualRefresh, setQualRefresh] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [blockedSlots, setBlockedSlots] = useState<Set<string>>(new Set());
@@ -238,15 +243,25 @@ export function EntityEditorsPanel({
   }, [staffDetail]);
 
   useEffect(() => {
+    // Clear first: the form below seeds its inputs from qualDetail, so leaving
+    // the previous qualification's detail in place while the next one loads
+    // would show one stage's group count against another stage's name.
+    setQualDetail(null);
     if (activeTab === "qualifications" && selectedId != null) {
+      let cancelled = false;
       api
         .qualificationDetail(sessionId, selectedId)
-        .then(setQualDetail)
-        .catch(() => setQualDetail(null));
-    } else {
-      setQualDetail(null);
+        .then((d) => {
+          if (!cancelled) setQualDetail(d);
+        })
+        .catch(() => {
+          if (!cancelled) setQualDetail(null);
+        });
+      return () => {
+        cancelled = true;
+      };
     }
-  }, [sessionId, activeTab, selectedId]);
+  }, [sessionId, activeTab, selectedId, qualRefresh]);
 
   useEffect(() => {
     if (activeTab === "units" && selectedId != null) {
@@ -275,7 +290,12 @@ export function EntityEditorsPanel({
     }
   }, [sessionId, activeTab, selectedId]);
 
-  const baseRows: { id: number; label: string }[] =
+  const qualFamilies = useMemo(() => groupIntoFamilies(qualifications), [qualifications]);
+
+  // A split qualification is still one qualification to the user, so a family
+  // is one row: selecting it opens its first stage, and `memberIds` keeps the
+  // row highlighted while any of its stages is being edited.
+  const baseRows: { id: number; label: string; memberIds?: number[] }[] =
     activeTab === "staff"
       ? staff.map((s) => ({ id: s.id, label: s.name }))
       : activeTab === "rooms"
@@ -284,7 +304,11 @@ export function EntityEditorsPanel({
           ? units.map((u) => ({ id: u.id, label: u.name }))
           : activeTab === "courses"
             ? courses.map((c) => ({ id: c.id, label: c.code }))
-            : qualifications.map((q) => ({ id: q.id, label: q.name }));
+            : qualFamilies.map((f) => ({
+                id: f.stages[0].id,
+                label: f.label,
+                memberIds: f.stages.map((s) => s.id),
+              }));
 
   const rows = useMemo(() => {
     if (activeTab === "units") {
@@ -302,10 +326,16 @@ export function EntityEditorsPanel({
     if (activeTab === "qualifications") {
       const q = qualSearch.trim().toLowerCase();
       if (!q) return baseRows;
-      return baseRows.filter((row) => row.label.toLowerCase().includes(q));
+      // Search the stage names too, so "Stg2" still finds its family.
+      return baseRows.filter((row) => {
+        if (row.label.toLowerCase().includes(q)) return true;
+        return (row.memberIds ?? []).some((id) =>
+          qualifications.find((x) => x.id === id)?.name.toLowerCase().includes(q),
+        );
+      });
     }
     return baseRows;
-  }, [activeTab, baseRows, units, unitSearch, unitQualFilter, qualSearch]);
+  }, [activeTab, baseRows, units, unitSearch, unitQualFilter, qualSearch, qualifications]);
 
   const onCampusRoomIds = useMemo(
     () => rooms.filter(isOnCampusRoom).map((r) => r.id),
@@ -324,6 +354,7 @@ export function EntityEditorsPanel({
   const selectedUnit = units.find((u) => u.id === selectedId);
   const selectedCourse = courses.find((c) => c.id === selectedId);
   const selectedQual = qualifications.find((q) => q.id === selectedId);
+  const selectedFamily = familyOf(qualFamilies, selectedId);
 
   useEffect(() => {
     setUnitDoubleSession(!!selectedUnit?.double_session);
@@ -654,7 +685,12 @@ export function EntityEditorsPanel({
                 <li key={row.id}>
                   <button
                     type="button"
-                    className={selectedId === row.id ? "entity-item active" : "entity-item"}
+                    className={
+                      selectedId === row.id ||
+                      (selectedId != null && (row.memberIds ?? []).includes(selectedId))
+                        ? "entity-item active"
+                        : "entity-item"
+                    }
                     onClick={() => {
                       setSelectedId(row.id);
                       setMessage(null);
@@ -1104,8 +1140,39 @@ export function EntityEditorsPanel({
               </button>
             </form>
           )}
+          {selectedQual && activeTab === "qualifications" && selectedFamily?.isSplit && (
+            <div className="qual-stage-tabs" role="tablist" aria-label="Stages">
+              {selectedFamily.stages.map((stage, i) => (
+                <button
+                  key={stage.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={stage.id === selectedQual.id}
+                  className={
+                    stage.id === selectedQual.id
+                      ? "qual-stage-tab qual-stage-tab--active"
+                      : "qual-stage-tab"
+                  }
+                  title={stage.name}
+                  onClick={() => {
+                    setSelectedId(stage.id);
+                    setMessage(null);
+                    setError(null);
+                  }}
+                >
+                  Stage {i + 1}
+                </button>
+              ))}
+            </div>
+          )}
           {selectedQual && activeTab === "qualifications" && (
-            <form key={selectedQual.id} className="form" onSubmit={save}>
+            // Keyed on the loaded detail as well as the selection, so the
+            // uncontrolled inputs re-seed once the right detail arrives.
+            <form
+              key={`${selectedQual.id}:${qualRefresh}:${qualDetail?.id ?? "pending"}`}
+              className="form"
+              onSubmit={save}
+            >
               {qualDetail && (
                 <div className="qual-detail-summary muted">
                   {qualDetail.groups_summary && <p>{qualDetail.groups_summary}</p>}
@@ -1134,31 +1201,6 @@ export function EntityEditorsPanel({
                   <option value="night">Night (17:30–21:30)</option>
                 </select>
               </label>
-              {qualDetail && (qualDetail.stage_siblings?.length ?? 0) > 1 && (
-                <fieldset className="qual-link-fieldset">
-                  <legend>Stages of this qualification</legend>
-                  <p className="muted entity-hint">
-                    Split from one qualification — each stage timetables separately.
-                  </p>
-                  <ul className="entity-linked-list">
-                    {qualDetail.stage_siblings!.map((s) => (
-                      <li key={s.id}>
-                        {s.is_current ? (
-                          <strong>{s.name} (this one)</strong>
-                        ) : (
-                          <button
-                            type="button"
-                            className="entity-link-btn"
-                            onClick={() => setSelectedId(s.id)}
-                          >
-                            {s.name}
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </fieldset>
-              )}
               {qualDetail && qualDetail.linked_classes.length > 0 && (
                 <fieldset className="qual-link-fieldset">
                   <legend>Linked classes</legend>
@@ -1218,25 +1260,6 @@ export function EntityEditorsPanel({
                 >
                   Stage split
                 </button>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  disabled={saving}
-                  title="Download this qualification as a CSP document, one table per stage"
-                  onClick={async () => {
-                    setSaving(true);
-                    setError(null);
-                    try {
-                      await api.exportQualificationCsp(sessionId, selectedQual.id);
-                    } catch (err) {
-                      setError(err instanceof Error ? err.message : "CSP export failed");
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
-                >
-                  Export CSP
-                </button>
               </div>
             </form>
           )}
@@ -1253,6 +1276,7 @@ export function EntityEditorsPanel({
           onSplit={(summary) => {
             setStageSplitFor(null);
             setMessage(summary);
+            setQualRefresh((n) => n + 1);
             // Stages are new qualifications with new courses — the sidebar and
             // every list of qualifications is stale until the caller reloads.
             onUpdated({ qualificationId: stageSplitFor });

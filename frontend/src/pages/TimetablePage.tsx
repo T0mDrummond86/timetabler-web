@@ -611,7 +611,12 @@ export function TimetablePage() {
         const parsedBlockWeek = parseIntParam(searchParams.get("blockWeek"), 1);
         const parsedSemesterWeek = parseIntParam(searchParams.get("semesterWeek"), 1);
         const parsedPreviewWeek = parseNullableIntParam(searchParams.get("previewWeek"));
-        const cid = parsedCourseId ?? courseList[0]?.id ?? null;
+        // The URL may name a course that no longer exists — a stage split, for
+        // one, deletes and recreates a qualification's group courses. Fall back
+        // to the first real course rather than asking for a dead id.
+        const courseStillExists =
+          parsedCourseId != null && courseList.some((c) => c.id === parsedCourseId);
+        const cid = (courseStillExists ? parsedCourseId : null) ?? courseList[0]?.id ?? null;
         const sid = parsedStaffId ?? staffList[0]?.id ?? null;
         setSessionTab(parsedTab);
         setViewKind(parsedView);

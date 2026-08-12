@@ -41,6 +41,8 @@ from timetable.core.tenancy_models import Organization, TimetableSession  # noqa
 from app.services.qualification_stages import (  # noqa: E402
     StagePlan,
     StageSplitError,
+    family_qualifications,
+    family_title,
     split_qualification_into_stages,
     stage_split_preview,
 )
@@ -225,3 +227,63 @@ class TestRefusals:
         db.commit()
         with pytest.raises(StageSplitError, match="at least two"):
             _split(db, q, [StagePlan("Only", 1, ())])
+
+
+class TestFamily:
+    """Stages stay linked to the qualification they were split from."""
+
+    def test_split_puts_every_stage_in_one_family(self, db):
+        q = _qual(db, "Dip")
+        a, b = _unit(db, "A", q), _unit(db, "B", q)
+        db.commit()
+
+        out = _split(db, q, [
+            StagePlan("Dip Stg1", 1, (a.id,)),
+            StagePlan("Dip Stg2", 1, (b.id,)),
+        ])
+
+        ids = out["stage_qualification_ids"]
+        parents = {db.get(Qualification, qid).parent_qualification_id for qid in ids}
+        # Stage one points at itself, so the whole family shares one parent id.
+        assert parents == {q.id}
+
+    def test_family_is_reachable_from_any_stage(self, db):
+        q = _qual(db, "Dip")
+        a, b, c = _unit(db, "A", q), _unit(db, "B", q), _unit(db, "C", q)
+        db.commit()
+
+        out = _split(db, q, [
+            StagePlan("Dip Stg1", 1, (a.id,)),
+            StagePlan("Dip Stg2", 1, (b.id,)),
+            StagePlan("Dip Stg3", 1, (c.id,)),
+        ])
+        ids = out["stage_qualification_ids"]
+
+        for qid in ids:
+            family = family_qualifications(db, timetable_session_id=SID, qualification_id=qid)
+            assert [f.id for f in family] == sorted(ids)
+
+    def test_never_split_qualification_is_a_family_of_one(self, db):
+        q = _qual(db, "Cert IV")
+        _unit(db, "A", q)
+        db.commit()
+
+        family = family_qualifications(db, timetable_session_id=SID, qualification_id=q.id)
+
+        assert [f.id for f in family] == [q.id]
+        assert family_title(family) == "Cert IV"
+
+    def test_family_title_drops_the_stage_suffix(self, db):
+        q = _qual(db, "Dip of IT")
+        a, b = _unit(db, "A", q), _unit(db, "B", q)
+        db.commit()
+
+        out = _split(db, q, [
+            StagePlan("Dip of IT Stg1", 1, (a.id,)),
+            StagePlan("Dip of IT Stg2", 1, (b.id,)),
+        ])
+        family = family_qualifications(
+            db, timetable_session_id=SID, qualification_id=out["stage_qualification_ids"][1]
+        )
+
+        assert family_title(family) == "Dip of IT"

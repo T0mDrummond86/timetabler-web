@@ -13,6 +13,7 @@ Better to say so than to guess.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
@@ -31,6 +32,62 @@ from .qualification_editor import sync_qualification_regular_groups
 
 class StageSplitError(ValueError):
     """The split cannot be performed; the message is meant for the user."""
+
+
+_STAGE_SUFFIX_RE = re.compile(r"\s*St(?:a?ge?)?\s*\d+\s*$", re.IGNORECASE)
+
+
+def family_qualifications(
+    db: Session, *, timetable_session_id: int, qualification_id: int
+) -> list[Qualification]:
+    """Every stage of the family this qualification belongs to, in stage order.
+
+    A qualification that was never split is its own family of one, so callers
+    can treat both cases the same.
+    """
+    qual = (
+        db.query(Qualification)
+        .filter(
+            Qualification.id == qualification_id,
+            Qualification.timetable_session_id == timetable_session_id,
+        )
+        .one_or_none()
+    )
+    if qual is None:
+        raise LookupError("Qualification not found")
+
+    if not qual.parent_qualification_id:
+        return [qual]
+
+    return (
+        db.query(Qualification)
+        .filter(
+            Qualification.timetable_session_id == timetable_session_id,
+            Qualification.parent_qualification_id == qual.parent_qualification_id,
+        )
+        # By id: the split keeps the original record as stage one and creates the
+        # rest in order, so ids are the stage order and survive a rename.
+        .order_by(Qualification.id)
+        .all()
+    )
+
+
+def family_title(stages: list[Qualification]) -> str:
+    """The whole qualification's name, with the stage suffix taken back off.
+
+    Named after the root record — the one the split started from — so renaming
+    a later stage does not rename the qualification it belongs to.
+    """
+    if not stages:
+        return "Qualification"
+    if len(stages) == 1:
+        return stages[0].name
+    root = next(
+        (q for q in stages if q.parent_qualification_id == q.id),
+        min(stages, key=lambda q: q.id),
+    )
+    stem = _STAGE_SUFFIX_RE.sub("", root.name).strip()
+    return stem or root.name
 
 
 @dataclass(frozen=True)

@@ -542,6 +542,7 @@ export function GlobalSessionPage() {
           ]}
           columns={[
             { header: "Qualification", cell: (r) => r.name },
+            { header: "Stages", cell: (r) => r.stages ?? "—" },
             { header: "Used in sessions", cell: (r) => formatSessions(r.session_names) },
             { header: "Groups", cell: (r) => formatVaries(r.num_groups) },
             { header: "Period", cell: (r) => formatVaries(r.schedule_period) },

@@ -650,6 +650,9 @@ class QualificationDetailOut(BaseModel):
 class QualificationOut(BaseModel):
     id: int
     name: str
+    #: Root of the stage family, so a list can group a split qualification back
+    #: into one entry. Null when this qualification was never split.
+    parent_qualification_id: int | None = None
     num_groups: int = 1
     schedule_period: str = "day"
 

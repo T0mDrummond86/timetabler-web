@@ -4,9 +4,14 @@
  * staged qualifications are already written by hand ("… Stg1", "… Stg2"). The
  * dialog therefore asks for the two things a qualification needs — a name and
  * a group count — plus which classes belong to it.
+ *
+ * Assignment is one row per class with a stage dropdown, rather than a button
+ * per stage on every row: the row count then depends only on how many classes
+ * there are, so six stages read exactly as calmly as two.
  */
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
+import { stripStageSuffix } from "../stageFamily";
 import type { StageSplitPreview } from "../types";
 
 type Props = {
@@ -18,12 +23,12 @@ type Props = {
 
 type StageDraft = { name: string; numGroups: number; unitIds: Set<number> };
 
-const MAX_STAGES = 8;
+const MAX_STAGES = 6;
 
 function defaultStages(baseName: string, count: number, groups: number): StageDraft[] {
   // Strip any stage suffix the name already carries, so splitting
   // "Cert IV Cyber Stg1" doesn't produce "Cert IV Cyber Stg1 Stg1".
-  const stem = baseName.replace(/\s*St(?:a?ge?)?\s*\d+\s*$/i, "").trim() || baseName;
+  const stem = stripStageSuffix(baseName);
   return Array.from({ length: count }, (_, i) => ({
     name: `${stem} Stg${i + 1}`,
     numGroups: groups,
@@ -66,7 +71,12 @@ export function StageSplitDialog({ sessionId, qualificationId, onClose, onSplit 
       const next = defaultStages(preview?.name ?? "", count, preview?.num_groups || 1);
       // Keep what has already been assigned where the stage still exists.
       for (let i = 0; i < Math.min(prev.length, count); i++) {
-        next[i] = { ...next[i], name: prev[i].name, numGroups: prev[i].numGroups, unitIds: prev[i].unitIds };
+        next[i] = {
+          ...next[i],
+          name: prev[i].name,
+          numGroups: prev[i].numGroups,
+          unitIds: prev[i].unitIds,
+        };
       }
       return next;
     });
@@ -83,7 +93,12 @@ export function StageSplitDialog({ sessionId, qualificationId, onClose, onSplit 
     );
   }
 
-  const unassigned = (preview?.classes ?? []).filter((c) => !stageOfUnit.has(c.id));
+  function editStage(index: number, patch: Partial<StageDraft>) {
+    setStages((prev) => prev.map((s, j) => (j === index ? { ...s, ...patch } : s)));
+  }
+
+  const classes = preview?.classes ?? [];
+  const unassignedCount = classes.filter((c) => !stageOfUnit.has(c.id)).length;
 
   async function submit() {
     setBusy(true);
@@ -134,86 +149,90 @@ export function StageSplitDialog({ sessionId, qualificationId, onClose, onSplit 
               </select>
             </label>
 
-            <div className="stage-split-grid">
-              {stages.map((stage, i) => (
-                <section key={i} className="stage-split-col">
-                  <input
-                    className="stage-split-name"
-                    value={stage.name}
-                    disabled={busy}
-                    aria-label={`Stage ${i + 1} name`}
-                    onChange={(e) =>
-                      setStages((prev) =>
-                        prev.map((s, j) => (j === i ? { ...s, name: e.target.value } : s)),
-                      )
-                    }
-                  />
-                  <label className="stage-split-groups">
-                    <span>Groups</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={26}
-                      value={stage.numGroups}
-                      disabled={busy}
-                      onChange={(e) =>
-                        setStages((prev) =>
-                          prev.map((s, j) =>
-                            j === i ? { ...s, numGroups: Math.max(1, Number(e.target.value) || 1) } : s,
-                          ),
-                        )
-                      }
-                    />
-                  </label>
-                  <ul className="stage-split-classes">
-                    {(preview.classes ?? [])
-                      .filter((c) => stageOfUnit.get(c.id) === i)
-                      .map((c) => (
-                        <li key={c.id}>
-                          <button
-                            type="button"
-                            className="stage-split-chip"
-                            disabled={busy}
-                            title="Remove from this stage"
-                            onClick={() => assign(c.id, null)}
-                          >
-                            {c.name} ✕
-                          </button>
-                        </li>
-                      ))}
-                    {!stages[i].unitIds.size && <li className="muted stage-split-empty">No classes yet</li>}
-                  </ul>
-                </section>
-              ))}
-            </div>
+            <table className="stage-split-table stage-split-stages">
+              <thead>
+                <tr>
+                  <th>Stage</th>
+                  <th>Name</th>
+                  <th className="stage-split-num">Groups</th>
+                  <th className="stage-split-num">Classes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stages.map((stage, i) => (
+                  <tr key={i}>
+                    <td className="stage-split-index">{i + 1}</td>
+                    <td>
+                      <input
+                        className="stage-split-name"
+                        value={stage.name}
+                        disabled={busy}
+                        aria-label={`Stage ${i + 1} name`}
+                        onChange={(e) => editStage(i, { name: e.target.value })}
+                      />
+                    </td>
+                    <td className="stage-split-num">
+                      <input
+                        type="number"
+                        className="stage-split-groups-input"
+                        min={1}
+                        max={26}
+                        value={stage.numGroups}
+                        disabled={busy}
+                        aria-label={`Stage ${i + 1} groups`}
+                        onChange={(e) =>
+                          editStage(i, { numGroups: Math.max(1, Number(e.target.value) || 1) })
+                        }
+                      />
+                    </td>
+                    <td className="stage-split-num muted">{stage.unitIds.size}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
             <div className="stage-split-pool">
               <h3 className="stage-split-pool-title">
-                Unassigned classes
-                <span className="muted"> — click a stage to place each one</span>
+                Classes
+                <span className="muted"> — choose the stage each one belongs to</span>
               </h3>
-              {!unassigned.length && <p className="muted">All classes assigned.</p>}
-              <ul className="stage-split-pool-list">
-                {unassigned.map((c) => (
-                  <li key={c.id} className="stage-split-pool-row">
-                    <span className="stage-split-pool-name">{c.name}</span>
-                    {stages.map((s, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        className="btn-secondary btn-xs"
-                        disabled={busy}
-                        onClick={() => assign(c.id, i)}
-                      >
-                        {s.name.trim() || `Stage ${i + 1}`}
-                      </button>
-                    ))}
-                  </li>
-                ))}
-              </ul>
-              {!!unassigned.length && (
+              <table className="stage-split-table stage-split-classes-table">
+                <tbody>
+                  {classes.map((c) => {
+                    const at = stageOfUnit.get(c.id);
+                    return (
+                      <tr key={c.id} className={at == null ? "stage-split-row--unassigned" : ""}>
+                        <td className="stage-split-class-name">{c.name}</td>
+                        <td className="stage-split-num">
+                          <select
+                            className="field-select stage-split-pick"
+                            value={at ?? ""}
+                            disabled={busy}
+                            aria-label={`Stage for ${c.name}`}
+                            onChange={(e) =>
+                              assign(c.id, e.target.value === "" ? null : Number(e.target.value))
+                            }
+                          >
+                            <option value="">Unassigned</option>
+                            {stages.map((_, i) => (
+                              // Numbers, not names: the stage names run to 70-odd
+                              // characters here and truncate to nothing useful.
+                              // The table above is the number-to-name key.
+                              <option key={i} value={i}>
+                                Stage {i + 1}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {!!unassignedCount && (
                 <p className="muted stage-split-note">
-                  Anything left here stays with the first stage.
+                  {unassignedCount} class(es) still unassigned — anything left that way stays with
+                  the first stage.
                 </p>
               )}
             </div>
