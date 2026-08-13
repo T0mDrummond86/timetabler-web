@@ -13,6 +13,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -115,6 +116,10 @@ class GlobalSession(Base):
     created_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("user_account.id", ondelete="SET NULL"), nullable=True
     )
+    #: One user's private tutorial group. Practice with the global features
+    #: writes real rows — cover log entries, calendar weeks — so a sandbox gets
+    #: a workspace of its own rather than the one the timetable team relies on.
+    is_tutorial: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     created_at: Mapped[_dt.datetime] = mapped_column(
         DateTime,
         default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),

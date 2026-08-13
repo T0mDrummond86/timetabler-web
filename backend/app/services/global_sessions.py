@@ -12,6 +12,7 @@ from timetable.core.tenancy_models import GlobalSession, GlobalSessionMember, Ti
 
 from .class_custodians import class_custodians_for_session, qualification_names_by_unit
 from .qualification_stages import family_title
+from .tutorial.lifecycle import is_tutorial_sandbox
 from .timetable_grid import get_repeating_week
 
 
@@ -177,6 +178,20 @@ def set_global_members(
             )
             .first()
         )
+        # A sandbox belongs in its owner's tutorial group and nowhere else. The
+        # tutorials write real cover-log entries and calendar weeks, so letting
+        # one join a working group would put practice data in the records the
+        # timetable team relies on.
+        if is_tutorial_sandbox(ts) != bool(global_session.is_tutorial):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"{ts.name!r} is a tutorial sandbox and can only belong to a "
+                    "tutorial group"
+                    if is_tutorial_sandbox(ts)
+                    else f"{ts.name!r} is a real timetable and cannot join a tutorial group"
+                ),
+            )
         if other is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

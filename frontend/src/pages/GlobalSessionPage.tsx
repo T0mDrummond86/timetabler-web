@@ -87,6 +87,9 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "calendar", label: "Calendar" },
 ];
 
+/** Matches TUTORIAL_PREFIX in app/services/tutorial/lifecycle.py. */
+const TUTORIAL_SESSION_PREFIX = "Tutorial sandbox — ";
+
 export function GlobalSessionPage() {
   const { globalSessionId: idParam } = useParams();
   const globalSessionId = Number(idParam);
@@ -388,16 +391,23 @@ export function GlobalSessionPage() {
             {allSessions.map((s) => {
               const inOther =
                 s.global_session_id != null && s.global_session_id !== globalSessionId;
+              // A tutorial sandbox belongs in a tutorial workspace and nowhere
+              // else: the tutorials write real cover-log and calendar rows, and
+              // those must never land in a working group. The API refuses it
+              // either way; showing why beats an error on save.
+              const isSandbox = s.name.startsWith(TUTORIAL_SESSION_PREFIX);
+              const wrongKind = isSandbox !== !!global?.is_tutorial;
+              const blocked = inOther || wrongKind;
               const linked = selectedMemberIds.includes(s.id);
               if (!canLinkSessions && !linked) return null;
               return (
                 <li key={s.id}>
                   {canLinkSessions ? (
-                    <label className={inOther ? "global-member-disabled" : "checkbox"}>
+                    <label className={blocked ? "global-member-disabled" : "checkbox"}>
                       <input
                         type="checkbox"
                         checked={linked}
-                        disabled={inOther}
+                        disabled={blocked}
                         onChange={() => toggleMember(s.id)}
                       />
                       <span>
@@ -407,6 +417,13 @@ export function GlobalSessionPage() {
                         )}
                         {inOther && (
                           <span className="muted"> — in {s.global_session_name}</span>
+                        )}
+                        {!inOther && wrongKind && (
+                          <span className="muted">
+                            {isSandbox
+                              ? " — tutorial sandboxes stay in tutorial groups"
+                              : " — a tutorial group takes tutorial sandboxes only"}
+                          </span>
                         )}
                       </span>
                     </label>

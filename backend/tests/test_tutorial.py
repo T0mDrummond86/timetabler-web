@@ -27,10 +27,20 @@ from timetable.core.clash_check_settings import (  # noqa: E402
 )
 from timetable.core.models import Base, Booking, Course, Semester, Unit, Week  # noqa: E402
 from timetable.core.pending_classes import pending_classes_for_course  # noqa: E402
-from timetable.core.tenancy_models import Organization, TimetableSession  # noqa: E402
+from timetable.core.tenancy_models import (  # noqa: E402
+    GlobalSession,
+    GlobalSessionMember,
+    GlobalSessionUserAccess,
+    Organization,
+    TimetableSession,
+    User,
+)
 from timetable.core.validation import validate_bookings  # noqa: E402
 from timetable.io.backup_payload import PAYLOAD_VERSION  # noqa: E402
 
+from fastapi import HTTPException  # noqa: E402
+
+from app.services.global_sessions import set_global_members  # noqa: E402
 from app.services.session_data import restore_session, serialize_session  # noqa: E402
 from app.services.session_seed import seed_timetable_session_data  # noqa: E402
 from app.services.tutorial.dataset import (  # noqa: E402
@@ -39,6 +49,7 @@ from app.services.tutorial.dataset import (  # noqa: E402
     build_tutorial_payload,
     tutorial_clash_settings_json,
 )
+from app.services.tutorial.lifecycle import start_tutorial, tutorial_group_id  # noqa: E402
 
 
 @pytest.fixture()
@@ -273,3 +284,135 @@ def test_tutorial_works_in_production(client, monkeypatch):
     assert resp.status_code == 201, resp.text
     sid = resp.json()["session"]["id"]
     assert client.post(f"/sessions/{sid}/tutorial-reset", headers=headers).status_code == 200
+
+
+class TestTutorialGlobalGroup:
+    """The sandbox gets a workspace of its own, and cannot leave it.
+
+    The tutorials teach the global features, and those write real rows — cover
+    log entries, calendar weeks. The whole point of the separate group is that
+    practice never lands in the records the timetable team relies on.
+    """
+
+    def _user(self, db, username: str) -> User:
+        row = User(
+            username=username,
+            name=username,
+            password_hash="x",
+            is_admin=False,
+        )
+        db.add(row)
+        db.flush()
+        return row
+
+    def _org(self, db) -> Organization:
+        org = Organization(name="Test Org", slug="test-org")
+        db.add(org)
+        db.flush()
+        return org
+
+    def test_start_puts_the_sandbox_in_its_own_tutorial_group(self, db):
+        org = self._org(db)
+        user = self._user(db, "tester")
+        db.commit()
+
+        row, created = start_tutorial(db, organization_id=org.id, user=user)
+
+        assert created
+        group_id = tutorial_group_id(db, row.id)
+        assert group_id is not None
+        group = db.get(GlobalSession, group_id)
+        assert group.is_tutorial is True
+        assert group.created_by_id == user.id
+
+    def test_two_users_get_separate_groups(self, db):
+        org = self._org(db)
+        a, b = self._user(db, "ann"), self._user(db, "bo")
+        db.commit()
+
+        row_a, _ = start_tutorial(db, organization_id=org.id, user=a)
+        row_b, _ = start_tutorial(db, organization_id=org.id, user=b)
+
+        assert tutorial_group_id(db, row_a.id) != tutorial_group_id(db, row_b.id)
+
+    def test_starting_again_reuses_the_same_group(self, db):
+        org = self._org(db)
+        user = self._user(db, "tester")
+        db.commit()
+
+        first, _ = start_tutorial(db, organization_id=org.id, user=user)
+        first_group = tutorial_group_id(db, first.id)
+        again, created = start_tutorial(db, organization_id=org.id, user=user)
+
+        assert not created
+        assert again.id == first.id
+        assert tutorial_group_id(db, again.id) == first_group
+        assert db.query(GlobalSession).filter_by(is_tutorial=True).count() == 1
+
+    def test_the_owner_is_granted_access_to_their_group(self, db):
+        org = self._org(db)
+        user = self._user(db, "tester")
+        db.commit()
+
+        row, _ = start_tutorial(db, organization_id=org.id, user=user)
+
+        # Non-admins see only workspaces they hold an explicit grant on, so
+        # without this the owner could not open their own tutorial group.
+        grant = (
+            db.query(GlobalSessionUserAccess)
+            .filter_by(global_session_id=tutorial_group_id(db, row.id), user_id=user.id)
+            .first()
+        )
+        assert grant is not None
+
+    def test_a_sandbox_in_the_working_group_is_moved_out_on_next_start(self, db):
+        org = self._org(db)
+        user = self._user(db, "tester")
+        working = GlobalSession(organization_id=org.id, name="IT", created_by_id=user.id)
+        db.add(working)
+        db.flush()
+        row, _ = start_tutorial(db, organization_id=org.id, user=user)
+        # Simulate a sandbox created before tutorial groups existed.
+        member = (
+            db.query(GlobalSessionMember).filter_by(timetable_session_id=row.id).one()
+        )
+        member.global_session_id = working.id
+        db.commit()
+
+        start_tutorial(db, organization_id=org.id, user=user)
+
+        moved = db.get(GlobalSession, tutorial_group_id(db, row.id))
+        assert moved.is_tutorial is True
+        assert moved.id != working.id
+
+    def test_a_sandbox_cannot_be_linked_into_a_working_group(self, db):
+        org = self._org(db)
+        user = self._user(db, "tester")
+        working = GlobalSession(organization_id=org.id, name="IT", created_by_id=user.id)
+        db.add(working)
+        db.flush()
+        row, _ = start_tutorial(db, organization_id=org.id, user=user)
+        db.commit()
+
+        with pytest.raises(HTTPException) as exc:
+            set_global_members(
+                db, global_session=working, timetable_session_ids=[row.id]
+            )
+        assert exc.value.status_code == 409
+        assert "tutorial" in str(exc.value.detail).lower()
+
+    def test_a_real_timetable_cannot_be_linked_into_a_tutorial_group(self, db):
+        org = self._org(db)
+        user = self._user(db, "tester")
+        db.commit()
+        row, _ = start_tutorial(db, organization_id=org.id, user=user)
+        group = db.get(GlobalSession, tutorial_group_id(db, row.id))
+        real = TimetableSession(organization_id=org.id, name="Joondalup IT")
+        db.add(real)
+        db.commit()
+
+        with pytest.raises(HTTPException) as exc:
+            set_global_members(
+                db, global_session=group, timetable_session_ids=[row.id, real.id]
+            )
+        assert exc.value.status_code == 409

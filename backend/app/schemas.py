@@ -132,11 +132,15 @@ class TutorialStartOut(BaseModel):
     session: TimetableSessionOut
     created: bool
     entities: dict[str, dict[str, int]]
+    #: The sandbox's own global workspace, so tutorials covering the global
+    #: features have somewhere to send the user that is not the working group.
+    global_session_id: int | None = None
 
 
 class TutorialInfoOut(BaseModel):
     is_tutorial: bool
     entities: dict[str, dict[str, int]]
+    global_session_id: int | None = None
 
 
 class TimetableSessionCreate(BaseModel):
@@ -176,6 +180,8 @@ class GlobalSessionOut(BaseModel):
     id: int
     organization_id: int
     name: str
+    #: A private tutorial workspace; only tutorial sandboxes may be linked in.
+    is_tutorial: bool = False
     created_at: datetime
     updated_at: datetime
     member_sessions: list[TimetableSessionLinkOut] = Field(default_factory=list)

@@ -1,6 +1,7 @@
 """Global session CRUD and aggregated entity views."""
 from __future__ import annotations
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
@@ -68,6 +69,7 @@ def _global_out(row: GlobalSession, db: Session) -> GlobalSessionOut:
         id=row.id,
         organization_id=row.organization_id,
         name=row.name,
+        is_tutorial=bool(row.is_tutorial),
         created_at=row.created_at,
         updated_at=row.updated_at,
         member_sessions=[
@@ -89,6 +91,14 @@ def list_global_sessions(
     if ctx.organization.id != org_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong organization")
     q = db.query(GlobalSession).filter(GlobalSession.organization_id == org_id)
+    # Tutorial groups are private to their owner. Admins can see every other
+    # workspace, but one tutorial group per user would bury the real ones.
+    q = q.filter(
+        sa.or_(
+            GlobalSession.is_tutorial.is_(False),
+            GlobalSession.created_by_id == ctx.user.id,
+        )
+    )
     visible = visible_global_session_ids(ctx.user, org_id, db)
     if visible is not None:
         if not visible:

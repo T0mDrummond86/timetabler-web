@@ -146,17 +146,22 @@ export type TutorialStart = {
   session: TimetableSession;
   created: boolean;
   entities: TutorialEntityMap;
+  /** The sandbox's own global workspace — never the working one. */
+  global_session_id?: number | null;
 };
 
 export type TutorialInfo = {
   is_tutorial: boolean;
   entities: Partial<TutorialEntityMap>;
+  global_session_id?: number | null;
 };
 
 export type GlobalSession = {
   id: number;
   organization_id: number;
   name: string;
+  /** A private tutorial workspace; only tutorial sandboxes may be linked in. */
+  is_tutorial?: boolean;
   created_at: string;
   updated_at: string;
   member_sessions: { id: number; name: string }[];

@@ -12,6 +12,7 @@ from ..services.tutorial.lifecycle import (
     is_tutorial_session,
     reset_tutorial,
     start_tutorial,
+    tutorial_group_id,
 )
 from .sessions import _session_in_org, _session_out_with_stats
 
@@ -36,6 +37,7 @@ def start_tutorial_session(
         session=_session_out_with_stats(row, db),
         created=created,
         entities=entity_map(db, row.id),
+        global_session_id=tutorial_group_id(db, row.id),
     )
 
 
@@ -57,6 +59,7 @@ def reset_tutorial_session(
         session=_session_out_with_stats(row, db),
         created=False,
         entities=entity_map(db, row.id),
+        global_session_id=tutorial_group_id(db, row.id),
     )
 
 
@@ -72,4 +75,5 @@ def tutorial_info(
     return TutorialInfoOut(
         is_tutorial=is_tut,
         entities=entity_map(db, row.id) if is_tut else {},
+        global_session_id=tutorial_group_id(db, row.id) if is_tut else None,
     )

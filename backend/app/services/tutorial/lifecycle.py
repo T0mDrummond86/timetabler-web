@@ -6,13 +6,26 @@ existing per-user visibility rules keep it private and normal session CRUD
 name carries the tutorial prefix AND the requesting user created it — the
 destructive reset endpoint refuses anything else, so it can never wipe a real
 timetable. Works in production (unlike the dev-only demo seed).
+
+Each user also gets a global workspace of their own for the sandbox to sit in.
+The global features — the cover log, the shared calendar, the cross-session
+views — write real rows, and a tutorial that teaches them has to write real
+rows too. Pointed at the working group, practice would land in the records the
+timetable team relies on, so the sandbox is given somewhere private to make a
+mess.
 """
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
 from timetable.core.models import Course, Qualification, Room, Staff, Unit
-from timetable.core.tenancy_models import TimetableSession, User
+from timetable.core.tenancy_models import (
+    GlobalSession,
+    GlobalSessionMember,
+    GlobalSessionUserAccess,
+    TimetableSession,
+    User,
+)
 
 from ..session_data import restore_session
 from ..session_seed import seed_timetable_session_data
@@ -20,10 +33,105 @@ from ..violation_cache import invalidate_session_violations
 from .dataset import build_tutorial_payload, tutorial_clash_settings_json
 
 TUTORIAL_PREFIX = "Tutorial sandbox — "
+TUTORIAL_GROUP_PREFIX = "Tutorial group — "
 
 
 def tutorial_session_name(user: User) -> str:
     return f"{TUTORIAL_PREFIX}{user.username}"
+
+
+def tutorial_group_name(user: User) -> str:
+    return f"{TUTORIAL_GROUP_PREFIX}{user.username}"
+
+
+def tutorial_global_session(
+    db: Session, *, organization_id: int, user: User
+) -> GlobalSession:
+    """The user's own tutorial workspace, created on first use.
+
+    Created lazily rather than at registration: a user who never opens the
+    tutorial never needs one, and finding-or-creating here means accounts that
+    predate this get theirs the moment they start a tutorial.
+    """
+    row = (
+        db.query(GlobalSession)
+        .filter(
+            GlobalSession.organization_id == organization_id,
+            GlobalSession.is_tutorial.is_(True),
+            GlobalSession.created_by_id == user.id,
+        )
+        .first()
+    )
+    if row is None:
+        row = GlobalSession(
+            organization_id=organization_id,
+            name=tutorial_group_name(user),
+            created_by_id=user.id,
+            is_tutorial=True,
+        )
+        db.add(row)
+        db.flush()
+
+    # Admins see every workspace, but everyone else needs an explicit grant —
+    # without one the owner could not open their own tutorial group.
+    granted = (
+        db.query(GlobalSessionUserAccess)
+        .filter(
+            GlobalSessionUserAccess.global_session_id == row.id,
+            GlobalSessionUserAccess.user_id == user.id,
+        )
+        .first()
+    )
+    if granted is None:
+        db.add(
+            GlobalSessionUserAccess(
+                global_session_id=row.id,
+                user_id=user.id,
+                granted_by_id=user.id,
+            )
+        )
+        db.flush()
+    return row
+
+
+def place_in_tutorial_group(
+    db: Session, *, session_row: TimetableSession, user: User
+) -> GlobalSession:
+    """Put the sandbox in its owner's tutorial workspace, moving it if need be.
+
+    A timetable session belongs to at most one global group, so moving is a
+    matter of repointing the single membership row. Enforced on every tutorial
+    start, not only at creation: a sandbox that predates this — or one somebody
+    linked into the working group by hand — is corrected the next time the
+    tutorial is opened.
+    """
+    group = tutorial_global_session(
+        db, organization_id=session_row.organization_id, user=user
+    )
+    membership = (
+        db.query(GlobalSessionMember)
+        .filter(GlobalSessionMember.timetable_session_id == session_row.id)
+        .first()
+    )
+    if membership is None:
+        db.add(
+            GlobalSessionMember(
+                global_session_id=group.id, timetable_session_id=session_row.id
+            )
+        )
+    elif membership.global_session_id != group.id:
+        membership.global_session_id = group.id
+    db.flush()
+    return group
+
+
+def is_tutorial_sandbox(row: TimetableSession | None) -> bool:
+    """Whether this session is somebody's sandbox, without asking whose.
+
+    The ownership check belongs on destructive operations; this one is for
+    rules that hold for every sandbox, such as never joining a working group.
+    """
+    return row is not None and row.name.startswith(TUTORIAL_PREFIX)
 
 
 def is_tutorial_session(row: TimetableSession | None, user: User) -> bool:
@@ -54,6 +162,11 @@ def start_tutorial(
         .first()
     )
     if existing is not None:
+        # Placed on every start, not just at creation: sandboxes made before
+        # tutorial groups existed are moved into theirs the first time the
+        # tutorial is opened again.
+        place_in_tutorial_group(db, session_row=existing, user=user)
+        db.commit()
         return existing, False
 
     row = TimetableSession(
@@ -66,10 +179,21 @@ def start_tutorial(
     seed_timetable_session_data(db, row)
     restore_session(db, row.id, build_tutorial_payload())
     row.clash_check_settings_json = tutorial_clash_settings_json()
+    place_in_tutorial_group(db, session_row=row, user=user)
     db.commit()
     invalidate_session_violations(db, row.id)
     db.refresh(row)
     return row, True
+
+
+def tutorial_group_id(db: Session, timetable_session_id: int) -> int | None:
+    """The global workspace this sandbox sits in, for the tutorial to link to."""
+    row = (
+        db.query(GlobalSessionMember)
+        .filter(GlobalSessionMember.timetable_session_id == timetable_session_id)
+        .first()
+    )
+    return row.global_session_id if row else None
 
 
 def reset_tutorial(db: Session, row: TimetableSession) -> None:
