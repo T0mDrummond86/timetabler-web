@@ -7,7 +7,34 @@
  */
 import { api } from "../../api";
 import type { TutorialModule } from "../types";
-import { holdingUnitNames, urlIntParam, urlTab, urlView } from "../verifyHelpers";
+import {
+  courseBookings,
+  holdingUnitNames,
+  urlIntParam,
+  urlTab,
+  urlView,
+} from "../verifyHelpers";
+
+/** A course's placed card for this class, matched on name the way the chips are. */
+async function placedCard(
+  ctx: Parameters<typeof holdingUnitNames>[0],
+  courseCode: string,
+  needle: string,
+) {
+  const cards = await courseBookings(ctx, courseCode);
+  return cards.find((b) =>
+    (b.unit_name ?? "").toLowerCase().includes(needle.toLowerCase()),
+  );
+}
+
+/** True when no hard warning names this card. */
+async function cardIsClashFree(
+  ctx: Parameters<typeof holdingUnitNames>[0],
+  bookingId: number,
+): Promise<boolean> {
+  const report = await api.violationsReport(ctx.sessionId, "hard");
+  return !report.rows.some((row) => (row.booking_ids ?? []).includes(bookingId));
+}
 
 /** How many of a course's holding-area chips carry this class name. */
 async function holdingCount(
@@ -51,10 +78,10 @@ export const m7Capstone: TutorialModule = {
       id: "split-for-capstone",
       title: "Put a lecturer's week beside it",
       body:
-        "Before placing anything, open Split Layout ▾ → 2-way side-by-side. Keep CYB-T in one pane and switch the other to Staff view.\n\nThat second pane is what stops you creating a clash: as you drop a class, the lecturer's week redraws instantly and you see whether they were already busy.",
+        "Before placing anything, open Split Layout ▾ → 2-way side-by-side. Keep CYB-T in one pane and switch the other to Staff view.\n\nThat second pane is what stops you creating a clash: as you drop a class, the lecturer's week redraws instantly and you see whether they were already busy.\n\nOne thing to know: the split screen has no holding area. You place each class from the holding area in the normal timetable view, then come back here — or keep both open in separate browser tabs — to check the lecturer as you go.",
       advance: "next",
       target: "split-layout",
-      hint: "Split Layout ▾ is in the top toolbar. In the new pane, set View to Staff and pick a lecturer.",
+      hint: "Split Layout ▾ is in the top toolbar. In the new pane, set View to Staff and pick a lecturer. Use 'Back to single view' to reach the holding area again.",
     },
     {
       id: "place-netsec",
@@ -73,8 +100,15 @@ export const m7Capstone: TutorialModule = {
         "Now place Workplace Communication. This one is about who takes it: watch your Staff pane as you choose.\n\nIf you pick someone already teaching at that hour you'll get a red double-booking — either move the class or choose a lecturer who is free. Cathy Freeman and Nelson Mandela are the likely candidates.",
       advance: "verify",
       watch: { api: /\/bookings/ },
-      verify: async (ctx) => (await holdingCount(ctx, "CYB-T", "Workplace Communication")) === 0,
-      hint: "Drop it on a clear CYB-T slot, then set the lecturer. If the card turns red, check the Warnings tab — it names the clash.",
+      // Placing the card is only half of it — this step is about who takes the
+      // class, so it is not done until someone is on it and they are free.
+      verify: async (ctx) => {
+        const card = await placedCard(ctx, "CYB-T", "Workplace Communication");
+        if (!card) return false;
+        if (!(card.staff_name ?? "").trim()) return false;
+        return cardIsClashFree(ctx, card.id);
+      },
+      hint: "Drop it on a clear CYB-T slot, then double-click it and set the Lecturer. If the card turns red, the lecturer is already teaching then — pick another, or move the class.",
     },
     {
       id: "place-incident",
