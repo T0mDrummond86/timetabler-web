@@ -53,7 +53,7 @@ def test_register_login_and_sessions(client: TestClient):
         "/auth/register",
         json={
             "username": "alice",
-            "password": "password123",
+            "password": "password123-amber-cedar",
             "name": "Alice",
             "organization_name": "Joondalup Campus",
         },

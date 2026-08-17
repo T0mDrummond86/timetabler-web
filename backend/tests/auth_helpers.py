@@ -20,7 +20,7 @@ def register_test_user(
     client: TestClient,
     *,
     username: str,
-    password: str = "password123",
+    password: str = "password123-amber-cedar",
     name: str = "Test User",
     organization_name: str = "Test Org",
 ) -> tuple[str, int, int]:
@@ -48,7 +48,7 @@ def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def seed_admin_user(db: Session, *, username: str = "admin", password: str = "password123") -> User:
+def seed_admin_user(db: Session, *, username: str = "admin", password: str = "password123-amber-cedar") -> User:
     org = Organization(name="Admin Org", slug=unique_org_slug(db, "Admin Org"))
     user = User(
         username=username,

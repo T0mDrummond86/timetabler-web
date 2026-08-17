@@ -56,7 +56,7 @@ def _auth_headers(client: TestClient, username: str, org_name: str) -> tuple[dic
         "/auth/register",
         json={
             "email": email,
-            "password": "password123",
+            "password": "password123-amber-cedar",
             "name": "LAP Tester",
             "organization_name": org_name,
         },

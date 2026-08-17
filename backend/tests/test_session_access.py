@@ -122,7 +122,7 @@ class _World:
     def _user(self, username, *, is_admin=False, role="editor") -> User:
         u = User(
             username=username,
-            password_hash=hash_password("password123"),
+            password_hash=hash_password("password123-amber-cedar"),
             name=username.title(),
             is_admin=is_admin,
             is_active=True,

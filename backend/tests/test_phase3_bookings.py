@@ -54,7 +54,7 @@ def _seed_session(client: TestClient) -> tuple[str, int, int]:
         "/auth/register",
         json={
             "username": "edit",
-            "password": "password123",
+            "password": "password123-amber-cedar",
             "name": "Editor",
             "organization_name": "Edit Org",
         },

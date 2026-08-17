@@ -3,8 +3,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, AdminUser, getToken, GlobalSessionAccess, GlobalSessionSummary } from "../api";
 import { AppShell } from "../components/AppShell";
 import { LoadingMark } from "../components/LoadingMark";
+import { generatePassphrase } from "../lib/generatedPassphrase";
 
-const DEFAULT_USER_PASSWORD = "tafetabler";
+/** Shown to the admin once, after creating or resetting an account. */
+type HandoverPassphrase = { username: string; passphrase: string };
 
 export function AdminPage() {
   const navigate = useNavigate();
@@ -14,6 +16,7 @@ export function AdminPage() {
   const [globalAccess, setGlobalAccess] = useState<GlobalSessionAccess[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [handover, setHandover] = useState<HandoverPassphrase | null>(null);
   const [newUsername, setNewUsername] = useState("");
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -74,12 +77,17 @@ export function AdminPage() {
     setCreating(true);
     setError(null);
     try {
+      // One generated passphrase per account, rather than a shared default.
+      // A default printed on this page meant every new account had a known
+      // password until its owner first signed in.
+      const passphrase = generatePassphrase();
       const row = await api.adminCreateUser({
         username: newUsername.trim(),
-        password: DEFAULT_USER_PASSWORD,
+        password: passphrase,
         name: newName.trim(),
       });
       setUsers((prev) => [...prev, row].sort((a, b) => a.username.localeCompare(b.username)));
+      setHandover({ username: row.username, passphrase });
       setNewUsername("");
       setNewName("");
     } catch (err) {
@@ -102,8 +110,10 @@ export function AdminPage() {
   async function resetPassword(user: AdminUser) {
     setError(null);
     try {
-      const updated = await api.adminPatchUser(user.id, { password: DEFAULT_USER_PASSWORD });
+      const passphrase = generatePassphrase();
+      const updated = await api.adminPatchUser(user.id, { password: passphrase });
       setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+      setHandover({ username: updated.username, passphrase });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Password reset failed");
     }
@@ -188,9 +198,34 @@ export function AdminPage() {
           <section className="card dashboard-card">
             <h2>Users</h2>
             <p className="muted">
-              New users are created with default password <code>{DEFAULT_USER_PASSWORD}</code> and
-              must change it on first sign-in.
+              Creating an account generates a one-off passphrase, shown here once for you to pass
+              on. The user must change it at first sign-in, and set up two-factor at the same time.
             </p>
+            {handover && (
+              <div className="card handover-card">
+                <p>
+                  Passphrase for <strong>{handover.username}</strong> — copy it now, it is not
+                  shown again:
+                </p>
+                <code className="handover-passphrase">{handover.passphrase}</code>
+                <div className="row gap">
+                  <button
+                    type="button"
+                    className="btn-secondary btn-xs"
+                    onClick={() => void navigator.clipboard.writeText(handover.passphrase)}
+                  >
+                    Copy
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-xs"
+                    onClick={() => setHandover(null)}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
             <form className="dashboard-create-form" onSubmit={(e) => void createUser(e)}>
               <input
                 className="field-input"

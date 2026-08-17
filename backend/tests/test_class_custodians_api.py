@@ -61,7 +61,7 @@ def test_class_custodians_includes_qualifications(client):
         "/auth/register",
         json={
             "username": "cust",
-            "password": "password123",
+            "password": "password123-amber-cedar",
             "name": "Tester",
             "organization_name": "Test Org",
         },

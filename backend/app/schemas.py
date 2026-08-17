@@ -6,6 +6,29 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from .services.password_policy import (
+    MAX_LENGTH as PASSWORD_MAX_LENGTH,
+    MIN_LENGTH as PASSWORD_MIN_LENGTH,
+    PasswordPolicyError,
+    validate_password,
+)
+
+
+def _check_password(value: str | None) -> str | None:
+    """Shared passphrase validator for every field that sets one.
+
+    Field(min_length=...) alone would only enforce length; the policy also
+    screens common and self-referential choices, and its message is what the
+    user should read.
+    """
+    if value is None:
+        return None
+    try:
+        validate_password(value)
+    except PasswordPolicyError as exc:
+        raise ValueError(str(exc)) from exc
+    return value
+
 
 class LoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=80)
@@ -24,9 +47,14 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     """Legacy self-registration — disabled by default; admin creates accounts instead."""
     username: str = Field(min_length=3, max_length=80)
-    password: str = Field(min_length=8, max_length=128)
+    password: str
     name: str = Field(default="", max_length=200)
     organization_name: str = Field(min_length=1, max_length=200)
+
+    @field_validator("password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        return _check_password(v) or v
 
     @field_validator("username")
     @classmethod
@@ -104,14 +132,26 @@ class UserOut(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
-    new_password: str = Field(min_length=8, max_length=128)
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        return _check_password(v) or v
 
 
 class AdminUserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=80)
-    password: str = Field(min_length=8, max_length=128, description="Initial password; user must change on first sign-in")
+    password: str = Field(
+        description="Initial passphrase; the user must change it on first sign-in"
+    )
     name: str = Field(default="", max_length=200)
     role: str = Field(default="editor", pattern="^(editor|viewer)$")
+
+    @field_validator("password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        return _check_password(v) or v
 
     @field_validator("username")
     @classmethod
@@ -122,8 +162,13 @@ class AdminUserCreate(BaseModel):
 class AdminUserPatch(BaseModel):
     name: str | None = Field(default=None, max_length=200)
     is_active: bool | None = None
-    password: str | None = Field(default=None, min_length=8, max_length=128)
+    password: str | None = None
     role: str | None = Field(default=None, pattern="^(editor|viewer)$")
+
+    @field_validator("password")
+    @classmethod
+    def check_password(cls, v: str | None) -> str | None:
+        return _check_password(v)
 
 
 class AdminUserOut(BaseModel):

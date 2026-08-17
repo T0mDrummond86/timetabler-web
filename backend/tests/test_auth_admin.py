@@ -66,7 +66,7 @@ def test_public_register_disabled(client):
         "/auth/register",
         json={
             "username": "newbie",
-            "password": "password123",
+            "password": "password123-amber-cedar",
             "name": "New",
             "organization_name": "Org",
         },
@@ -85,13 +85,13 @@ def test_admin_creates_user_and_grants_global_access(client):
     create_user = c.post(
         "/admin/users",
         headers=headers,
-        json={"username": "editor1", "password": "password123", "name": "Editor One"},
+        json={"username": "editor1", "password": "password123-amber-cedar", "name": "Editor One"},
     )
     assert create_user.status_code == 201, create_user.text
     assert create_user.json()["must_change_password"] is True
     editor_id = create_user.json()["id"]
 
-    login = c.post("/auth/login", json={"username": "editor1", "password": "password123"})
+    login = c.post("/auth/login", json={"username": "editor1", "password": "password123-amber-cedar"})
     assert login.status_code == 200
     editor_headers = auth_headers(login.json()["access_token"])
 
@@ -102,7 +102,7 @@ def test_admin_creates_user_and_grants_global_access(client):
     changed = c.post(
         "/auth/change-password",
         headers=editor_headers,
-        json={"current_password": "password123", "new_password": "newpassword99"},
+        json={"current_password": "password123-amber-cedar", "new_password": "newpassword99-amber-cedar"},
     )
     assert changed.status_code == 200, changed.text
     assert changed.json()["must_change_password"] is False
@@ -111,10 +111,10 @@ def test_admin_creates_user_and_grants_global_access(client):
     sessions = c.get(f"/orgs/{org_id}/sessions", headers=editor_headers)
     assert sessions.status_code == 200
 
-    bad_login = c.post("/auth/login", json={"username": "editor1", "password": "password123"})
+    bad_login = c.post("/auth/login", json={"username": "editor1", "password": "password123-amber-cedar"})
     assert bad_login.status_code == 401
 
-    good_login = c.post("/auth/login", json={"username": "editor1", "password": "newpassword99"})
+    good_login = c.post("/auth/login", json={"username": "editor1", "password": "newpassword99-amber-cedar"})
     assert good_login.status_code == 200
     editor_headers = auth_headers(good_login.json()["access_token"])
 
@@ -173,8 +173,8 @@ def test_admin_creates_user_and_grants_global_access(client):
 def test_login_uses_username(client):
     c, SessionLocal = client
     with SessionLocal() as db:
-        seed_admin_user(db, username="alice", password="password123")
-    res = c.post("/auth/login", json={"username": "alice", "password": "password123"})
+        seed_admin_user(db, username="alice", password="password123-amber-cedar")
+    res = c.post("/auth/login", json={"username": "alice", "password": "password123-amber-cedar"})
     assert res.status_code == 200
     me = c.get("/auth/me", headers=auth_headers(res.json()["access_token"]))
     assert me.json()["username"] == "alice"
@@ -184,26 +184,26 @@ def test_login_uses_username(client):
 def test_admin_changes_own_password(client):
     c, SessionLocal = client
     with SessionLocal() as db:
-        admin = seed_admin_user(db, username="admin", password="oldadmin99")
+        admin = seed_admin_user(db, username="admin", password="oldadmin99-amber-cedar")
         headers = _login(db, admin)
 
     changed = c.post(
         "/auth/change-password",
         headers=headers,
-        json={"current_password": "oldadmin99", "new_password": "newadmin99"},
+        json={"current_password": "oldadmin99-amber-cedar", "new_password": "newadmin99-amber-cedar"},
     )
     assert changed.status_code == 200, changed.text
     assert changed.json()["must_change_password"] is False
 
-    bad = c.post("/auth/login", json={"username": "admin", "password": "oldadmin99"})
+    bad = c.post("/auth/login", json={"username": "admin", "password": "oldadmin99-amber-cedar"})
     assert bad.status_code == 401
 
-    good = c.post("/auth/login", json={"username": "admin", "password": "newadmin99"})
+    good = c.post("/auth/login", json={"username": "admin", "password": "newadmin99-amber-cedar"})
     assert good.status_code == 200
 
     patch_self = c.patch(
         f"/admin/users/{admin.id}",
         headers=headers,
-        json={"password": "reset12345"},
+        json={"password": "reset12345-amber-cedar"},
     )
     assert patch_self.status_code == 404

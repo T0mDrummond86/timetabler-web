@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, getToken } from "../api";
+import { PASSPHRASE_MIN_LENGTH, PASSPHRASE_REQUIREMENTS } from "../lib/passwordPolicy";
 import { AppShell } from "../components/AppShell";
 
 type ChangePasswordPageProps = {
@@ -45,8 +46,8 @@ export function ChangePasswordPage({ voluntary = false }: ChangePasswordPageProp
       setError("New passwords do not match");
       return;
     }
-    if (newPassword.length < 8) {
-      setError("New password must be at least 8 characters");
+    if (newPassword.length < PASSPHRASE_MIN_LENGTH) {
+      setError(PASSPHRASE_REQUIREMENTS);
       return;
     }
     setSaving(true);
@@ -77,7 +78,7 @@ export function ChangePasswordPage({ voluntary = false }: ChangePasswordPageProp
         <input
           type="password"
           required
-          minLength={8}
+          minLength={PASSPHRASE_MIN_LENGTH}
           autoComplete="new-password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
@@ -88,7 +89,7 @@ export function ChangePasswordPage({ voluntary = false }: ChangePasswordPageProp
         <input
           type="password"
           required
-          minLength={8}
+          minLength={PASSPHRASE_MIN_LENGTH}
           autoComplete="new-password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
@@ -131,7 +132,8 @@ export function ChangePasswordPage({ voluntary = false }: ChangePasswordPageProp
       >
         <section className="card dashboard-card" style={{ maxWidth: "28rem" }}>
           <h2>Update your password</h2>
-          <p className="muted">Enter your current password, then choose a new one (at least 8 characters).</p>
+          <p className="muted">Enter your current passphrase, then choose a new one.</p>
+          <p className="muted">{PASSPHRASE_REQUIREMENTS}</p>
           {form}
         </section>
       </AppShell>

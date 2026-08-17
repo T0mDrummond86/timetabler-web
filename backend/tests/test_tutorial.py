@@ -204,7 +204,7 @@ def _register(client: TestClient, username: str, org: str) -> tuple[dict, int]:
         "/auth/register",
         json={
             "username": username,
-            "password": "password123",
+            "password": "password123-amber-cedar",
             "name": username.title(),
             "organization_name": org,
         },
@@ -214,7 +214,7 @@ def _register(client: TestClient, username: str, org: str) -> tuple[dict, int]:
     changed = client.post(
         "/auth/change-password",
         headers=headers,
-        json={"current_password": "password123", "new_password": "password456"},
+        json={"current_password": "password123-amber-cedar", "new_password": "password456-amber-cedar"},
     )
     assert changed.status_code == 200, changed.text
     org_id = client.get("/orgs", headers=headers).json()[0]["id"]

@@ -54,7 +54,7 @@ def _seed(client: TestClient) -> tuple[str, int, int, int, dict]:
         "/auth/register",
         json={
             "username": "changelog",
-            "password": "password123",
+            "password": "password123-amber-cedar",
             "name": "Log Tester",
             "organization_name": "Log Org",
         },

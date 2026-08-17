@@ -58,7 +58,7 @@ def _register(client: TestClient, username: str, org_name: str) -> tuple[str, in
         "/auth/register",
         json={
             "email": email,
-            "password": "password123",
+            "password": "password123-amber-cedar",
             "name": "Tester",
             "organization_name": org_name,
         },
@@ -118,7 +118,7 @@ def test_registration_disabled(client: TestClient, monkeypatch):
         "/auth/register",
         json={
             "username": "blocked",
-            "password": "password123",
+            "password": "password123-amber-cedar",
             "name": "Blocked",
             "organization_name": "Blocked Org",
         },

@@ -64,7 +64,7 @@ def _auth(client: TestClient) -> tuple[str, int]:
         "/auth/register",
         json={
             "username": "admin-visual",
-            "password": "password123",
+            "password": "password123-amber-cedar",
             "name": "Admin Visual",
             "organization_name": "Org",
         },
@@ -141,7 +141,7 @@ def test_admin_visual_import_tolerates_duplicate_unit_names_across_sessions(
         "/auth/register",
         json={
             "username": "admin-visual-a",
-            "password": "password123",
+            "password": "password123-amber-cedar",
             "name": "A",
             "organization_name": "Org A",
         },
@@ -156,7 +156,7 @@ def test_admin_visual_import_tolerates_duplicate_unit_names_across_sessions(
         "/auth/register",
         json={
             "username": "admin-visual-b",
-            "password": "password123",
+            "password": "password123-amber-cedar",
             "name": "B",
             "organization_name": "Org B",
         },

@@ -59,7 +59,7 @@ def _auth(client: TestClient) -> tuple[str, int]:
         "/auth/register",
         json={
             "username": "phase4",
-            "password": "password123",
+            "password": "password123-amber-cedar",
             "name": "Phase4",
             "organization_name": "Org",
         },

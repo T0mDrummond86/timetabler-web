@@ -36,6 +36,27 @@ function filenameFromContentDisposition(header: string | null, fallback: string)
   return plain?.[1] ?? fallback;
 }
 
+/** Turn a FastAPI error detail into something worth showing a person.
+ *
+ * A 422 arrives as a list of pydantic errors whose ``msg`` carries a
+ * "Value error, " prefix; stringifying the list put raw JSON in front of the
+ * user, which is how a clear validation message becomes noise.
+ */
+function readDetail(detail: unknown): string {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) =>
+        typeof item === "object" && item && "msg" in item
+          ? String((item as { msg: unknown }).msg).replace(/^Value error,\s*/, "")
+          : null,
+      )
+      .filter((m): m is string => !!m);
+    if (messages.length) return messages.join(" ");
+  }
+  return JSON.stringify(detail);
+}
+
 function triggerBlobDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -465,7 +486,7 @@ async function apiFetch<T>(
     let detail = res.statusText;
     try {
       const body = await res.json();
-      if (body.detail) detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      if (body.detail) detail = readDetail(body.detail);
     } catch {
       /* ignore */
     }
