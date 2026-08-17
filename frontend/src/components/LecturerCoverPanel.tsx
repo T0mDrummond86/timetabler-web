@@ -5,7 +5,7 @@ import { WeekGridView } from "./WeekGridView";
 import { LoadingMark } from "./LoadingMark";
 import { DEFAULT_GRID_ZOOM, displayZoomPercent, resetGridZoom, zoomIn, zoomOut } from "../lib/gridZoom";
 import { readDisplayPrefs } from "../lib/displayPrefs";
-import { copyCoverTimetable } from "../lib/coverTimetableClipboard";
+import { copyCoverRequests } from "../lib/coverTimetableClipboard";
 import { slotRangeLabel } from "../lib/timeUtils";
 import { formatHours } from "../lib/staffVariance";
 
@@ -376,18 +376,18 @@ export function LecturerCoverPanel({
     }
   }
 
-  async function copyTimetableToClipboard() {
-    if (!displayLeftGrid) return;
-    const awayName =
-      staff.find((s) => s.id === needingCoverStaffId)?.name ?? displayLeftGrid.entity_label;
-    const title = `Cover timetable — ${awayName}`;
-    // Match the grid badges: only the week in focus (requestByBooking is scoped).
-    const dateByBookingId = new Map<number, string>();
-    for (const [bid, r] of requestByBooking) {
-      if (r.cover_date) dateByBookingId.set(bid, r.cover_date);
-    }
+  async function copyRequestsToClipboard() {
+    if (requests.length === 0) return;
+    // Every pending request, not just the lecturer or week on screen: the list
+    // is the plan, and the plan is what gets emailed.
+    const dates = requests.map((r) => r.cover_date).filter(Boolean).sort();
+    const span =
+      dates.length && dates[0] !== dates[dates.length - 1]
+        ? `${dates[0]} to ${dates[dates.length - 1]}`
+        : dates[0] ?? "";
+    const title = span ? `Cover required — ${span}` : "Cover required";
     try {
-      await copyCoverTimetable(displayLeftGrid, title, dateByBookingId);
+      await copyCoverRequests(requests, title);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2500);
     } catch (err) {
@@ -527,9 +527,10 @@ export function LecturerCoverPanel({
             type="button"
             className="btn-secondary"
             disabled={requests.length === 0}
-            onClick={() => void copyTimetableToClipboard()}
+            title="Copy the pending cover requests as a table, ready to paste into an email"
+            onClick={() => void copyRequestsToClipboard()}
           >
-            {copied ? "Copied ✓" : "Copy timetable for email"}
+            {copied ? "Copied ✓" : "Copy list for email"}
           </button>
         </div>
       </div>

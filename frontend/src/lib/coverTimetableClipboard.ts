@@ -1,35 +1,12 @@
-/** Build an email-pasteable cover timetable from a loaded grid and copy it. */
-import type { TimetableGrid } from "../types";
-import { slotToTimeLabel } from "./timeUtils";
-
-type Row = {
-  date: string;
-  day: string;
-  dayIndex: number;
-  start: number;
-  time: string;
-  group: string;
-  unit: string;
-  room: string;
-  cover: string;
-};
-
-function buildRows(grid: TimetableGrid, dateByBookingId: Map<number, string>): Row[] {
-  return grid.bookings
-    .filter((b) => (b.cover_staff_name ?? "").trim() !== "")
-    .map((b) => ({
-      date: dateByBookingId.get(b.id) ?? "",
-      day: grid.days[b.day] ?? `Day ${b.day + 1}`,
-      dayIndex: b.day,
-      start: b.start_slot,
-      time: `${slotToTimeLabel(b.start_slot)} – ${slotToTimeLabel(b.end_slot)}`,
-      group: b.course_code ?? "",
-      unit: b.unit_name ?? b.course_code ?? "",
-      room: b.room_code ?? "",
-      cover: b.cover_staff_name ?? "",
-    }))
-    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.dayIndex - b.dayIndex || a.start - b.start));
-}
+/** Build an email-pasteable cover list from the pending requests and copy it.
+ *
+ * The list, not the grid it was built from: what gets emailed is "these are the
+ * classes needing cover, here is who is doing each", which is exactly the
+ * pending requests table. Reading it off the timetable instead meant the copy
+ * only ever held one lecturer's classes in one week, and nothing at all before
+ * a lecturer was picked.
+ */
+import type { CoverRequest } from "../api";
 
 function escapeHtml(s: string): string {
   return s
@@ -38,22 +15,46 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;");
 }
 
-const HEADERS = ["Date", "Day", "Time", "Group", "Class", "Room", "Cover lecturer"];
+const HEADERS = [
+  "Date",
+  "Day / Time",
+  "Group",
+  "Class",
+  "Room",
+  "Away lecturer",
+  "Cover lecturer",
+];
 
-function buildHtml(title: string, rows: Row[]): string {
+function cells(r: CoverRequest): string[] {
+  return [
+    r.cover_date ?? "—",
+    [r.day_label, r.time_label].filter(Boolean).join(" "),
+    r.group_name,
+    r.unit_name,
+    r.room_code,
+    r.away_staff_name,
+    // Unassigned is worth saying out loud in an email, not left blank.
+    r.cover_staff_name || "Unassigned",
+  ];
+}
+
+/** Date first, so a multi-week plan reads in the order it happens. */
+function sortRows(requests: CoverRequest[]): CoverRequest[] {
+  return [...requests].sort((a, b) => {
+    const da = a.cover_date ?? "";
+    const db = b.cover_date ?? "";
+    if (da !== db) return da < db ? -1 : 1;
+    return (a.time_label || "").localeCompare(b.time_label || "");
+  });
+}
+
+function buildHtml(title: string, rows: CoverRequest[]): string {
   const th = (t: string) =>
     `<th style="border:1px solid #ccc;padding:6px 10px;background:#f0f3f8;text-align:left;font-family:Arial,sans-serif;font-size:13px;">${escapeHtml(t)}</th>`;
   const td = (t: string) =>
     `<td style="border:1px solid #ccc;padding:6px 10px;font-family:Arial,sans-serif;font-size:13px;">${escapeHtml(t)}</td>`;
 
-  const body = rows
-    .map(
-      (r) =>
-        `<tr>${td(r.date || "—")}${td(r.day)}${td(r.time)}${td(r.group)}${td(r.unit)}${td(r.room)}${td(
-          r.cover || "—"
-        )}</tr>`
-    )
-    .join("");
+  const body = rows.map((r) => `<tr>${cells(r).map(td).join("")}</tr>`).join("");
 
   return (
     `<p style="font-family:Arial,sans-serif;font-size:14px;font-weight:bold;margin:0 0 8px;">${escapeHtml(title)}</p>` +
@@ -63,26 +64,22 @@ function buildHtml(title: string, rows: Row[]): string {
   );
 }
 
-function buildPlainText(title: string, rows: Row[]): string {
-  const lines = [title, ""];
-  lines.push(HEADERS.join("\t"));
-  for (const r of rows) {
-    lines.push([r.date || "—", r.day, r.time, r.group, r.unit, r.room, r.cover || "—"].join("\t"));
-  }
+function buildPlainText(title: string, rows: CoverRequest[]): string {
+  const lines = [title, "", HEADERS.join("\t")];
+  for (const r of rows) lines.push(cells(r).join("\t"));
   return lines.join("\n");
 }
 
 /**
- * Copies the grid as a formatted table to the clipboard.
- * Writes both text/html (pastes as a table in email clients) and
- * text/plain (tab-separated fallback). Returns the row count.
+ * Copies the pending cover requests as a formatted table.
+ * Writes both text/html (pastes as a table in email clients) and text/plain
+ * (tab-separated fallback). Returns the row count.
  */
-export async function copyCoverTimetable(
-  grid: TimetableGrid,
+export async function copyCoverRequests(
+  requests: CoverRequest[],
   title: string,
-  dateByBookingId: Map<number, string> = new Map()
 ): Promise<number> {
-  const rows = buildRows(grid, dateByBookingId);
+  const rows = sortRows(requests);
   const html = buildHtml(title, rows);
   const plain = buildPlainText(title, rows);
 
