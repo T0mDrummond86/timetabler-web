@@ -44,6 +44,9 @@ services:
       ENVIRONMENT: production
       AUTO_CREATE_TABLES: "false"
       ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
+      # Break-glass for two-factor enforcement. Defaults on; set false in
+      # .env.prod and restart to let everyone back in if enrolment misfires.
+      REQUIRE_TOTP: ${REQUIRE_TOTP:-true}
       BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?set BOOTSTRAP_ADMIN_PASSWORD in .env.prod}
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-52428800}
