@@ -36,6 +36,24 @@ async function cardIsClashFree(
   return !report.rows.some((row) => (row.booking_ids ?? []).includes(bookingId));
 }
 
+/**
+ * A class counts as scheduled when it is on the grid, has whoever is needed to
+ * run it, and draws no hard warning. Dropping the card is only the first of
+ * those, so a step that asked for a lecturer used to pass before one was set.
+ */
+async function classIsFullyScheduled(
+  ctx: Parameters<typeof holdingUnitNames>[0],
+  courseCode: string,
+  needle: string,
+  opts: { room?: boolean } = {},
+): Promise<boolean> {
+  const card = await placedCard(ctx, courseCode, needle);
+  if (!card) return false;
+  if (!(card.staff_name ?? "").trim()) return false;
+  if (opts.room && !(card.room_code ?? "").trim()) return false;
+  return cardIsClashFree(ctx, card.id);
+}
+
 /** How many of a course's holding-area chips carry this class name. */
 async function holdingCount(
   ctx: Parameters<typeof holdingUnitNames>[0],
@@ -90,8 +108,10 @@ export const m7Capstone: TutorialModule = {
         "Drag Network Security Fundamentals out of the holding area onto a free CYB-T slot. Monday and Thursday afternoons are wide open.\n\nGive it a lecturer and a lab room (B1.04 or B1.05) when the edit dialog opens — double-click the card if you need to reopen it.",
       advance: "verify",
       watch: { api: /\/bookings/ },
-      verify: async (ctx) => (await holdingCount(ctx, "CYB-T", "Network Security")) === 0,
-      hint: "Drag the chip onto Monday 13:00. Then double-click it → set Lecturer and Room → Save.",
+      // The step asks for a lecturer and a lab room, so it waits for both —
+      // and for the placement not to have created a clash.
+      verify: (ctx) => classIsFullyScheduled(ctx, "CYB-T", "Network Security", { room: true }),
+      hint: "Drag the chip onto Monday 13:00. Then double-click it → set Lecturer and Room → Save. A red card means a clash: check the Warnings tab.",
     },
     {
       id: "place-workcom",
@@ -102,12 +122,7 @@ export const m7Capstone: TutorialModule = {
       watch: { api: /\/bookings/ },
       // Placing the card is only half of it — this step is about who takes the
       // class, so it is not done until someone is on it and they are free.
-      verify: async (ctx) => {
-        const card = await placedCard(ctx, "CYB-T", "Workplace Communication");
-        if (!card) return false;
-        if (!(card.staff_name ?? "").trim()) return false;
-        return cardIsClashFree(ctx, card.id);
-      },
+      verify: (ctx) => classIsFullyScheduled(ctx, "CYB-T", "Workplace Communication"),
       hint: "Drop it on a clear CYB-T slot, then double-click it and set the Lecturer. If the card turns red, the lecturer is already teaching then — pick another, or move the class.",
     },
     {
