@@ -10,14 +10,17 @@ from sqlalchemy.orm import Session
 
 from timetable.core.tenancy_models import Membership, Organization, User
 
+from ..config import settings
 from ..database import get_db
-from .security import decode_access_token
+from .security import TOKEN_TYPE_ACCESS, decode_access_token, token_type_of
 
 _bearer = HTTPBearer(auto_error=False)
 
 EDITOR_ROLES = frozenset({"owner", "editor"})
 VIEWER_ROLES = frozenset({"owner", "editor", "viewer"})
 PASSWORD_CHANGE_REQUIRED = "password_change_required"
+#: The frontend redirects on this exactly as it does on a password change.
+TOTP_SETUP_REQUIRED = "totp_setup_required"
 
 
 def ensure_password_changed(user: User) -> None:
@@ -26,6 +29,36 @@ def ensure_password_changed(user: User) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail=PASSWORD_CHANGE_REQUIRED,
         )
+
+
+def ensure_full_session(payload: dict) -> None:
+    """Refuse a token that only proved the password.
+
+    The two-step sign-in hands out a token between the password and the code.
+    Without this check that token would be a complete bypass of the second
+    factor, so every authenticated dependency runs it.
+    """
+    if token_type_of(payload) != TOKEN_TYPE_ACCESS:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Finish signing in first",
+        )
+
+
+def ensure_two_factor_enrolled(user: User) -> None:
+    """Block an unenrolled account out of everything but enrolment.
+
+    Enforced per request against the account rather than the token, so a
+    session minted before two-factor existed cannot be used to skip setup.
+    """
+    if not settings.require_totp:
+        return
+    if user.totp_secret and user.totp_confirmed_at:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=TOTP_SETUP_REQUIRED,
+    )
 
 
 @dataclass(frozen=True)
@@ -62,6 +95,7 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
         ) from exc
+    ensure_full_session(payload)
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(
@@ -101,6 +135,7 @@ def get_auth_context(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
         ) from exc
+    ensure_full_session(payload)
 
     user = db.get(User, user_id)
     org = db.get(Organization, org_id)
@@ -110,6 +145,7 @@ def get_auth_context(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled")
 
     ensure_password_changed(user)
+    ensure_two_factor_enrolled(user)
 
     membership = (
         db.query(Membership)

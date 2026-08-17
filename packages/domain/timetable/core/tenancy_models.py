@@ -51,17 +51,82 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
+    #: TOTP shared secret (base32). Present once enrolment starts.
+    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: When the first correct code was entered. Null means not enrolled — which
+    #: is what the enrolment block keys on, so a half-finished setup still
+    #: counts as unenrolled.
+    totp_confirmed_at: Mapped[_dt.datetime | None] = mapped_column(DateTime, nullable=True)
+    #: Consecutive bad codes, and a lockout once they pile up: six digits is
+    #: brute-forceable in minutes without one.
+    totp_failed_attempts: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0")
+    )
+    totp_locked_until: Mapped[_dt.datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[_dt.datetime] = mapped_column(
         DateTime,
         default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
     )
 
+    recovery_codes: Mapped[list["UserRecoveryCode"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    trusted_devices: Mapped[list["UserTrustedDevice"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
     memberships: Mapped[list["Membership"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
     global_session_access: Mapped[list["GlobalSessionUserAccess"]] = relationship(
         back_populates="user", cascade="all, delete-orphan", foreign_keys="GlobalSessionUserAccess.user_id"
     )
+
+
+class UserRecoveryCode(Base):
+    """One single-use way back in when the authenticator is gone.
+
+    Hashed like a password: a recovery code is a credential, and the whole
+    point is that it works without the second factor.
+    """
+
+    __tablename__ = "user_recovery_code"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE"), index=True
+    )
+    code_hash: Mapped[str] = mapped_column(String(128))
+    used_at: Mapped[_dt.datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[_dt.datetime | None] = mapped_column(
+        DateTime,
+        default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
+    )
+
+    user: Mapped[User] = relationship(back_populates="recovery_codes")
+
+
+class UserTrustedDevice(Base):
+    """A browser that has already proved the second factor.
+
+    Lecturers read their timetable on a phone; asking for a code every week
+    would make the app worse for the people using it most. The token is stored
+    hashed and expires, so a lost phone stops being trusted on its own.
+    """
+
+    __tablename__ = "user_trusted_device"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(128), index=True)
+    label: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    created_at: Mapped[_dt.datetime | None] = mapped_column(
+        DateTime,
+        default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),
+    )
+    last_seen_at: Mapped[_dt.datetime | None] = mapped_column(DateTime, nullable=True)
+    expires_at: Mapped[_dt.datetime] = mapped_column(DateTime)
+
+    user: Mapped[User] = relationship(back_populates="trusted_devices")
 
 
 class Membership(Base):

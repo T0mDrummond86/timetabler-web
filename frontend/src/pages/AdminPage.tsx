@@ -109,6 +109,25 @@ export function AdminPage() {
     }
   }
 
+  async function resetTwoFactor(user: AdminUser) {
+    if (
+      !window.confirm(
+        `Reset two-factor for ${user.username}? Their authenticator and recovery codes stop ` +
+          `working, every remembered device is forgotten, and they set it up again at their ` +
+          `next sign-in.`,
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    try {
+      const updated = await api.resetUserTwoFactor(user.id);
+      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Reset failed");
+    }
+  }
+
   async function deleteUser(user: AdminUser) {
     if (!window.confirm(`Delete user ${user.username}? This cannot be undone.`)) return;
     setError(null);
@@ -206,6 +225,7 @@ export function AdminPage() {
                       </div>
                       <span className="muted dashboard-session-meta">
                         {u.name || "—"} · {u.role}
+                        {u.two_factor_enrolled === false && " · 2FA not set up"}
                       </span>
                     </div>
                     <div className="row gap">
@@ -215,6 +235,19 @@ export function AdminPage() {
                         onClick={() => void resetPassword(u)}
                       >
                         Reset password
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-xs"
+                        disabled={!u.two_factor_enrolled}
+                        title={
+                          u.two_factor_enrolled
+                            ? "Clear their two-factor so they can set it up on a new phone"
+                            : "This account has not set two-factor up yet"
+                        }
+                        onClick={() => void resetTwoFactor(u)}
+                      >
+                        Reset 2FA
                       </button>
                       <button
                         type="button"

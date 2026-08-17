@@ -3239,6 +3239,65 @@ body:has(.app-shell--fill) #root {
   font-size: 1.45rem;
 }
 
+/* ---------------- two-factor enrolment ---------------- */
+
+/* The enrolment screen carries a QR and ten codes, so it needs more room than
+   the sign-in form the .auth-page width was chosen for. */
+.auth-page:has(.auth-card-wide) {
+  max-width: 560px;
+}
+
+.totp-steps {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.totp-steps > li > strong {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+/* White plate around the code: a QR is read by a camera, so it stays
+   black-on-white in both themes. */
+.totp-qr {
+  display: inline-block;
+  padding: 10px;
+  background: #ffffff;
+  border-radius: var(--radius-md);
+  line-height: 0;
+}
+
+.totp-secret {
+  display: inline-block;
+  margin-top: 0.35rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  word-break: break-all;
+}
+
+.recovery-code-list {
+  list-style: none;
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.35rem 1rem;
+}
+
+.recovery-code-list code {
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+}
+
 /* Semester / block auxiliary panels */
 .semester-panel .panel-header h2 {
   font-size: 0.95rem;

@@ -16,6 +16,7 @@ from timetable.core.tenancy_models import (
 from ..auth.deps import AuthContext, get_auth_context, require_admin
 from ..auth.security import hash_password
 from ..database import get_db
+from ..services.two_factor import reset_two_factor
 from ..schemas import (
     AdminUserCreate,
     AdminUserOut,
@@ -43,6 +44,7 @@ def _admin_user_out(db: Session, user: User, org_id: int) -> AdminUserOut:
         is_admin=user.is_admin,
         is_active=user.is_active,
         must_change_password=user.must_change_password,
+        two_factor_enrolled=bool(user.totp_secret and user.totp_confirmed_at),
         role=membership.role if membership else "editor",
     )
 
@@ -118,6 +120,37 @@ def patch_user(
         membership.role = body.role
     db.commit()
     db.refresh(user)
+    return _admin_user_out(db, user, ctx.organization.id)
+
+
+@router.post("/users/{user_id}/reset-two-factor", response_model=AdminUserOut)
+def reset_user_two_factor(
+    user_id: int,
+    ctx: AuthContext = Depends(get_auth_context),
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Clear a user's second factor so they enrol again on next sign-in.
+
+    The answer to a lost or wiped phone. Any admin in the organisation may do
+    it, including for another admin: with a handful of accounts, an admin who
+    loses their phone has nobody else to ask.
+    """
+    del admin
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    membership = (
+        db.query(Membership)
+        .filter(
+            Membership.user_id == user_id,
+            Membership.organization_id == ctx.organization.id,
+        )
+        .first()
+    )
+    if membership is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    reset_two_factor(db, user)
     return _admin_user_out(db, user, ctx.organization.id)
 
 

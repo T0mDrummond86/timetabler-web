@@ -19,6 +19,11 @@ _INSECURE_JWT_SECRETS = frozenset(
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    #: Two-factor is mandatory: an enrolled account must present a code, and an
+    #: unenrolled one can reach nothing but the enrolment endpoints. Settable to
+    #: false on the host as a break-glass — if the enrolment block ever misfires
+    #: it would otherwise lock every account out of a live app at once.
+    require_totp: bool = True
     database_url: str = "postgresql+psycopg://timetabler:timetabler@localhost:5432/timetabler"
     redis_url: str = "redis://localhost:6379/0"
     jwt_secret: str = "change-me-in-production"

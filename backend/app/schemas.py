@@ -11,6 +11,9 @@ class LoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=80)
     password: str
     organization_id: int | None = None
+    #: A "remember this device" marker from a previous sign-in, if the browser
+    #: still holds one — lets a trusted device skip the code step.
+    device_token: str | None = None
 
     @field_validator("username")
     @classmethod
@@ -34,6 +37,58 @@ class RegisterRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class LoginResultOut(BaseModel):
+    """Either a session, or the next step towards one.
+
+    One shape for both outcomes so the sign-in form has a single thing to read:
+    a token when the password was enough, otherwise the pending token and which
+    step is owed.
+    """
+
+    access_token: str | None = None
+    token_type: str = "bearer"
+    #: Password accepted, a code is needed. Carries the pending token.
+    mfa_required: bool = False
+    #: Password accepted, but this account has never set two-factor up.
+    mfa_setup_required: bool = False
+    pending_token: str | None = None
+
+
+class MfaVerifyRequest(BaseModel):
+    pending_token: str
+    #: A six-digit code, or one of the recovery codes.
+    code: str = Field(min_length=1, max_length=40)
+    remember_device: bool = False
+    device_label: str = Field(default="", max_length=120)
+
+
+class MfaSetupOut(BaseModel):
+    secret: str
+    #: otpauth:// URI — what the QR code encodes.
+    provisioning_uri: str
+    issuer: str
+    username: str
+
+
+class MfaConfirmRequest(BaseModel):
+    pending_token: str | None = None
+    code: str = Field(min_length=1, max_length=40)
+
+
+class MfaConfirmOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    #: Shown once and never retrievable again.
+    recovery_codes: list[str]
+
+
+class MfaStatusOut(BaseModel):
+    enrolled: bool
+    required: bool
+    unused_recovery_codes: int
+    trusted_devices: int
 
 
 class UserOut(BaseModel):
@@ -78,6 +133,9 @@ class AdminUserOut(BaseModel):
     is_admin: bool
     is_active: bool
     must_change_password: bool
+    #: Has this account finished two-factor setup? False means they will be
+    #: asked to enrol at their next sign-in.
+    two_factor_enrolled: bool = False
     role: str
 
     model_config = {"from_attributes": True}

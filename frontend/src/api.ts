@@ -46,6 +46,31 @@ function triggerBlobDownload(blob: Blob, filename: string): void {
 }
 
 export type TokenResponse = { access_token: string; token_type: string };
+
+/** Either a session, or which step of signing in is still owed. */
+export type LoginResult = {
+  access_token?: string | null;
+  token_type?: string;
+  mfa_required?: boolean;
+  mfa_setup_required?: boolean;
+  /** The short-lived token that carries the attempt to its next step. On a
+   *  verify response this instead carries a new remember-this-device marker. */
+  pending_token?: string | null;
+};
+
+export type MfaSetup = {
+  secret: string;
+  provisioning_uri: string;
+  issuer: string;
+  username: string;
+};
+
+export type MfaStatus = {
+  enrolled: boolean;
+  required: boolean;
+  unused_recovery_codes: number;
+  trusted_devices: number;
+};
 export type User = {
   id: number;
   username: string;
@@ -61,6 +86,8 @@ export type AdminUser = {
   is_admin: boolean;
   is_active: boolean;
   must_change_password: boolean;
+  /** Has this account finished two-factor setup? */
+  two_factor_enrolled?: boolean;
   role: string;
 };
 export type GlobalSessionAccess = {
@@ -383,6 +410,26 @@ export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
+const DEVICE_TOKEN_KEY = "timetabler_device_token";
+
+/** The "remember this device" marker, if this browser holds one. */
+export function getDeviceToken(): string | null {
+  try {
+    return localStorage.getItem(DEVICE_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setDeviceToken(token: string | null) {
+  try {
+    if (token) localStorage.setItem(DEVICE_TOKEN_KEY, token);
+    else localStorage.removeItem(DEVICE_TOKEN_KEY);
+  } catch {
+    /* private browsing — the code is simply asked for every time */
+  }
+}
+
 export function setToken(token: string | null) {
   if (token) localStorage.setItem(TOKEN_KEY, token);
   else localStorage.removeItem(TOKEN_KEY);
@@ -422,9 +469,13 @@ async function apiFetch<T>(
     } catch {
       /* ignore */
     }
+    // An account that has not enrolled in two-factor can reach nothing but the
+    // enrolment endpoints, and those need a fresh sign-in to get a setup token.
+    // Treat it exactly like an expired session: send them back to sign in.
+    const needsEnrolment = res.status === 403 && detail === "totp_setup_required";
     if (
       auth &&
-      res.status === 401 &&
+      (res.status === 401 || needsEnrolment) &&
       typeof window !== "undefined" &&
       !window.location.pathname.startsWith("/login") &&
       !window.location.pathname.startsWith("/register")
@@ -494,7 +545,52 @@ export const api = {
   }) => apiFetch<TokenResponse>("/auth/register", { method: "POST", body: JSON.stringify(body) }, false),
 
   login: (body: { username: string; password: string; organization_id?: number }) =>
-    apiFetch<TokenResponse>("/auth/login", { method: "POST", body: JSON.stringify(body) }, false),
+    apiFetch<LoginResult>(
+      "/auth/login",
+      {
+        method: "POST",
+        // Sent so a browser that already proved the second factor can skip it.
+        body: JSON.stringify({ ...body, device_token: getDeviceToken() }),
+      },
+      false,
+    ),
+
+  /** Second step of signing in: a TOTP code or a recovery code. */
+  mfaVerify: (body: {
+    pending_token: string;
+    code: string;
+    remember_device?: boolean;
+    device_label?: string;
+  }) =>
+    apiFetch<LoginResult>(
+      "/auth/mfa/verify",
+      { method: "POST", body: JSON.stringify(body) },
+      false,
+    ),
+
+  /** Issue a secret to enrol against. Enables nothing on its own. */
+  mfaSetup: (pendingToken: string) =>
+    apiFetch<MfaSetup>(
+      "/auth/mfa/setup",
+      { method: "POST", body: JSON.stringify({ pending_token: pendingToken, code: "x" }) },
+      false,
+    ),
+
+  /** Finish enrolment; returns a session and the recovery codes, once. */
+  mfaConfirm: (pendingToken: string, code: string) =>
+    apiFetch<{ access_token: string; recovery_codes: string[] }>(
+      "/auth/mfa/confirm",
+      { method: "POST", body: JSON.stringify({ pending_token: pendingToken, code }) },
+      false,
+    ),
+
+  mfaStatus: () => apiFetch<MfaStatus>("/auth/mfa/status"),
+
+  mfaForgetDevices: () =>
+    apiFetch<MfaStatus>("/auth/mfa/forget-devices", { method: "POST" }),
+
+  resetUserTwoFactor: (userId: number) =>
+    apiFetch<AdminUser>(`/admin/users/${userId}/reset-two-factor`, { method: "POST" }),
 
   adminUsers: () => apiFetch<AdminUser[]>("/admin/users"),
 

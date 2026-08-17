@@ -3,38 +3,14 @@
  * The QR is rendered locally from the URL; it is never sent to a third-party
  * chart service, so internal timetable URLs stay inside the deployment. */
 import { useMemo, useState } from "react";
-import qrcode from "qrcode-generator";
-
-function qrSvg(text: string, size = 148): string {
-  // Type 0 = pick the smallest version that fits; "M" tolerates a little
-  // screen glare and printing.
-  const qr = qrcode(0, "M");
-  qr.addData(text);
-  qr.make();
-  const count = qr.getModuleCount();
-  const cell = size / count;
-  let path = "";
-  for (let r = 0; r < count; r++) {
-    for (let c = 0; c < count; c++) {
-      if (qr.isDark(r, c)) {
-        path += `M${(c * cell).toFixed(2)},${(r * cell).toFixed(2)}h${cell.toFixed(2)}v${cell.toFixed(2)}h-${cell.toFixed(2)}z`;
-      }
-    }
-  }
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" ` +
-    `viewBox="0 0 ${size} ${size}" role="img" aria-label="QR code linking to the phone app">` +
-    `<rect width="${size}" height="${size}" fill="#ffffff"/>` +
-    `<path d="${path}" fill="#000000"/></svg>`
-  );
-}
+import { qrSvgMarkup } from "../lib/qrSvg";
 
 export function PhoneAppCard({ bare = false }: { bare?: boolean } = {}) {
   const [copied, setCopied] = useState(false);
   const url = useMemo(() => `${window.location.origin}/m`, []);
   const svg = useMemo(() => {
     try {
-      return qrSvg(url);
+      return qrSvgMarkup(url);
     } catch {
       return null;
     }

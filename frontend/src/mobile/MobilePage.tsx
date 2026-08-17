@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   getToken,
+  setDeviceToken,
   setToken,
   SIGNED_OUT_EVENT,
   type GlobalAggregatedStaffRow,
@@ -433,6 +434,11 @@ function MobileLogin({ onSignedIn }: { onSignedIn: () => void }) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Two steps once two-factor is on. The device is remembered by default here:
+  // a phone is personal, and a lecturer checking their week should not be
+  // asked for a code every time the token rolls over.
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
+  const [code, setCode] = useState("");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -440,13 +446,90 @@ function MobileLogin({ onSignedIn }: { onSignedIn: () => void }) {
     setError(null);
     try {
       const res = await api.login({ username: username.trim(), password });
-      setToken(res.access_token);
-      onSignedIn();
+      if (res.mfa_setup_required) {
+        // Enrolment needs the QR screen, which is a desktop-sized job.
+        setError(
+          "Set up two-factor on a computer first — open TAFEtabler and sign in there.",
+        );
+        return;
+      }
+      if (res.mfa_required && res.pending_token) {
+        setPendingToken(res.pending_token);
+        return;
+      }
+      if (res.access_token) {
+        setToken(res.access_token);
+        onSignedIn();
+        return;
+      }
+      setError("Unexpected sign-in response. Try again.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-in failed");
     } finally {
       setBusy(false);
     }
+  }
+
+  async function verify(e: React.FormEvent) {
+    e.preventDefault();
+    if (!pendingToken) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.mfaVerify({
+        pending_token: pendingToken,
+        code,
+        remember_device: true,
+        device_label: "Phone app",
+      });
+      if (res.pending_token) setDeviceToken(res.pending_token);
+      if (res.access_token) {
+        setToken(res.access_token);
+        onSignedIn();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That code was not accepted");
+      setCode("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (pendingToken) {
+    return (
+      <div className="mv-login">
+        <form className="mv-login-card" onSubmit={verify}>
+          <h1>Enter your code</h1>
+          <p className="mv-login-hint">
+            From your authenticator app. This phone is remembered for 30 days.
+          </p>
+          <input
+            className="mv-input"
+            placeholder="123456"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            autoFocus
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+          {error && <p className="mv-error">{error}</p>}
+          <button className="mv-btn-primary" type="submit" disabled={busy || !code.trim()}>
+            {busy ? "Checking…" : "Sign in"}
+          </button>
+          <button
+            className="mv-btn"
+            type="button"
+            onClick={() => {
+              setPendingToken(null);
+              setCode("");
+              setError(null);
+            }}
+          >
+            Back
+          </button>
+        </form>
+      </div>
+    );
   }
 
   return (
