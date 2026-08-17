@@ -6,6 +6,7 @@ import { noViolation, urlTab } from "../verifyHelpers";
 export const m5StaffCover: TutorialModule = {
   id: "m5_staff_cover",
   title: "Staff hours & cover",
+  section: "Tutorial 1 — The essentials",
   goal: "Balance an overloaded lecturer, respect availability, arrange cover.",
   startUrl: (ctx) => `/timetable/${ctx.sessionId}?tab=staff`,
   steps: [

@@ -33,12 +33,16 @@ export type TutorialStep = {
   verify?: (ctx: VerifyCtx) => Promise<boolean> | boolean;
   /** Shown via the Hint button (and auto-offered after idling on a verify step). */
   hint?: string;
+  /** Renders a download button for a generated sample file (import modules). */
+  download?: { label: string; kind: "csp" | "preferences"; filename: string };
 };
 
 export type TutorialModule = {
   id: string;
   title: string;
   goal: string;
+  /** Picker grouping — modules with the same section render under one heading. */
+  section: string;
   /** Where the module starts — navigated to on start/replay. */
   startUrl?: (ctx: VerifyCtx) => string;
   steps: TutorialStep[];

@@ -5,6 +5,7 @@ import { urlTab } from "../verifyHelpers";
 export const m6ChangelogExports: TutorialModule = {
   id: "m6_changelog_exports",
   title: "Change log & exports",
+  section: "Tutorial 1 — The essentials",
   goal: "Trace your edits and hand the timetable to the outside world.",
   startUrl: (ctx) => `/timetable/${ctx.sessionId}?tab=changelog`,
   steps: [

@@ -5,6 +5,7 @@ import { noViolation, urlIntParam, urlTab, urlView } from "../verifyHelpers";
 export const m4Clashes: TutorialModule = {
   id: "m4_clashes",
   title: "Clashes & warnings",
+  section: "Tutorial 1 — The essentials",
   goal: "Read the Warnings tab and fix a double-booking, a wrong room, and more.",
   startUrl: (ctx) =>
     `/timetable/${ctx.sessionId}?tab=timetable&view=staff&staff=${ctx.entities.staff["Serena Williams"] ?? ""}`,

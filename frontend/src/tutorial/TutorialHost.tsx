@@ -4,11 +4,12 @@
  * unless the tutorial is active for this exact session. All interaction with
  * the app happens through the user's own clicks — the panel only watches.
  */
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 
 import { api } from "../api";
+import { onApiEvent } from "./apiEvents";
 import { useConfirmPrompt } from "../hooks/useConfirmPrompt";
 import { useDropdown } from "../hooks/useDropdown";
 import { LoadingMark } from "../components/LoadingMark";
@@ -76,6 +77,23 @@ export function TutorialHost({ sessionId }: { sessionId: number }) {
     return () => {
       cancelled = true;
     };
+  }, [active, sessionId]);
+
+  // Imports can replace entity rows wholesale (a session restore certainly
+  // does), which strands every cached id. Refetch the map when one lands.
+  useEffect(() => {
+    if (!active) return;
+    return onApiEvent((event) => {
+      if (!event.ok || !/\/import(\/|$)/.test(event.path)) return;
+      void api
+        .tutorialInfo(sessionId)
+        .then((info) => {
+          if (info.is_tutorial) setEntities(info.entities as TutorialEntityMap);
+        })
+        .catch(() => {
+          /* the next module start refetches anyway */
+        });
+    });
   }, [active, sessionId]);
 
   const currentModule: TutorialModule | null =
@@ -252,11 +270,21 @@ export function TutorialHost({ sessionId }: { sessionId: number }) {
           <ol className="tutorial-module-list">
             {TUTORIAL_MODULES.map((mod, i) => {
               const status = progress.modules[mod.id]?.status ?? "not_started";
+              // A heading opens each tutorial; numbering restarts under it.
+              const newSection = i === 0 || TUTORIAL_MODULES[i - 1].section !== mod.section;
+              const numberInSection =
+                i - TUTORIAL_MODULES.findIndex((m) => m.section === mod.section) + 1;
               return (
-                <li key={mod.id} className="tutorial-module-row">
+                <Fragment key={mod.id}>
+                  {newSection && (
+                    <li className="tutorial-section-heading" aria-hidden>
+                      {mod.section}
+                    </li>
+                  )}
+                  <li className="tutorial-module-row">
                   <div className="tutorial-module-info">
                     <span className="tutorial-module-name">
-                      {i + 1}. {mod.title}
+                      {numberInSection}. {mod.title}
                       {status !== "not_started" && (
                         <span className={`tutorial-chip tutorial-chip-${status}`}>
                           {STATUS_LABEL[status]}
@@ -277,7 +305,8 @@ export function TutorialHost({ sessionId }: { sessionId: number }) {
                         ? "Resume"
                         : "Start"}
                   </button>
-                </li>
+                  </li>
+                </Fragment>
               );
             })}
           </ol>
@@ -329,6 +358,23 @@ export function TutorialHost({ sessionId }: { sessionId: number }) {
 
           {showHint && engine.step.hint && (
             <p className="tutorial-hint">{engine.step.hint}</p>
+          )}
+
+          {engine.step.download && progress.sessionId != null && (
+            <button
+              type="button"
+              className="btn-secondary btn-xs tutorial-download"
+              onClick={() =>
+                void api
+                  .downloadExport(
+                    `/sessions/${progress.sessionId}/tutorial-files/${engine.step!.download!.kind}`,
+                    engine.step!.download!.filename,
+                  )
+                  .catch(() => setNotice("Download failed — is the API reachable?"))
+              }
+            >
+              ⬇ {engine.step.download.label}
+            </button>
           )}
 
           <div className="tutorial-actions">

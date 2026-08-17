@@ -1,7 +1,7 @@
 """In-app tutorial sandbox endpoints (production-safe, editor-only)."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from ..auth.deps import AuthContext, get_auth_context, require_session_editor
@@ -9,10 +9,17 @@ from ..database import get_db
 from ..schemas import TutorialInfoOut, TutorialStartOut
 from ..services.tutorial.lifecycle import (
     entity_map,
+    is_tutorial_sandbox,
     is_tutorial_session,
     reset_tutorial,
     start_tutorial,
     tutorial_group_id,
+)
+from ..services.tutorial.sample_files import (
+    SAMPLE_CSP_FILENAME,
+    SAMPLE_PREFS_FILENAME,
+    build_sample_csp_docx,
+    build_sample_preferences_xlsx,
 )
 from .sessions import _session_in_org, _session_out_with_stats
 
@@ -76,4 +83,40 @@ def tutorial_info(
         is_tutorial=is_tut,
         entities=entity_map(db, row.id) if is_tut else {},
         global_session_id=tutorial_group_id(db, row.id) if is_tut else None,
+    )
+
+
+@router.get("/sessions/{session_id}/tutorial-files/{kind}")
+def tutorial_sample_file(
+    session_id: int,
+    kind: str,
+    ctx: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    """Downloadable sample documents for the import modules.
+
+    Generated fresh each time rather than shipped as binaries, so they always
+    match what the importers accept. Sandbox-only: the files name sandbox
+    lecturers, so they make no sense against a real session.
+    """
+    row = _session_in_org(db, session_id, ctx.organization.id, ctx)
+    if not is_tutorial_sandbox(row):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sample files are only available in the tutorial sandbox",
+        )
+    if kind == "csp":
+        content = build_sample_csp_docx()
+        filename = SAMPLE_CSP_FILENAME
+        media = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    elif kind == "preferences":
+        content = build_sample_preferences_xlsx()
+        filename = SAMPLE_PREFS_FILENAME
+        media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    else:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown sample file")
+    return Response(
+        content=content,
+        media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

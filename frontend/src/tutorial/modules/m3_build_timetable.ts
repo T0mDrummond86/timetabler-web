@@ -13,6 +13,7 @@ const THREAT = "Cyber Threat Intelligence — VU23223";
 export const m3BuildTimetable: TutorialModule = {
   id: "m3_build_timetable",
   title: "Build the timetable",
+  section: "Tutorial 1 — The essentials",
   goal: "Schedule a class from the holding area, then move, edit, lock and undo.",
   startUrl: (ctx) =>
     `/timetable/${ctx.sessionId}?tab=timetable&view=course&course=${ctx.entities.courses["CYB-A"] ?? ""}`,

@@ -67,6 +67,7 @@ async function holdingCount(
 export const m7Capstone: TutorialModule = {
   id: "m7_capstone",
   title: "Capstone",
+  section: "Tutorial 1 — The essentials",
   goal: "Schedule the CYB-T group, clash-free, one class at a time.",
   startUrl: (ctx) =>
     `/timetable/${ctx.sessionId}?tab=timetable&view=course&course=${ctx.entities.courses["CYB-T"] ?? ""}`,

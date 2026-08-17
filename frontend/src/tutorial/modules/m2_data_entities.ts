@@ -17,6 +17,7 @@ const SEEDED_STAFF = new Set([
 export const m2DataEntities: TutorialModule = {
   id: "m2_data_entities",
   title: "Data & entities",
+  section: "Tutorial 1 — The essentials",
   goal: "Meet the Staff, Rooms and Classes editors — and add a lecturer.",
   startUrl: (ctx) => `/timetable/${ctx.sessionId}?tab=staff`,
   steps: [

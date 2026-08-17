@@ -5,6 +5,7 @@ import { urlIntParam, urlTab, urlView } from "../verifyHelpers";
 export const m1Orientation: TutorialModule = {
   id: "m1_orientation",
   title: "Orientation",
+  section: "Tutorial 1 — The essentials",
   goal: "Find your way around: tabs, views, and the holding area.",
   startUrl: (ctx) =>
     `/timetable/${ctx.sessionId}?tab=timetable&view=course&course=${ctx.entities.courses["CYB-A"] ?? ""}`,

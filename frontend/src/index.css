@@ -5648,6 +5648,26 @@ body.staff-editor-resizing {
   gap: 0.6rem;
 }
 
+/* One heading per tutorial; the list carries both parts. */
+.tutorial-section-heading {
+  display: block;
+  list-style: none;
+  margin: 0.9rem 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.tutorial-section-heading:first-child {
+  margin-top: 0;
+}
+
+.tutorial-download {
+  margin-bottom: 0.6rem;
+}
+
 .tutorial-module-row {
   display: flex;
   align-items: center;

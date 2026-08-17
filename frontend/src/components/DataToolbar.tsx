@@ -201,7 +201,7 @@ export function DataToolbar({
       )}
       <div className="tt-toolbar-group">
         <span className="tt-toolbar-label">Data</span>
-        <span className="tt-dropdown-wrap" ref={importMenu.wrapRef}>
+        <span className="tt-dropdown-wrap" ref={importMenu.wrapRef} data-tutorial-id="import-menu">
         <button
           type="button"
           className="btn-secondary"
