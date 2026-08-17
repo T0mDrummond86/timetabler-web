@@ -7,6 +7,7 @@
  * a lecturer was picked.
  */
 import type { CoverRequest } from "../api";
+import { formatHours } from "./staffVariance";
 
 function escapeHtml(s: string): string {
   return s
@@ -23,7 +24,15 @@ const HEADERS = [
   "Room",
   "Away lecturer",
   "Cover lecturer",
+  // Spelled out rather than the screen's "Owed"/"After": the table lands in an
+  // email with none of the surrounding page to explain the shorthand.
+  "Hours owed",
+  "Owed after cover",
 ];
+
+function hoursCell(hours: number | null | undefined): string {
+  return hours == null ? "—" : `${formatHours(hours, 1)}h`;
+}
 
 function cells(r: CoverRequest): string[] {
   return [
@@ -35,6 +44,8 @@ function cells(r: CoverRequest): string[] {
     r.away_staff_name,
     // Unassigned is worth saying out loud in an email, not left blank.
     r.cover_staff_name || "Unassigned",
+    hoursCell(r.hours_owed_before),
+    hoursCell(r.hours_owed_after),
   ];
 }
 
