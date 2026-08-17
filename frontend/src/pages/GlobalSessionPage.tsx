@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
@@ -24,6 +24,8 @@ import {
   varianceSignFilter,
 } from "../components/GlobalFilteredAggregateTable";
 import { LinkedSessionImportPanel } from "../components/LinkedSessionImportPanel";
+import { TutorialHost } from "../tutorial/TutorialHost";
+import { readTutorialProgress } from "../tutorial/progress";
 import { LoadingMark } from "../components/LoadingMark";
 import { AccessLevelsPanel } from "../components/AccessLevelsPanel";
 import { PhoneAppCard } from "../components/PhoneAppCard";
@@ -91,10 +93,25 @@ const TABS: { id: Tab; label: string }[] = [
 const TUTORIAL_SESSION_PREFIX = "Tutorial sandbox — ";
 
 export function GlobalSessionPage() {
+  const tutorialSessionId = readTutorialProgress().sessionId;
   const { globalSessionId: idParam } = useParams();
   const globalSessionId = Number(idParam);
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>("members");
+  // The active tab lives in the URL, so views here are linkable — and the
+  // tutorial can both send the learner to a tab and see they arrived.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const tab: Tab = TABS.some((t) => t.id === tabParam) ? (tabParam as Tab) : "members";
+  const setTab = (next: Tab) => {
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.set("tab", next);
+        return p;
+      },
+      { replace: true },
+    );
+  };
   const [global, setGlobal] = useState<GlobalSession | null>(null);
   const [allSessions, setAllSessions] = useState<TimetableSession[]>([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
@@ -361,6 +378,7 @@ export function GlobalSessionPage() {
           <button
             key={t.id}
             type="button"
+            data-tutorial-id={`gtab-${t.id}`}
             className={tab === t.id ? "session-tab active" : "session-tab"}
             onClick={() => setTab(t.id)}
           >
@@ -728,6 +746,7 @@ export function GlobalSessionPage() {
           Back to dashboard
         </button>
       </p>
+      {tutorialSessionId != null && <TutorialHost sessionId={tutorialSessionId} />}
     </AppShell>
   );
 }

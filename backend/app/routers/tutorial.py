@@ -4,15 +4,19 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
+from timetable.core.tenancy_models import TimetableSession
+
 from ..auth.deps import AuthContext, get_auth_context, require_session_editor
 from ..database import get_db
 from ..schemas import TutorialInfoOut, TutorialStartOut
 from ..services.tutorial.lifecycle import (
+    companion_session_name,
     entity_map,
     is_tutorial_sandbox,
     is_tutorial_session,
     reset_tutorial,
     start_tutorial,
+    start_tutorial_companion,
     tutorial_group_id,
 )
 from ..services.tutorial.sample_files import (
@@ -79,10 +83,48 @@ def tutorial_info(
     """Whether this session is the caller's sandbox, plus the entity name→id map."""
     row = _session_in_org(db, session_id, ctx.organization.id, ctx)
     is_tut = is_tutorial_session(row, ctx.user)
+    companion = (
+        db.query(TimetableSession)
+        .filter(
+            TimetableSession.organization_id == ctx.organization.id,
+            TimetableSession.name == companion_session_name(ctx.user),
+            TimetableSession.created_by_id == ctx.user.id,
+        )
+        .first()
+        if is_tut
+        else None
+    )
     return TutorialInfoOut(
         is_tutorial=is_tut,
         entities=entity_map(db, row.id) if is_tut else {},
         global_session_id=tutorial_group_id(db, row.id) if is_tut else None,
+        companion_session_id=companion.id if companion else None,
+    )
+
+
+@router.post("/sessions/{session_id}/tutorial-companion", response_model=TutorialStartOut)
+def create_tutorial_companion(
+    session_id: int,
+    ctx: AuthContext = Depends(require_session_editor),
+    db: Session = Depends(get_db),
+):
+    """Find or create the second-campus sandbox for the global-features tutorial.
+
+    Addressed from the caller's own sandbox, so nobody can conjure companions
+    for other people's sessions.
+    """
+    row = _session_in_org(db, session_id, ctx.organization.id, ctx)
+    if not is_tutorial_session(row, ctx.user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not your tutorial sandbox",
+        )
+    companion, created = start_tutorial_companion(db, primary=row, user=ctx.user)
+    return TutorialStartOut(
+        session=_session_out_with_stats(companion, db),
+        created=created,
+        entities=entity_map(db, companion.id),
+        global_session_id=tutorial_group_id(db, companion.id),
     )
 
 

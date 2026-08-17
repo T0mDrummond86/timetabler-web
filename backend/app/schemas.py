@@ -141,6 +141,8 @@ class TutorialInfoOut(BaseModel):
     is_tutorial: bool
     entities: dict[str, dict[str, int]]
     global_session_id: int | None = None
+    #: The second-campus sandbox, once a global-features module has created it.
+    companion_session_id: int | None = None
 
 
 class TimetableSessionCreate(BaseModel):

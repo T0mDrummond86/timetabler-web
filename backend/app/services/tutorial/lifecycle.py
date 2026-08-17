@@ -30,14 +30,32 @@ from timetable.core.tenancy_models import (
 from ..session_data import restore_session
 from ..session_seed import seed_timetable_session_data
 from ..violation_cache import invalidate_session_violations
-from .dataset import build_tutorial_payload, tutorial_clash_settings_json
+from .dataset import (
+    build_companion_payload,
+    build_tutorial_payload,
+    tutorial_clash_settings_json,
+)
 
 TUTORIAL_PREFIX = "Tutorial sandbox — "
 TUTORIAL_GROUP_PREFIX = "Tutorial group — "
+COMPANION_SUFFIX = " (campus 2)"
 
 
 def tutorial_session_name(user: User) -> str:
     return f"{TUTORIAL_PREFIX}{user.username}"
+
+
+def companion_session_name(user: User) -> str:
+    return f"{TUTORIAL_PREFIX}{user.username}{COMPANION_SUFFIX}"
+
+
+def is_companion_sandbox(row: TimetableSession | None) -> bool:
+    """The second-campus sandbox — carries its own dataset on reset."""
+    return (
+        row is not None
+        and row.name.startswith(TUTORIAL_PREFIX)
+        and row.name.endswith(COMPANION_SUFFIX)
+    )
 
 
 def tutorial_group_name(user: User) -> str:
@@ -186,6 +204,48 @@ def start_tutorial(
     return row, True
 
 
+def start_tutorial_companion(
+    db: Session, *, primary: TimetableSession, user: User
+) -> tuple[TimetableSession, bool]:
+    """Find or create the second-campus sandbox alongside the caller's own.
+
+    Created only when a global-features module asks for it — most learners
+    never need two timetables, and one sandbox is noise enough in a session
+    list. Idempotent, and placed in the owner's tutorial workspace on every
+    call for the same reason the primary is: pre-dating sandboxes get moved
+    in the moment they matter.
+    """
+    name = companion_session_name(user)
+    existing = (
+        db.query(TimetableSession)
+        .filter(
+            TimetableSession.organization_id == primary.organization_id,
+            TimetableSession.name == name,
+            TimetableSession.created_by_id == user.id,
+        )
+        .first()
+    )
+    if existing is not None:
+        place_in_tutorial_group(db, session_row=existing, user=user)
+        db.commit()
+        return existing, False
+
+    row = TimetableSession(
+        organization_id=primary.organization_id,
+        name=name,
+        created_by_id=user.id,
+    )
+    db.add(row)
+    db.flush()
+    seed_timetable_session_data(db, row)
+    restore_session(db, row.id, build_companion_payload())
+    row.clash_check_settings_json = tutorial_clash_settings_json()
+    place_in_tutorial_group(db, session_row=row, user=user)
+    db.commit()
+    db.refresh(row)
+    return row, True
+
+
 def tutorial_group_id(db: Session, timetable_session_id: int) -> int | None:
     """The global workspace this sandbox sits in, for the tutorial to link to."""
     row = (
@@ -197,8 +257,13 @@ def tutorial_group_id(db: Session, timetable_session_id: int) -> int | None:
 
 
 def reset_tutorial(db: Session, row: TimetableSession) -> None:
-    """Re-apply the pristine dataset (clears all content first, incl. change log)."""
-    restore_session(db, row.id, build_tutorial_payload())
+    """Re-apply the pristine dataset (clears all content first, incl. change log).
+
+    The companion resets to the companion dataset — applying the main payload
+    to it would silently turn campus 2 into a second copy of campus 1.
+    """
+    payload = build_companion_payload() if is_companion_sandbox(row) else build_tutorial_payload()
+    restore_session(db, row.id, payload)
     row.clash_check_settings_json = tutorial_clash_settings_json()
     db.commit()
     invalidate_session_violations(db, row.id)

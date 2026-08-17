@@ -13,6 +13,9 @@ import { m10PreferencesImport } from "./m10_preferences_import";
 import { m11AdminExport } from "./m11_admin_export";
 import { m12ClashSettings } from "./m12_clash_settings";
 import { m13BackupRestore } from "./m13_backup_restore";
+import { m14GlobalCover } from "./m14_global_cover";
+import { m15GlobalCustodians } from "./m15_global_custodians";
+import { m16SharedLecturer } from "./m16_shared_lecturer";
 
 export const TUTORIAL_MODULES: TutorialModule[] = [
   m1Orientation,
@@ -28,4 +31,7 @@ export const TUTORIAL_MODULES: TutorialModule[] = [
   m11AdminExport,
   m12ClashSettings,
   m13BackupRestore,
+  m14GlobalCover,
+  m15GlobalCustodians,
+  m16SharedLecturer,
 ];

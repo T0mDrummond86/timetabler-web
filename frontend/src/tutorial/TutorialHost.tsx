@@ -117,8 +117,19 @@ export function TutorialHost({ sessionId }: { sessionId: number }) {
 
   if (!active) return null;
 
-  function startModule(mod: TutorialModule) {
+  async function startModule(mod: TutorialModule) {
     setShowHint(false);
+    if (mod.prepare) {
+      setBusy(true);
+      try {
+        await mod.prepare(sessionId);
+      } catch (err) {
+        setNotice(err instanceof Error ? err.message : "Could not prepare this module.");
+        return;
+      } finally {
+        setBusy(false);
+      }
+    }
     setModuleStatus(mod.id, "in_progress");
     apply({ currentModuleId: mod.id, currentStepIndex: 0 });
     // Deliberately no navigate(mod.startUrl): TimetablePage only parses URL
@@ -297,7 +308,7 @@ export function TutorialHost({ sessionId }: { sessionId: number }) {
                     type="button"
                     className="btn-secondary btn-xs"
                     disabled={!entities}
-                    onClick={() => startModule(mod)}
+                    onClick={() => void startModule(mod)}
                   >
                     {status === "completed" || status === "skipped"
                       ? "Replay"

@@ -25,7 +25,7 @@ from timetable.core.clash_check_settings import (  # noqa: E402
     filter_violations_by_clash_settings,
     parse_clash_check_settings_json,
 )
-from timetable.core.models import Base, Booking, Course, Semester, Unit, Week  # noqa: E402
+from timetable.core.models import Base, Booking, Course, Semester, Staff, Unit, Week  # noqa: E402
 from timetable.core.pending_classes import pending_classes_for_course  # noqa: E402
 from timetable.core.tenancy_models import (  # noqa: E402
     GlobalSession,
@@ -49,7 +49,11 @@ from app.services.tutorial.dataset import (  # noqa: E402
     build_tutorial_payload,
     tutorial_clash_settings_json,
 )
-from app.services.tutorial.lifecycle import start_tutorial, tutorial_group_id  # noqa: E402
+from app.services.tutorial.lifecycle import (  # noqa: E402
+    start_tutorial,
+    start_tutorial_companion,
+    tutorial_group_id,
+)
 
 
 @pytest.fixture()
@@ -416,3 +420,89 @@ class TestTutorialGlobalGroup:
                 db, global_session=group, timetable_session_ids=[row.id, real.id]
             )
         assert exc.value.status_code == 409
+
+
+class TestCompanionSandbox:
+    """The second campus: created on demand, shares the workspace, resets to
+    its own dataset."""
+
+    def _user(self, db, username: str = "tester") -> User:
+        row = User(username=username, name=username, password_hash="x", is_admin=False)
+        db.add(row)
+        db.flush()
+        return row
+
+    def _org(self, db) -> Organization:
+        org = Organization(name="Test Org", slug="test-org")
+        db.add(org)
+        db.flush()
+        return org
+
+    def _pair(self, db):
+        org = self._org(db)
+        user = self._user(db)
+        db.commit()
+        primary, _ = start_tutorial(db, organization_id=org.id, user=user)
+        companion, created = start_tutorial_companion(db, primary=primary, user=user)
+        return org, user, primary, companion, created
+
+    def test_created_in_the_same_tutorial_workspace(self, db):
+        _org, _user, primary, companion, created = self._pair(db)
+
+        assert created
+        assert tutorial_group_id(db, companion.id) == tutorial_group_id(db, primary.id)
+
+    def test_find_or_create_is_idempotent(self, db):
+        _org, user, primary, companion, _ = self._pair(db)
+
+        again, created = start_tutorial_companion(db, primary=primary, user=user)
+
+        assert not created
+        assert again.id == companion.id
+
+    def test_shares_lecturers_and_classes_by_name(self, db):
+        _org, _user, primary, companion, _ = self._pair(db)
+
+        names = lambda model, sid: {  # noqa: E731
+            r.name for r in db.query(model).filter_by(timetable_session_id=sid)
+        }
+        shared_staff = names(Staff, primary.id) & names(Staff, companion.id)
+        shared_units = names(Unit, primary.id) & names(Unit, companion.id)
+
+        assert "Serena Williams" in shared_staff
+        assert "Nelson Mandela" in shared_staff
+        assert "Network Security Fundamentals — VU23217" in shared_units
+        assert "Workplace Communication — BSBXCM301" in shared_units
+
+    def test_reset_restores_the_companion_dataset_not_the_primary(self, db):
+        from app.services.tutorial.lifecycle import reset_tutorial
+
+        _org, _user, _primary, companion, _ = self._pair(db)
+
+        reset_tutorial(db, companion)
+
+        courses = {c.code for c in db.query(Course).filter_by(timetable_session_id=companion.id)}
+        # Campus 2 has its own single group — not the primary's CYB-A/CHC-A set.
+        assert courses == {"CYB-C"}
+
+    def test_shared_lecturer_is_busy_across_sessions(self, db):
+        from app.services.global_sessions import linked_session_busy_slots
+        from app.services.tutorial.dataset import COMPANION_BUSY_DEMO
+
+        _org, _user, primary, _companion, _ = self._pair(db)
+
+        williams = (
+            db.query(Staff)
+            .filter_by(timetable_session_id=primary.id, name="Serena Williams")
+            .one()
+        )
+        busy, label = linked_session_busy_slots(
+            db, timetable_session_id=primary.id, staff_id=williams.id
+        )
+
+        assert busy is not None
+        day_slots = busy.get(str(COMPANION_BUSY_DEMO["day"])) or busy.get(
+            COMPANION_BUSY_DEMO["day"]
+        )
+        assert day_slots, f"no busy slots for demo day in {busy!r}"
+        assert COMPANION_BUSY_DEMO["start"] in day_slots

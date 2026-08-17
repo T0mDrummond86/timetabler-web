@@ -154,6 +154,8 @@ export type TutorialInfo = {
   is_tutorial: boolean;
   entities: Partial<TutorialEntityMap>;
   global_session_id?: number | null;
+  /** The second-campus sandbox, once a global-features module has created it. */
+  companion_session_id?: number | null;
 };
 
 export type GlobalSession = {
@@ -1305,6 +1307,10 @@ export const api = {
   tutorialInfo: (sessionId: number) =>
     apiFetch<TutorialInfo>(`/sessions/${sessionId}/tutorial-info`),
 
+
+  /** Find-or-create the second-campus sandbox for the global tutorial. */
+  tutorialCompanion: (sessionId: number) =>
+    apiFetch<TutorialStart>(`/sessions/${sessionId}/tutorial-companion`, { method: "POST" }),
   dismissViolation: (sessionId: number, bookingId: number, code: string) =>
     apiFetch<{ ok: boolean }>(`/sessions/${sessionId}/violation-dismissals`, {
       method: "POST",

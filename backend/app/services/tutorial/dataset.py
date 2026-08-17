@@ -360,3 +360,81 @@ def build_tutorial_payload() -> dict[str, Any]:
             _booking(24, CYB_T, U_WEBSEC, S_HAWKING, R_A202, 1, 4, 8),   # Tue 10-12
         ],
     }
+
+
+# ---------------------------------------------------------------------------
+# Companion sandbox — "campus 2"
+# ---------------------------------------------------------------------------
+#
+# The global tutorial needs a second timetable in the same workspace: shared
+# lecturers make the linked-busy shading appear, and shared class names make
+# the global custodians list worth reading. Kept deliberately small — it is
+# scenery for the global features, not a second course to complete.
+
+# Local-id aliases for the companion payload (ids are per-payload, so reusing
+# small integers is fine — restore_session renumbers everything anyway).
+C_Q_CYBER = 1
+C_CYB_C = 1
+(C_U_NETSEC, C_U_WORKCOM, C_U_CLOUD) = range(1, 4)
+(C_S_WILLIAMS, C_S_MANDELA, C_S_HOPPER) = range(1, 4)
+(C_R_J101, C_R_J102, C_R_ONL) = range(1, 4)
+
+#: Serena Williams teaches this Tuesday-afternoon block at campus 2; in the
+#: main sandbox her Tuesday shows the linked-busy shading because of it.
+COMPANION_BUSY_DEMO = {"staff": "Serena Williams", "day": 1, "start": 10, "end": 16}
+
+
+def build_companion_payload() -> dict[str, Any]:
+    """The second campus: two shared lecturers, two shared classes, one local of each."""
+    return {
+        "version": PAYLOAD_VERSION,
+        "qualifications": [
+            # Same name as the main sandbox's qualification, so the workspace
+            # amalgamates them into one row.
+            _qual(C_Q_CYBER, "Certificate IV in Cyber Security — 22603VIC", 1),
+        ],
+        "qualification_time_windows": [],
+        "courses": [
+            _course(C_CYB_C, "CYB-C", "Cyber Security Group C (campus 2)", C_Q_CYBER, 0),
+        ],
+        "units": [
+            # Shared with the main sandbox by name…
+            _unit(C_U_NETSEC, "Network Security Fundamentals — VU23217", 4, codes="VU23217"),
+            _unit(C_U_WORKCOM, "Workplace Communication — BSBXCM301", 4, codes="BSBXCM301"),
+            # …plus one class this campus alone teaches.
+            _unit(C_U_CLOUD, "Cloud Fundamentals — ICTCLD401", 4, codes="ICTCLD401"),
+        ],
+        "unit_qualifications": [
+            {"unit_id": u, "qualification_id": C_Q_CYBER}
+            for u in (C_U_NETSEC, C_U_WORKCOM, C_U_CLOUD)
+        ],
+        "unit_allowed_rooms": [],
+        "course_units": [],
+        "staff": [
+            # Shared with the main sandbox by name — the workspace merges them.
+            _staff(C_S_WILLIAMS, "Serena Williams", fte=1.0, order=0),
+            _staff(C_S_MANDELA, "Nelson Mandela", fte=1.0, order=1),
+            _staff(C_S_HOPPER, "Grace Hopper", fte=0.8, order=2),
+        ],
+        "staff_qualification_online_students": [],
+        "staff_unit_online_students": [],
+        "staff_preferences": [],
+        "staff_competencies": [],
+        "staff_availability": [],
+        "rooms": [
+            _room(C_R_J101, "J1.01", "Campus 2 Lab", "on-campus", 20),
+            _room(C_R_J102, "J1.02", "Campus 2 Classroom", "on-campus", 25),
+            _room(C_R_ONL, "ONL-2", "Online Delivery", "online", 99),
+        ],
+        "bookings": [
+            # Williams' Tuesday block — the linked-busy demonstration.
+            _booking(1, C_CYB_C, C_U_NETSEC, C_S_WILLIAMS, C_R_J101,
+                     COMPANION_BUSY_DEMO["day"], COMPANION_BUSY_DEMO["start"],
+                     COMPANION_BUSY_DEMO["end"]),
+            # A second delivery makes her this campus's clear custodian.
+            _booking(2, C_CYB_C, C_U_NETSEC, C_S_WILLIAMS, C_R_J101, 4, 2, 6),
+            _booking(3, C_CYB_C, C_U_WORKCOM, C_S_MANDELA, C_R_J102, 2, 2, 6),
+            _booking(4, C_CYB_C, C_U_WORKCOM, C_S_HOPPER, C_R_J102, 0, 8, 12),
+            _booking(5, C_CYB_C, C_U_CLOUD, C_S_HOPPER, C_R_J102, 3, 4, 8),
+        ],
+    }

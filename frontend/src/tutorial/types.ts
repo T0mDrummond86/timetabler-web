@@ -43,6 +43,9 @@ export type TutorialModule = {
   goal: string;
   /** Picker grouping — modules with the same section render under one heading. */
   section: string;
+  /** Awaited before the module starts — for setup like creating the companion
+   *  sandbox. Idempotent; failures surface as a notice and block the start. */
+  prepare?: (sessionId: number) => Promise<void>;
   /** Where the module starts — navigated to on start/replay. */
   startUrl?: (ctx: VerifyCtx) => string;
   steps: TutorialStep[];
