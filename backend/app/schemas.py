@@ -191,6 +191,14 @@ class GlobalSessionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class GlobalClassCustodianPatch(BaseModel):
+    """Pin one custodian for a class across every session that teaches it."""
+
+    unit_name: str = Field(min_length=1, max_length=300)
+    #: By name, matching how the workspace amalgamates people. Null unpins.
+    staff_name: str | None = None
+
+
 class GlobalSessionMembersPatch(BaseModel):
     timetable_session_ids: list[int] = Field(default_factory=list)
 
@@ -890,6 +898,11 @@ class CoverLogEntryOut(BaseModel):
     source_session_name: str = ""
     hours: float | None = None
     created_at: str | None = None
+    #: What the cover lecturer still owed before this job and after it, walked
+    #: chronologically. Null when they are not behind on hours.
+    hours_owed_before: float | None = None
+    hours_owed_after: float | None = None
+
 
 
 class CoverLogOut(BaseModel):

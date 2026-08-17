@@ -33,7 +33,65 @@ def list_cover_log_entries(db: Session, *, global_session_id: int) -> list[dict]
         .order_by(CoverLogEntry.cover_date.desc(), CoverLogEntry.created_at.desc())
         .all()
     )
-    return [_entry_out(e) for e in rows]
+    return _with_shortfall(db, global_session_id=global_session_id, rows=rows)
+
+
+def _with_shortfall(
+    db: Session, *, global_session_id: int, rows: list[CoverLogEntry]
+) -> list[dict]:
+    """Attach each entry's effect on what its cover lecturer still owes.
+
+    A running ledger rather than one repeated total: read down a lecturer's
+    entries and the debt comes off job by job, which is the question the log is
+    actually asked — "has this cleared what they were owed?".
+
+    The shortfall from the ledger already has every logged hour subtracted, so
+    the *earliest* entry starts from owed-plus-everything-logged and each entry
+    then works forward. Rows are displayed newest-first, so the walk runs over
+    the reversed list.
+    """
+    from .cover_ledger import (
+        cover_hours_by_lecturer,
+        ledger_for,
+        normalize_staff_name,
+    )
+    from .global_sessions import aggregated_staff
+
+    covered = cover_hours_by_lecturer(db, global_session_id)
+    owed_now: dict[str, float] = {}
+    for staff_row in aggregated_staff(db, global_session_id):
+        key = normalize_staff_name(staff_row.get("name"))
+        led = ledger_for(staff_row.get("variance"), covered.get(key, 0.0))
+        if led["still_to_make_up"] is not None:
+            owed_now[key] = led["still_to_make_up"]
+
+    # Oldest first for the walk: each lecturer's debt starts before any of
+    # their logged cover and comes down as the entries are read.
+    running: dict[str, float] = {}
+    figures: dict[int, tuple[float | None, float | None]] = {}
+    for entry in reversed(rows):
+        key = normalize_staff_name(entry.cover_staff_name)
+        outstanding = owed_now.get(key)
+        if not key or outstanding is None:
+            figures[entry.id] = (None, None)
+            continue
+        # still_to_make_up already nets off every logged hour, so add them back
+        # to recover what was owed before this lecturer covered anything.
+        start = outstanding + (covered.get(key, 0.0) or 0.0)
+        already = running.get(key, 0.0)
+        before = max(0.0, start - already)
+        spent = already + (float(entry.hours or 0.0))
+        running[key] = spent
+        figures[entry.id] = (round(before, 2), round(max(0.0, start - spent), 2))
+
+    out: list[dict] = []
+    for entry in rows:
+        item = _entry_out(entry)
+        before, after = figures.get(entry.id, (None, None))
+        item["hours_owed_before"] = before
+        item["hours_owed_after"] = after
+        out.append(item)
+    return out
 
 
 def create_cover_log_entry(

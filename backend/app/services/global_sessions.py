@@ -494,6 +494,87 @@ def _merge_custodian_detail(rows: list[dict], field: str) -> str:
     return "; ".join(f"{sn}: {val}" for sn, val in values if val and val != "—")
 
 
+def _split_labels(raw: object) -> list[str]:
+    """Comma-joined display labels back into individual names."""
+    text = (str(raw or "")).strip()
+    if not text or text == "—":
+        return []
+    out: list[str] = []
+    for part in text.split(","):
+        # Custodian/lecturer labels can carry a delivery count: "Name (3)".
+        name = part.strip()
+        if name.endswith(")") and "(" in name:
+            name = name[: name.rindex("(")].strip()
+        # "Unassigned" is a bucket in the delivery counts, not a person.
+        if name and name != "—" and name != "Unassigned":
+            out.append(name)
+    return out
+
+
+def set_global_class_custodian(
+    db: Session,
+    *,
+    global_session_id: int,
+    unit_name: str,
+    staff_name: str | None,
+) -> dict:
+    """Pin one custodian for a class across every session that teaches it.
+
+    A class taught at two campuses is one class to the curriculum, so the
+    workspace pins it once and writes through to each member session. Matching
+    is by name, the same way the workspace amalgamates everything else.
+
+    Sessions that teach the class but have nobody of that name are skipped and
+    named in the result rather than failing the whole write — a half-applied
+    pin the user is told about beats an error that changes nothing.
+    """
+    wanted_unit = _normalize_label(unit_name)
+    if not wanted_unit:
+        raise ValueError("A class name is required")
+    wanted_staff = normalize_staff_name(staff_name) if staff_name else None
+
+    session_ids = member_session_ids(db, global_session_id)
+    names = _session_name_map(db, session_ids)
+    applied: list[str] = []
+    skipped: list[str] = []
+
+    for sid in session_ids:
+        unit = next(
+            (
+                u
+                for u in db.query(Unit).filter(Unit.timetable_session_id == sid).all()
+                if _normalize_label(u.name) == wanted_unit
+            ),
+            None,
+        )
+        if unit is None:
+            continue  # this session does not teach the class at all
+        if wanted_staff is None:
+            unit.custodian_staff_id = None
+            applied.append(names.get(sid, f"Session {sid}"))
+            continue
+        staff = next(
+            (
+                s
+                for s in db.query(Staff).filter(Staff.timetable_session_id == sid).all()
+                if normalize_staff_name(s.name) == wanted_staff
+            ),
+            None,
+        )
+        if staff is None:
+            skipped.append(names.get(sid, f"Session {sid}"))
+            continue
+        unit.custodian_staff_id = staff.id
+        applied.append(names.get(sid, f"Session {sid}"))
+
+    db.commit()
+    return {
+        "applied": len(applied),
+        "applied_sessions": applied,
+        "skipped_sessions": skipped,
+    }
+
+
 def aggregated_class_custodians(db: Session, global_session_id: int) -> dict:
     session_ids = member_session_ids(db, global_session_id)
     names = _session_name_map(db, session_ids)
@@ -529,6 +610,25 @@ def aggregated_class_custodians(db: Session, global_session_id: int) -> dict:
                 "qualifications": _merge_qualification_labels(members),
                 "lecturers": _merge_custodian_detail(members, "lecturers"),
                 "custodian": _merge_custodian_detail(members, "custodian"),
+                # A pin in any member session marks the row: the workspace pin
+                # writes to all of them, but a session-level pin made earlier
+                # should still read as pinned here.
+                "custodian_is_manual": any(
+                    bool(m.get("custodian_is_manual")) for m in members
+                ),
+                #: Choices for the row's dropdown, by name — the workspace
+                #: matches people by name rather than id. Everyone who delivers
+                #: the class anywhere, plus whoever is currently custodian: a
+                #: custodian pinned from outside the teaching list must still
+                #: appear as its own dropdown's value.
+                "custodian_choices": sorted(
+                    {
+                        name
+                        for m in members
+                        for name in _split_labels(m.get("lecturers"))
+                        + _split_labels(m.get("custodian"))
+                    }
+                ),
             }
         )
     amalgamated.sort(key=lambda r: (r["unit_name"] or "").lower())

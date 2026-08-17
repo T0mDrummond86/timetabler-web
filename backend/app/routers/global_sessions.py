@@ -18,6 +18,7 @@ from ..schemas import (
     CoverLogEntryOut,
     CoverLogOut,
     GlobalSessionCreate,
+    GlobalClassCustodianPatch,
     GlobalSessionMembersPatch,
     GlobalSessionOut,
     GlobalSessionSummaryOut,
@@ -45,6 +46,7 @@ from ..services.global_access import assert_global_user_access, visible_global_s
 from ..services.global_sessions import (
     aggregated_class_custodians,
     aggregated_qualifications,
+    set_global_class_custodian,
     aggregated_rooms,
     aggregated_staff,
     aggregated_units,
@@ -289,6 +291,29 @@ def global_class_custodians(
         db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
     )
     return aggregated_class_custodians(db, global_session_id)
+
+
+@router.patch("/global-sessions/{global_session_id}/class-custodians")
+def patch_global_class_custodian(
+    global_session_id: int,
+    body: GlobalClassCustodianPatch,
+    ctx: AuthContext = Depends(require_session_editor),
+    db: Session = Depends(get_db),
+):
+    """Pin a class's custodian across every member session that teaches it."""
+    assert_global_user_access(
+        db, user=ctx.user, global_session_id=global_session_id, organization_id=ctx.organization.id
+    )
+    try:
+        result = set_global_class_custodian(
+            db,
+            global_session_id=global_session_id,
+            unit_name=body.unit_name,
+            staff_name=body.staff_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return {**result, **aggregated_class_custodians(db, global_session_id)}
 
 
 @router.get("/global-sessions/{global_session_id}/class-custodians/export")

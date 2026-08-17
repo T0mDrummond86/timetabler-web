@@ -103,6 +103,10 @@ export type GlobalClassCustodians = {
     qualifications: string;
     lecturers: string;
     custodian: string;
+    /** True when any member session carries a hand-set custodian. */
+    custodian_is_manual?: boolean;
+    /** Choices for the row's dropdown, by name. */
+    custodian_choices?: string[];
     session_names: string[];
     session_count?: number;
   }[];

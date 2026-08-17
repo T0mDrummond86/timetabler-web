@@ -188,6 +188,9 @@ export type CoverLogEntry = {
   source_session_name: string;
   /** Length of the job, credited to the cover lecturer's ledger. */
   hours: number | null;
+  /** What the cover lecturer owed before this job and after it. */
+  hours_owed_before?: number | null;
+  hours_owed_after?: number | null;
   created_at: string | null;
 };
 
@@ -1178,6 +1181,23 @@ export const api = {
       `/sessions/${sessionId}/units/${unitId}/custodian`,
       { method: "PATCH", body: JSON.stringify({ staff_id: staffId }) },
     ),
+
+  /** Pin a class's custodian across every session in the workspace. */
+  setGlobalClassCustodian: (
+    globalSessionId: number,
+    unitName: string,
+    staffName: string | null,
+  ) =>
+    apiFetch<
+      import("./types").GlobalClassCustodians & {
+        applied: number;
+        applied_sessions: string[];
+        skipped_sessions: string[];
+      }
+    >(`/global-sessions/${globalSessionId}/class-custodians`, {
+      method: "PATCH",
+      body: JSON.stringify({ unit_name: unitName, staff_name: staffName }),
+    }),
 
   async exportClassCustodians(
     globalSessionId: number,

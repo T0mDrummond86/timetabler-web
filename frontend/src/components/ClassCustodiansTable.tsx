@@ -12,6 +12,8 @@ export type ClassCustodianTableRow = {
   custodian_deliveries?: number;
   custodian_is_manual?: boolean;
   candidates?: { staff_id: number; name: string; deliveries: number }[];
+  /** Workspace view: choices by name, since sessions are merged by name. */
+  custodian_choices?: string[];
   session_name?: string;
   session_names?: string[];
 };
@@ -26,6 +28,9 @@ type Props = {
   amalgamatedSessions?: boolean;
   /** Reassign the custodian for one class. Absent means read-only. */
   onReassign?: (unitId: number, staffId: number | null) => void;
+  /** Workspace variant: pin by name across every session teaching the class.
+   *  Takes precedence over onReassign when both are given. */
+  onReassignByName?: (row: ClassCustodianTableRow, staffName: string | null) => void;
   /** Every lecturer in the session, so a custodian need not already deliver
    *  the class — the person who owns a class may not be teaching it now. */
   allStaff?: { id: number; name: string }[];
@@ -92,6 +97,7 @@ export function ClassCustodiansTable({
   showSessionColumn = false,
   amalgamatedSessions = false,
   onReassign,
+  onReassignByName,
   allStaff,
   saving = false,
   onOrderByChange,
@@ -298,7 +304,13 @@ export function ClassCustodiansTable({
                   <td>{row.qualifications || "—"}</td>
                   <td>{row.lecturers}</td>
                   <td>
-                    {onReassign ? (
+                    {onReassignByName ? (
+                      <CustodianNamePicker
+                        row={row}
+                        disabled={saving}
+                        onReassign={onReassignByName}
+                      />
+                    ) : onReassign ? (
                       <CustodianPicker
                         row={row}
                         allStaff={allStaff ?? []}
@@ -387,6 +399,57 @@ function CustodianPicker({
           disabled={disabled}
           title="Go back to the lecturer who delivers this class most"
           onClick={() => onReassign(row.unit_id, null)}
+        >
+          Auto
+        </button>
+      )}
+    </div>
+  );
+}
+
+
+/** The custodian cell in the workspace, where the pin applies everywhere.
+ *
+ * By name rather than id: the same lecturer is a different row in each
+ * session, and the workspace matches people by name throughout. One choice
+ * writes through to every session that teaches the class. */
+function CustodianNamePicker({
+  row,
+  disabled,
+  onReassign,
+}: {
+  row: ClassCustodianTableRow;
+  disabled: boolean;
+  onReassign: (row: ClassCustodianTableRow, staffName: string | null) => void;
+}) {
+  const choices = row.custodian_choices ?? [];
+  // The custodian label can read "Name (3)" or "Campus 1: Name" when sessions
+  // disagree; match a choice inside it rather than comparing whole strings.
+  const current = choices.find((name) => row.custodian.includes(name)) ?? "";
+
+  return (
+    <div className="custodian-cell">
+      <select
+        className="field-select custodian-select"
+        value={current}
+        disabled={disabled}
+        aria-label={`Custodian for ${row.unit_name}`}
+        onChange={(e) => onReassign(row, e.target.value === "" ? null : e.target.value)}
+      >
+        <option value="">— none (derived) —</option>
+        {choices.map((name) => (
+          <option key={name} value={name}>
+            {name}
+          </option>
+        ))}
+      </select>
+      {row.custodian_is_manual && (
+        <button
+          type="button"
+          className="btn-secondary btn-xs"
+          disabled={disabled}
+          title="Unpin in every session — back to whoever delivers this class most"
+          onClick={() => onReassign(row, null)}
         >
           Auto
         </button>

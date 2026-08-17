@@ -130,6 +130,7 @@ export function GlobalSessionPage() {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [custodianOrder, setCustodianOrder] = useState<"class" | "qualification">("class");
+  const [pinningCustodian, setPinningCustodian] = useState(false);
 
   async function exportCustodians() {
     setExporting(true);
@@ -198,6 +199,27 @@ export function GlobalSessionPage() {
       setError(err instanceof Error ? err.message : "Failed to load tab");
     }
   }, [tab, globalSessionId]);
+
+  /** Pin (or unpin) a custodian in every member session teaching the class. */
+  async function pinCustodian(unitName: string, staffName: string | null) {
+    setPinningCustodian(true);
+    setError(null);
+    try {
+      const result = await api.setGlobalClassCustodian(globalSessionId, unitName, staffName);
+      setCustodians({ rows: result.rows, summary: result.summary });
+      if (result.skipped_sessions.length) {
+        // Half-applied is a real outcome when a campus has nobody of that name.
+        setError(
+          `Pinned in ${result.applied} session(s). No lecturer of that name in: ` +
+            `${result.skipped_sessions.join(", ")}.`,
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not set the custodian");
+    } finally {
+      setPinningCustodian(false);
+    }
+  }
 
   const refreshFromLinkedSessions = useCallback(async () => {
     setRefreshing(true);
@@ -606,6 +628,10 @@ export function GlobalSessionPage() {
               onOrderByChange={setCustodianOrder}
               summary={custodians?.summary}
               emptyMessage="No class custodian rows match the current filters."
+              saving={pinningCustodian}
+              onReassignByName={(row, staffName) =>
+                void pinCustodian(row.unit_name, staffName)
+              }
               rows={(custodians?.rows ?? []).map((r) => ({
                 unit_id: r.unit_id,
                 unit_name: r.unit_name,
@@ -613,6 +639,8 @@ export function GlobalSessionPage() {
                 qualifications: r.qualifications ?? "—",
                 lecturers: r.lecturers,
                 custodian: r.custodian,
+                custodian_is_manual: r.custodian_is_manual,
+                custodian_choices: r.custodian_choices,
                 session_names: r.session_names,
               }))}
             />
@@ -645,6 +673,8 @@ export function GlobalSessionPage() {
                     <th>Room</th>
                     <th>Away lecturer</th>
                     <th>Cover lecturer</th>
+                    <th title="What this lecturer still owed before this job">Hours owed</th>
+                    <th title="What they still owed once this job was done">Owed after cover</th>
                     <th>Source session</th>
                     <th aria-label="Actions" />
                   </tr>
@@ -660,6 +690,14 @@ export function GlobalSessionPage() {
                       <td>{e.room_code}</td>
                       <td>{e.away_staff_name}</td>
                       <td>{e.cover_staff_name}</td>
+                      <td>{formatLedgerHours(e.hours_owed_before)}</td>
+                      <td>
+                        {e.hours_owed_after === 0 ? (
+                          <strong title="This job cleared what they owed">0h</strong>
+                        ) : (
+                          formatLedgerHours(e.hours_owed_after)
+                        )}
+                      </td>
                       <td>{e.source_session_name}</td>
                       <td>
                         <button
