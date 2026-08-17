@@ -28,15 +28,31 @@ function candidateLabel(c: CoverCandidate): string {
   return c.busy ? `${marked} — teaching this slot` : marked;
 }
 
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 /** Add whole days to an ISO date string (date-only, no timezone drift). */
 function addDays(iso: string, days: number): string {
   const [y, m, d] = iso.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d + days));
   return dt.toISOString().slice(0, 10);
+}
+
+/** The Monday of the week an ISO date falls in. */
+function mondayOf(iso: string): string {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  // getUTCDay: 0 = Sunday, so Sunday belongs to the week that started 6 days ago.
+  const back = (dt.getUTCDay() + 6) % 7;
+  return addDays(iso, -back);
+}
+
+function thisMonday(): string {
+  return mondayOf(new Date().toISOString().slice(0, 10));
+}
+
+/** "3.5h", or a dash when there is nothing to owe. */
+function owedLabel(hours: number | null | undefined): string {
+  if (hours == null) return "—";
+  return `${formatHours(hours, 1)}h`;
 }
 
 export function LecturerCoverPanel({
@@ -61,7 +77,10 @@ export function LecturerCoverPanel({
   // survive the email round-trip and stay editable until pushed to the log.
   const [requests, setRequests] = useState<CoverRequest[]>([]);
   const [busyRequestId, setBusyRequestId] = useState<number | null>(null);
-  const [coverDate, setCoverDate] = useState(todayIso);
+  // The week being planned. Each request's date is this Monday plus the day the
+  // class falls on, so one box covers a whole week of cover.
+  const [weekStart, setWeekStart] = useState(thisMonday);
+  const [duplicating, setDuplicating] = useState(false);
   const [calendar, setCalendar] = useState<CalendarWeek[]>([]);
   const [coverSemester, setCoverSemester] = useState(1);
   const [coverWeek, setCoverWeek] = useState(1);
@@ -99,16 +118,11 @@ export function LecturerCoverPanel({
     [calendar, coverSemester],
   );
 
-  // Resolve the cover date for a booking from semester+week + the booking's weekday.
+  // Every request's date is the week beginning plus the day the class sits on.
   const computedDateFor = useCallback(
-    (booking: BookingCard): string => {
-      const wk = calendar.find(
-        (w) => w.semester === coverSemester && w.week_number === coverWeek,
-      );
-      if (!wk?.monday_date) return "";
-      return addDays(wk.monday_date, booking.day); // booking.day: 0 = Monday
-    },
-    [calendar, coverSemester, coverWeek],
+    (booking: BookingCard): string =>
+      weekStart ? addDays(weekStart, booking.day) : "", // booking.day: 0 = Monday
+    [weekStart],
   );
 
   // Left grid badged with this session's pending cover requests (and clipboard).
@@ -211,17 +225,15 @@ export function LecturerCoverPanel({
     }
   }, [semesters, coverSemester]);
 
-  // Sync the create-time cover date for the selected booking.
+  // A calendar week names its own Monday, so choosing one moves the week box.
+  // The box stays editable: it is still the value the dates come from.
   useEffect(() => {
-    if (!selectedBooking) return;
-    const existing = requestByBooking.get(selectedBooking.id);
-    if (existing?.cover_date) {
-      setCoverDate(existing.cover_date);
-      return;
-    }
-    const computed = computedDateFor(selectedBooking);
-    if (computed) setCoverDate(computed);
-  }, [selectedBooking, coverSemester, coverWeek, computedDateFor, requestByBooking]);
+    if (!hasCalendar) return;
+    const wk = calendar.find(
+      (w) => w.semester === coverSemester && w.week_number === coverWeek,
+    );
+    if (wk?.monday_date) setWeekStart(mondayOf(wk.monday_date));
+  }, [hasCalendar, calendar, coverSemester, coverWeek]);
 
   useEffect(() => {
     setSelectedBookingId(null);
@@ -275,7 +287,7 @@ export function LecturerCoverPanel({
     try {
       await api.createCoverRequest(sessionId, {
         booking_id: booking.id,
-        cover_date: coverDate || null,
+        cover_date: computedDateFor(booking) || null,
         semester: hasCalendar ? coverSemester : null,
         week_number: hasCalendar ? coverWeek : null,
         day_label: leftGrid.days[booking.day] ?? "",
@@ -342,6 +354,25 @@ export function LecturerCoverPanel({
       onError?.(err instanceof Error ? err.message : "Failed to push to global log");
     } finally {
       setBusyRequestId(null);
+    }
+  }
+
+  async function duplicateWeek() {
+    setDuplicating(true);
+    try {
+      const res = await api.duplicateCoverWeek(sessionId);
+      await loadRequests();
+      if (res.created === 0) {
+        onError?.("That week is already covered — nothing left to copy forward.");
+      } else {
+        // Move the planning week along too, so the next class picked lands in
+        // the week just created rather than the one already dealt with.
+        setWeekStart(res.week_beginning);
+      }
+    } catch (err) {
+      onError?.(err instanceof Error ? err.message : "Failed to duplicate the week");
+    } finally {
+      setDuplicating(false);
     }
   }
 
@@ -465,15 +496,17 @@ export function LecturerCoverPanel({
                   </select>
                 </>
               )}
-              <label className="lecturer-cover-toolbar-label" htmlFor="cover-date">
-                {hasCalendar ? "Date (override)" : "Cover date"}
+              <label className="lecturer-cover-toolbar-label" htmlFor="cover-week-start">
+                Week beginning
               </label>
               <input
-                id="cover-date"
+                id="cover-week-start"
                 type="date"
                 className="field-input"
-                value={coverDate}
-                onChange={(e) => setCoverDate(e.target.value)}
+                value={weekStart}
+                title="The Monday of the week being covered; each request is dated from it"
+                // Snapped to the Monday, so picking any day of the week works.
+                onChange={(e) => setWeekStart(mondayOf(e.target.value))}
               />
             </div>
           </div>
@@ -556,8 +589,17 @@ export function LecturerCoverPanel({
       </div>
 
       <section className="lecturer-cover-requests">
-        <header className="lecturer-cover-pane-title">
-          Pending cover requests ({requests.length})
+        <header className="lecturer-cover-pane-title lecturer-cover-requests-head">
+          <span>Pending cover requests ({requests.length})</span>
+          <button
+            type="button"
+            className="btn-secondary btn-xs"
+            disabled={duplicating || !requests.some((r) => r.cover_date)}
+            title="Copy the last week of this plan forward by one week"
+            onClick={() => void duplicateWeek()}
+          >
+            {duplicating ? "Copying…" : "Repeat next week"}
+          </button>
         </header>
         {requests.length === 0 ? (
           <p className="muted lecturer-cover-empty">
@@ -576,6 +618,15 @@ export function LecturerCoverPanel({
                   <th>Room</th>
                   <th>Away lecturer</th>
                   <th>Cover lecturer</th>
+                  <th className="cover-request-hours-col" title="Hours this lecturer still owes">
+                    Owed
+                  </th>
+                  <th
+                    className="cover-request-hours-col"
+                    title="What they would still owe once this cover is done"
+                  >
+                    After
+                  </th>
                   <th aria-label="Actions" />
                 </tr>
               </thead>
@@ -618,6 +669,14 @@ export function LecturerCoverPanel({
                             </option>
                           ))}
                         </select>
+                      </td>
+                      <td className="cover-request-hours-col">{owedLabel(r.hours_owed_before)}</td>
+                      <td className="cover-request-hours-col">
+                        {r.hours_owed_after != null && r.hours_owed_after === 0 ? (
+                          <strong title="This cover clears what they owe">0h</strong>
+                        ) : (
+                          owedLabel(r.hours_owed_after)
+                        )}
                       </td>
                       <td className="cover-request-actions">
                         <button

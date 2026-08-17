@@ -852,6 +852,11 @@ class CoverRequestOut(BaseModel):
     away_staff_name: str = ""
     cover_staff_id: int | None = None
     cover_staff_name: str = ""
+    #: Length of the job, and what the cover lecturer still owes before and
+    #: after doing it. Null when nobody is assigned or they are not behind.
+    hours: float | None = None
+    hours_owed_before: float | None = None
+    hours_owed_after: float | None = None
 
 
 class CoverRequestsOut(BaseModel):

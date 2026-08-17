@@ -223,6 +223,11 @@ export type CoverRequest = {
   away_staff_name: string;
   cover_staff_id: number | null;
   cover_staff_name: string;
+  /** Length of the job. */
+  hours?: number | null;
+  /** What the cover lecturer still owes before and after doing it. */
+  hours_owed_before?: number | null;
+  hours_owed_after?: number | null;
 };
 
 export type CoverRequestCreate = {
@@ -1108,6 +1113,13 @@ export const api = {
     apiFetch<unknown>(`/sessions/${sessionId}/cover-requests/${requestId}/promote`, {
       method: "POST",
     }),
+
+  /** Copy the last week of the pending cover plan forward by one week. */
+  duplicateCoverWeek: (sessionId: number) =>
+    apiFetch<{ created: number; week_beginning: string; copied_from_week_beginning: string }>(
+      `/sessions/${sessionId}/cover-requests/duplicate-week`,
+      { method: "POST" },
+    ),
 
   coverLog: (globalSessionId: number) =>
     apiFetch<{ entries: CoverLogEntry[] }>(

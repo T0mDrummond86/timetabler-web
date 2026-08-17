@@ -42,6 +42,7 @@ from ..services.booking_mutations import (
 from ..services.cover_lecturers import assign_cover_staff, list_cover_candidates
 from ..services.cover_requests import (
     create_cover_request,
+    duplicate_latest_week,
     delete_cover_request,
     list_cover_requests,
     promote_cover_request,
@@ -437,6 +438,20 @@ def push_cover_request_to_log(
         )
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+
+@router.post("/sessions/{session_id}/cover-requests/duplicate-week")
+def duplicate_cover_week(
+    session_id: int,
+    ctx: AuthContext = Depends(require_session_editor),
+    db: Session = Depends(get_db),
+):
+    """Copy the last week of the pending cover plan forward by one week."""
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        return duplicate_latest_week(db, timetable_session_id=session_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 

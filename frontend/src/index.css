@@ -2874,6 +2874,21 @@ body:has(.app-shell--fill) #root {
   margin-top: 1rem;
 }
 
+/* The repeat action sits with the heading it acts on. */
+.lecturer-cover-requests-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* Numbers read as a ledger: right-aligned, and never wrapping. */
+.cover-request-hours-col {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
 .cover-request-date {
   min-width: 9rem;
   font-size: 0.85rem;
