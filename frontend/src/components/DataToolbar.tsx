@@ -225,7 +225,7 @@ export function DataToolbar({
             </button>
             <button type="button" className="ctx-item ctx-item-desc" role="menuitem" onClick={() => pickImport("qualifications-csp")}>
               <span className="ctx-item-title">Qualifications CSP</span>
-              <span className="ctx-item-hint">Curriculum Structure Package (.docx)</span>
+              <span className="ctx-item-hint">Course study plan (.docx)</span>
             </button>
             <button type="button" className="ctx-item ctx-item-desc" role="menuitem" onClick={() => pickImport("qualifications-ep-nb-csp")}>
               <span className="ctx-item-title">EP-NB CSP</span>

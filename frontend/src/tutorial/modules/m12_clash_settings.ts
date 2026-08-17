@@ -37,17 +37,17 @@ export const m12ClashSettings: TutorialModule = {
       id: "disable-room-capacity",
       title: "Turn a check off",
       body:
-        "First Aid Essentials meets in A1.10, a 12-seat seminar room, with 12 enrolled — the Warnings tab carries a room-capacity warning for it.\n\nFind \"Room capacity\" here and switch it off, then look at the Warnings tab: the warning is gone. Not fixed — gone. Disabling a check silences it everywhere, which is exactly why this screen deserves respect.",
+        "First Aid Essentials meets in A1.10, a 12-seat seminar room, with 12 enrolled — the Warnings tab carries a room-capacity warning for it.\n\nFind \"Room too small\" here and switch it off, then look at the Warnings tab: the warning is gone. Not fixed — gone. Disabling a check silences it everywhere, which is exactly why this screen deserves respect.",
       advance: "verify",
       watch: { api: /\/clash-settings/ },
       verify: async (ctx) => (await roomCapacityEnabled(ctx.sessionId)) === false,
-      hint: "Clash settings tab → find Room capacity → toggle it off. The change saves immediately.",
+      hint: "Clash settings tab → find Room too small → toggle it off. The change saves immediately.",
     },
     {
       id: "reenable-room-capacity",
       title: "Turn it back on",
       body:
-        "Switch Room capacity back on. The warning returns — the overcrowded room never stopped being overcrowded, the app just stopped mentioning it.\n\nRule of thumb: disable a check because it doesn't apply to how you timetable, never because a particular warning is annoying you today.",
+        "Switch Room too small back on. The warning returns — the overcrowded room never stopped being overcrowded, the app just stopped mentioning it.\n\nRule of thumb: disable a check because it doesn't apply to how you timetable, never because a particular warning is annoying you today.",
       advance: "verify",
       watch: { api: /\/clash-settings/ },
       verify: async (ctx) => (await roomCapacityEnabled(ctx.sessionId)) === true,

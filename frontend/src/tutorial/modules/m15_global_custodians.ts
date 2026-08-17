@@ -24,12 +24,12 @@ export const m15GlobalCustodians: TutorialModule = {
       id: "open-global-list",
       title: "Open the workspace custodian list",
       body:
-        "A class's custodian is the lecturer who owns it — keeps the materials current, answers for its delivery. By default that's whoever teaches it most.\n\nOpen your tutorial workspace and its Class custodians tab. Network Security Fundamentals and Workplace Communication appear from both campuses: same class, one row, with every lecturer who delivers it anywhere.",
+        "A class's custodian is the lecturer who owns it — keeps the materials current, answers for its delivery. By default that's whoever teaches it most.\n\nOpen your tutorial workspace in a second browser tab if it isn't already there (duplicate this tab, then Dashboard → Global workspaces → Tutorial group — you), and open its Class custodians tab. Network Security Fundamentals and Workplace Communication appear from both campuses: same class, one row, with every lecturer who delivers it anywhere.",
       advance: "verify",
       target: "gtab-custodians",
       watch: { url: true },
       verify: (ctx) => onWorkspaceTab(ctx, "custodians"),
-      hint: "Sidebar → the workspace name → Class custodians tab.",
+      hint: "Right-click this browser tab → Duplicate → in the copy: Dashboard → Global workspaces → Tutorial group — … → Class custodians tab. Keeping the timetable open in this tab makes the pin step quicker.",
     },
     {
       id: "work-the-list",

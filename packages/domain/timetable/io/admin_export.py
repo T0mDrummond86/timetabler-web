@@ -508,8 +508,7 @@ def _write_course_admin_sheet(
             )
             _write_active_week_band_row(ws, cur, 2, b, unit_text, fill)
 
-        eid = (b.external_id or "").strip()
-        flags = highlights.get(eid) if eid else None
+        flags = highlights.get(str(b.id))
         if flags is not None:
             _apply_row_change_highlights(
                 ws, cur, flags, in_term_1=bool(in_term_1), in_term_2=bool(in_term_2)
@@ -584,9 +583,9 @@ def _write_admin_workbook(
         raise RuntimeError("No week exists in session.")
     change_highlights: dict = {}
     if timetable_session_id is not None:
-        from ..core.change_log_data import admin_export_highlights_by_external_id
+        from ..core.change_log_data import admin_export_highlights_by_booking_id
 
-        change_highlights = admin_export_highlights_by_external_id(
+        change_highlights = admin_export_highlights_by_booking_id(
             session, timetable_session_id=timetable_session_id
         )
     courses = _courses_for_admin_export(

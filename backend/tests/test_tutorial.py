@@ -506,3 +506,50 @@ class TestCompanionSandbox:
         )
         assert day_slots, f"no busy slots for demo day in {busy!r}"
         assert COMPANION_BUSY_DEMO["start"] in day_slots
+
+
+class TestResetClearsWorkspaceLog:
+    """Practice cover jobs live on the workspace, so reset must reach them."""
+
+    def _pair(self, db):
+        org = Organization(name="Test Org", slug="test-org")
+        db.add(org)
+        db.flush()
+        user = User(username="tester", name="tester", password_hash="x", is_admin=False)
+        db.add(user)
+        db.commit()
+        primary, _ = start_tutorial(db, organization_id=org.id, user=user)
+        return primary
+
+    def _log_entry(self, db, gsid: int):
+        from timetable.core.tenancy_models import CoverLogEntry
+
+        import datetime as _dt
+
+        db.add(
+            CoverLogEntry(
+                global_session_id=gsid,
+                cover_date=_dt.date(2026, 8, 24),
+                day_label="Monday",
+                time_label="13:00 – 15:00",
+                group_name="CHC-A",
+                unit_name="Legal and Ethical Practice — CHCLEG003",
+                room_code="A2.01",
+                away_staff_name="Cathy Freeman",
+                cover_staff_name="Nelson Mandela",
+            )
+        )
+        db.commit()
+
+    def test_reset_wipes_the_tutorial_workspace_cover_log(self, db):
+        from timetable.core.tenancy_models import CoverLogEntry
+        from app.services.tutorial.lifecycle import reset_tutorial
+
+        primary = self._pair(db)
+        gsid = tutorial_group_id(db, primary.id)
+        self._log_entry(db, gsid)
+        assert db.query(CoverLogEntry).filter_by(global_session_id=gsid).count() == 1
+
+        reset_tutorial(db, primary)
+
+        assert db.query(CoverLogEntry).filter_by(global_session_id=gsid).count() == 0

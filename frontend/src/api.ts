@@ -1501,6 +1501,10 @@ export const api = {
       "admin-visual": `/sessions/${sessionId}/import/admin-visual`,
     };
     const res = await fetch(`${API_BASE}${paths[kind]}`, { method: "POST", headers, body: form });
+    // Multipart uploads bypass apiFetch, so emit the event it would have:
+    // tutorial import steps verify on these, and without one an event-only
+    // step can never fire.
+    emitApiEvent({ path: paths[kind], method: "POST", ok: res.ok });
     if (!res.ok) {
       let detail = res.statusText;
       try {

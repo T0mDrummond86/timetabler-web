@@ -22,7 +22,7 @@ export const m9CspImport: TutorialModule = {
       id: "what-a-csp",
       title: "What a CSP gives you",
       body:
-        "A Curriculum Structure Package is the Word document a qualification arrives as: semester tables listing each class, its hours, and its unit codes.\n\nRather than typing all of that in, you import the document — one qualification is created with every class linked, hours converted to timetable lengths, and unit codes attached.\n\nDownload the sample CSP below and open it to see the shape: two semester tables, six classes, one of them carrying two unit codes.",
+        "A CSP — course study plan — is the Word document a qualification arrives as: semester tables listing each class, its hours, and its unit codes.\n\nRather than typing all of that in, you import the document — one qualification is created with every class linked, hours converted to timetable lengths, and unit codes attached.\n\nDownload the sample CSP below and open it to see the shape: two semester tables, six classes, one of them carrying two unit codes.",
       advance: "next",
       download: {
         label: "Download the sample CSP (.docx)",

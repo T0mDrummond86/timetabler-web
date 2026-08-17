@@ -265,6 +265,19 @@ def reset_tutorial(db: Session, row: TimetableSession) -> None:
     payload = build_companion_payload() if is_companion_sandbox(row) else build_tutorial_payload()
     restore_session(db, row.id, payload)
     row.clash_check_settings_json = tutorial_clash_settings_json()
+    # Practice cover jobs live on the workspace, not the session, so a session
+    # restore alone leaves them behind — and every "the log has entries" check
+    # in the tutorials would pass forever after the first run. The workspace is
+    # the learner's own tutorial group, so clearing its log wipes nothing real.
+    if not is_companion_sandbox(row):
+        from timetable.core.tenancy_models import CoverLogEntry, GlobalSession
+
+        gsid = tutorial_group_id(db, row.id)
+        group = db.get(GlobalSession, gsid) if gsid is not None else None
+        if group is not None and group.is_tutorial:
+            db.query(CoverLogEntry).filter(
+                CoverLogEntry.global_session_id == group.id
+            ).delete()
     db.commit()
     invalidate_session_violations(db, row.id)
 

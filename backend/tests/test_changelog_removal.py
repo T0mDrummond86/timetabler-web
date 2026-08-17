@@ -22,7 +22,7 @@ os.environ["AUTO_CREATE_TABLES"] = "false"
 os.environ["JWT_SECRET"] = "test-secret"
 
 from timetable.core.change_log_data import (  # noqa: E402
-    admin_export_highlights_by_external_id,
+    admin_export_highlights_by_booking_id,
     gather_timetabling_change_log_display_rows,
 )
 from timetable.core.models import (  # noqa: E402
@@ -141,10 +141,10 @@ class World:
         return next((r for r in rows if r.booking_id == self.booking.id), None)
 
     def highlighted(self) -> bool:
-        hl = admin_export_highlights_by_external_id(
+        hl = admin_export_highlights_by_booking_id(
             self.db, timetable_session_id=self.session_id
         )
-        return "4401238" in hl
+        return str(self.booking.id) in hl
 
 
 def test_removal_hides_the_change_it_was_applied_to(db):

@@ -431,14 +431,16 @@ def _highlight_from_net_states(
     )
 
 
-def admin_export_highlights_by_external_id(
+def admin_export_highlights_by_booking_id(
     session: Session,
     *,
     timetable_session_id: int,
 ) -> dict[str, AdminExportChangeHighlight]:
-    """Resolved net timetabling changes keyed by class-card id (``Booking.external_id``).
+    """Resolved net timetabling changes keyed by ``Booking.id`` (as a string).
 
-    Entries without an event id are omitted. Deleted classes are omitted (not on export).
+    Keyed on the booking id, not the aSc card id: cards created natively in the
+    app have no external id, and keying on one meant their changes silently
+    never marked up. Deleted classes are omitted (not on the export).
     """
     before_map, after_map = resolve_session_booking_net_maps(
         session, timetable_session_id=timetable_session_id
@@ -456,12 +458,9 @@ def admin_export_highlights_by_external_id(
         a_state = after_map.get(bid)
         if a_state is None:
             continue
-        eid = _card_id_from_state(a_state) or _card_id_from_state(b_state)
-        if not eid:
-            continue
         flags = _highlight_from_net_states(b_state, a_state)
         if flags.time or flags.lecturer or flags.room or flags.day_header_days:
-            out[eid] = flags
+            out[str(bid)] = flags
 
     # Manual records highlight exactly the fields chosen when they were logged
     # (day → the booking's current day header). Records without a stored
@@ -470,9 +469,7 @@ def admin_export_highlights_by_external_id(
     for payload, booking in _manual_entry_bookings(session, timetable_session_id):
         if payload.get("manual_removed") is True:
             continue  # removed from the markup, but still shown in the log
-        eid = (booking.external_id or "").strip()
-        if not eid:
-            continue
+        eid = str(booking.id)
         chosen = payload.get("fields")
         if not isinstance(chosen, list):
             continue

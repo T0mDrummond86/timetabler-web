@@ -35,10 +35,13 @@ export const m14GlobalCover: TutorialModule = {
       id: "push-a-job",
       title: "Push a cover job to the log",
       body:
-        "On the Lecturer cover tab, get one request ready and push it: pick a lecturer needing cover, double-click one of their classes with a cover lecturer selected, then press \"Push to log\" on the request.\n\nIf you finished the cover-routine module, the log already has your job — this step recognises that and passes.",
+        "On the Lecturer cover tab, get one request ready and push it: pick a lecturer needing cover, double-click one of their classes with a cover lecturer selected, then press \"Push to log\" on the request.\n\nIf the log already holds a job from the cover-routine module, that counts too — the log having an entry is what this step is really about.",
       advance: "verify",
       target: "tab-lecturer_cover",
       watch: { api: /\/cover-requests|\/cover-log/ },
+      // Event-only: this step should complete off something the learner does,
+      // not auto-pass the moment the module opens because an old entry exists.
+      eventOnly: true,
       verify: async (ctx) => {
         const info = await api.tutorialInfo(ctx.sessionId);
         if (info.global_session_id == null) return false;
@@ -51,12 +54,12 @@ export const m14GlobalCover: TutorialModule = {
       id: "read-it-in-the-workspace",
       title: "Read it where the team does",
       body:
-        "Now see it from the other side. Open your tutorial workspace — the workspace name in the sidebar links there — and open its Cover log tab.\n\nEvery entry names the class, the date, who was away, who covered, the hours credited, and which session it came from. When both campuses push their jobs here, this one table is the department's cover record.",
+        "Now see it from the other side — and keep this timetable open while you do. Duplicate this browser tab (right-click the tab strip → Duplicate), and in the copy go to the Dashboard and open Tutorial group — you under Global workspaces, then its Cover log tab.\n\nThat two-tab setup is how the app is meant to be worked: timetable in one tab, workspace in the other, this panel following you in both.\n\nEvery entry names the class, the date, who was away, who covered, the hours credited, and which session it came from. When both campuses push their jobs here, this one table is the department's cover record.",
       advance: "verify",
       target: "gtab-cover_log",
       watch: { url: true },
       verify: (ctx) => onWorkspaceTab(ctx, "cover_log"),
-      hint: "Timetable sidebar → click the workspace name (Tutorial group — …) → Cover log tab. Or Dashboard → the workspace card.",
+      hint: "Right-click this browser tab → Duplicate. In the new tab: Dashboard → Global workspaces → Tutorial group — … → Cover log tab. (Navigating this tab works too — the duplicate just keeps your place here.)",
     },
   ],
   recap: [
