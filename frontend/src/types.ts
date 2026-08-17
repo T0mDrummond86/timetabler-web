@@ -302,25 +302,6 @@ export type StaffAvailability = {
   blocked: { day: number; slot: number }[];
 };
 
-export type ResourceUsage = {
-  kind: string;
-  resources: string[];
-  resource_ids: number[];
-  resource_tooltips: string[];
-  days: string[];
-  num_slots: number;
-  cells: {
-    booking_id: number | null;
-    label: string;
-    fill_colour: string;
-    status: string;
-    tooltip: string;
-    row_span: number;
-  }[][][];
-  summary: string;
-  course_id?: number;
-};
-
 export type StaffHoursRow = {
   id: number;
   name: string;
@@ -399,20 +380,6 @@ export type UnitConstraints = {
   unit_id: number;
   allowed_room_ids: number[];
   competent_staff_ids: number[];
-};
-
-export type LapRow = {
-  unit_id: number;
-  unit_name: string;
-  component_codes: string | null;
-  has_lap: boolean;
-  original_filename: string | null;
-  uploaded_at: string | null;
-  timetable_lecturer_name: string;
-};
-
-export type LapList = {
-  rows: LapRow[];
 };
 
 export type CreateBookingDraft = {

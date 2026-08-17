@@ -50,8 +50,6 @@ import { CourseSemesterPanel } from "../components/CourseSemesterPanel";
 import { EntityEditorsPanel } from "../components/EntityEditorsPanel";
 import { HoldingAreaPanel } from "../components/HoldingAreaPanel";
 import { TimetableSidebar } from "../components/TimetableSidebar";
-import { UsageDashboard } from "../components/UsageDashboard";
-import { LapCreationPanel } from "../components/LapCreationPanel";
 import { LecturerCoverPanel } from "../components/LecturerCoverPanel";
 import { NowPanel } from "../components/NowPanel";
 import { LoadingMark } from "../components/LoadingMark";
@@ -96,8 +94,6 @@ type SessionTab =
   | "warnings"
   | "clash_settings"
   | "custodians"
-  | "usage"
-  | "lap"
   | "lecturer_cover"
   | "now"
   | "unit_mapper";
@@ -132,8 +128,6 @@ const SESSION_TABS: { id: SessionTab; label: string; secondary?: boolean }[] = [
   { id: "rooms", label: "Rooms", secondary: true },
   { id: "clash_settings", label: "Clash settings", secondary: true },
   { id: "custodians", label: "Class custodians", secondary: true },
-  { id: "usage", label: "Usage", secondary: true },
-  { id: "lap", label: "LAP creation", secondary: true },
 ];
 
 /** Where the divider goes — derived, so reordering the list moves it too. */
@@ -2155,14 +2149,8 @@ export function TimetablePage() {
           canEdit={canEditSession}
         />
       )}
-      {sessionTab === "usage" && courses.length > 0 && (
-        <UsageDashboard sessionId={sessionId} refreshKey={changeLogKey} />
-      )}
       {sessionTab === "unit_mapper" && (
         <UnitClassMapperPanel sessionId={sessionId} onError={setError} />
-      )}
-      {sessionTab === "lap" && courses.length > 0 && (
-        <LapCreationPanel sessionId={sessionId} refreshKey={changeLogKey} />
       )}
 
       {createDraft && grid && (

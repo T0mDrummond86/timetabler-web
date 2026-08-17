@@ -6,7 +6,6 @@ import {
   ChangeLogList,
   CourseSemesterSchedule,
   ImportReport,
-  LapList,
   TimetableEntity,
   TimetableGrid,
   TimetableView,
@@ -481,20 +480,6 @@ function timetablePath(
     params.set("block_week_index", String(opts.blockWeekIndex));
   }
   return `/sessions/${sessionId}/timetable?${params.toString()}`;
-}
-
-function triggerAuthDownload(path: string): void {
-  const token = getToken();
-  const url = new URL(`${API_BASE}${path}`, window.location.origin);
-  if (token) url.searchParams.set("access_token", token);
-  const iframe = document.createElement("iframe");
-  iframe.style.display = "none";
-  iframe.setAttribute("aria-hidden", "true");
-  document.body.appendChild(iframe);
-  iframe.src = url.toString();
-  window.setTimeout(() => {
-    iframe.remove();
-  }, 120_000);
 }
 
 export const api = {
@@ -1277,12 +1262,6 @@ export const api = {
   deleteCourse: (sessionId: number, courseId: number) =>
     apiFetch<{ deleted: boolean }>(`/sessions/${sessionId}/courses/${courseId}`, { method: "DELETE" }),
 
-  staffUsage: (sessionId: number) =>
-    apiFetch<import("./types").ResourceUsage>(`/sessions/${sessionId}/usage/staff`),
-
-  roomUsage: (sessionId: number) =>
-    apiFetch<import("./types").ResourceUsage>(`/sessions/${sessionId}/usage/rooms`),
-
   patchSession: (sessionId: number, name: string) =>
     apiFetch<TimetableSession>(`/sessions/${sessionId}`, {
       method: "PATCH",
@@ -1535,51 +1514,4 @@ export const api = {
     return res.json();
   },
 
-  lapList: (sessionId: number) => apiFetch<LapList>(`/sessions/${sessionId}/laps`),
-
-  async lapUpload(sessionId: number, unitId: number, file: File): Promise<void> {
-    const token = getToken();
-    const headers: Record<string, string> = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
-    const form = new FormData();
-    form.append("file", file);
-    const res = await fetch(`${API_BASE}/sessions/${sessionId}/laps/${unitId}`, {
-      method: "POST",
-      headers,
-      body: form,
-    });
-    if (!res.ok) {
-      let detail = res.statusText;
-      try {
-        const body = await res.json();
-        if (body.detail) detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
-      } catch {
-        /* ignore */
-      }
-      throw new Error(detail);
-    }
-  },
-
-  lapDelete: (sessionId: number, unitId: number) =>
-    apiFetch<void>(`/sessions/${sessionId}/laps/${unitId}`, { method: "DELETE" }),
-
-  lapDownload(sessionId: number, unitId: number, deliveryPeriod?: string) {
-    const params = new URLSearchParams();
-    const period = deliveryPeriod?.trim();
-    if (period) params.set("delivery_period", period);
-    const qs = params.toString();
-    triggerAuthDownload(
-      `/sessions/${sessionId}/laps/${unitId}/download${qs ? `?${qs}` : ""}`,
-    );
-  },
-
-  lapDownloadAll(sessionId: number, deliveryPeriod?: string) {
-    const params = new URLSearchParams();
-    const period = deliveryPeriod?.trim();
-    if (period) params.set("delivery_period", period);
-    const qs = params.toString();
-    triggerAuthDownload(
-      `/sessions/${sessionId}/laps/download-all${qs ? `?${qs}` : ""}`,
-    );
-  },
 };
