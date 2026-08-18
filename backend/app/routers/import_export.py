@@ -143,8 +143,8 @@ async def import_qualifications_ep_nb_csp(
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=(
-                    "Workbook does not look like an EP-NB CSP export "
-                    "(expected qualification title, Semester bands, and BB Shell/TPN rows)."
+                    "Workbook does not look like a CSP planning spreadsheet "
+                    "(expected a title on row 1 and a header row naming a TPN column)."
                 ),
             )
         return import_qualifications_ep_nb_csp_workbook(db, session_id, tmp)

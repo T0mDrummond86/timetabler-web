@@ -102,9 +102,11 @@ def test_import_minimal_ep_nb(session, tmp_path):
     rep = import_qualifications_from_ep_nb_csp(
         session, path, timetable_session_id=session.timetable_session_id
     )
-    assert rep.qualifications_created == 2
+    # One qualification, not one per band: the bands describe the curriculum's
+    # shape, and splitting into stages is a later, manual decision.
+    assert rep.qualifications_created == 1
     assert rep.classes_created == 2
-    assert session.query(Qualification).count() == 2
+    assert session.query(Qualification).count() == 1
     unit = session.query(Unit).filter_by(name="Cluster Alpha").one()
     assert "VU11111" in (unit.component_codes or "")
     assert unit.length_slots == 6
@@ -128,8 +130,123 @@ def test_import_ep_nb_sample_when_available(session):
     rep = import_qualifications_from_ep_nb_csp(
         session, _EP_NB_SAMPLE, timetable_session_id=session.timetable_session_id
     )
-    assert rep.qualifications_created == 2
-    assert rep.classes_created >= 15
+    # The two semester bands are read (asserted above) but land in a single
+    # qualification; stage splitting is a decision made later, by hand.
+    assert rep.qualifications_created == 1
+    # 11 classes carrying 20 unit codes — verified against this workbook, and
+    # unchanged by the layout work (the previous >= 15 never matched it).
+    assert rep.classes_created == 11
 
     win = session.query(Unit).filter(Unit.name.ilike("%Windows Desktop%")).one()
     assert "ICTNWK422" in (win.component_codes or "")
+
+
+# ---------------------------------------------------------------------------
+# The "lecturer" layout — no BB Shell column, bands written as "Part N", and
+# the class name coming from the skill-set description (blank in real files).
+# ---------------------------------------------------------------------------
+
+
+def _write_lecturer_layout(path: Path, *, skill_set: str | None = None) -> None:
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws["B1"] = "AE780 Transition to Cyber Security"   # title in B, not A
+    ws["B3"] = "Part 1 •\tUnassigned – Thursday night"
+    for col, label in zip("ABCDEFGHIJ", [
+        "Lecturer(s)", "Hrs in class", "Actual", "Effic.", "Total NH",
+        "Skill set/ description", "SIN", "TPN", "UoC(s) being assessed", "Core / Elect",
+    ]):
+        ws[f"{col}4"] = label
+    ws["A5"] = "??"
+    ws["B5"] = 3
+    if skill_set:
+        ws["F5"] = skill_set
+    ws["G5"] = "AZ343"
+    ws["H5"] = "VU23214"
+    ws["H6"] = "VU23217"          # continuation row: unit code only
+    ws["B7"] = 3                   # part subtotal, no TPN
+    ws["B8"] = "Part 2 •\tJohn Robertson – Monday night"
+    for col, label in zip("ABCDEFGHIJ", [
+        "Lecturer(s)", "Hrs in class", "Actual", "Effic.", "Total NH",
+        "Skill set/ description", "SIN", "TPN", "UoC(s) being assessed", "Core / Elect",
+    ]):
+        ws[f"{col}9"] = label
+    ws["A10"] = "John Robertson"
+    ws["B10"] = 2
+    ws["H10"] = "ICTPRG435"
+    ws["H11"] = "VU23216"
+    wb.save(path)
+
+
+def test_lecturer_layout_is_recognised(tmp_path):
+    path = tmp_path / "lecturer.xlsx"
+    _write_lecturer_layout(path)
+
+    # Used to be rejected outright for having no Semester bands and no BB Shell.
+    assert is_ep_nb_csp_workbook(path) is True
+
+
+def test_lecturer_layout_reads_title_from_anywhere_on_row_one(tmp_path):
+    path = tmp_path / "lecturer.xlsx"
+    _write_lecturer_layout(path)
+
+    stages = extract_ep_nb_csp_stages(path)
+
+    assert all("AE780 Transition to Cyber Security" in s.qualification_name for s in stages)
+
+
+def test_part_bands_are_read_like_semesters(tmp_path):
+    path = tmp_path / "lecturer.xlsx"
+    _write_lecturer_layout(path)
+
+    stages = extract_ep_nb_csp_stages(path)
+
+    assert [s.stage_label for s in stages] == ["Part 1", "Part 2"]
+
+
+def test_class_name_comes_from_the_skill_set_description(tmp_path):
+    path = tmp_path / "lecturer.xlsx"
+    _write_lecturer_layout(path, skill_set="Cyber Fundamentals")
+
+    stages = extract_ep_nb_csp_stages(path)
+
+    # Column A holds the lecturer here, so it must not become the class name.
+    assert stages[0].classes[0].name == "Cyber Fundamentals"
+
+
+def test_a_blank_skill_set_gets_a_placeholder_rather_than_failing(tmp_path):
+    path = tmp_path / "lecturer.xlsx"
+    _write_lecturer_layout(path)  # no skill set at all, as in the real file
+
+    stages = extract_ep_nb_csp_stages(path)
+    names = [c.name for s in stages for c in s.classes]
+
+    assert names == ["Unnamed class 1", "Unnamed class 2"]
+    assert "??" not in names  # the lecturer column is not a fallback
+
+
+def test_multi_unit_blocks_and_hours_survive_the_lecturer_layout(tmp_path):
+    path = tmp_path / "lecturer.xlsx"
+    _write_lecturer_layout(path)
+
+    stages = extract_ep_nb_csp_stages(path)
+    first, second = stages[0].classes[0], stages[1].classes[0]
+
+    assert first.unit_codes == ["VU23214", "VU23217"]
+    assert first.hours == 3
+    assert second.unit_codes == ["ICTPRG435", "VU23216"]
+    assert second.hours == 2
+
+
+def test_placeholder_names_are_reported_as_a_warning(session, tmp_path):
+    path = tmp_path / "lecturer.xlsx"
+    _write_lecturer_layout(path)
+
+    rep = import_qualifications_from_ep_nb_csp(
+        session, path, timetable_session_id=session.timetable_session_id
+    )
+
+    assert rep.classes_created == 2
+    assert any("placeholder names" in w for w in rep.warnings)

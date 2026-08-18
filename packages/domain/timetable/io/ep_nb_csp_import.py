@@ -1,20 +1,22 @@
-"""Import qualifications + classes from NMTAFE EP-NB CSP Excel workbooks (.xlsx).
+"""Import qualifications + classes from NMTAFE CSP planning workbooks (.xlsx).
 
-Layout (single sheet)
-=====================
-Row 1, column A: qualification title
-  e.g. ``ICT40120 - AC10 - Certificate IV in Information Technology (Networking) 2026``
+These workbooks are laid out by hand and come in more than one shape, so the
+parser reads the header row to find out where things are rather than assuming
+fixed columns. Two shapes are known:
 
-Semester bands are marked in column B (``Semester 1``, ``Semester 2``, …).
-Each band has a header row containing ``BB Shell`` and ``TPN``, then data rows:
+  * a **BB Shell** layout — column A names the class, and the skill-set text in
+    column F is a fallback when column A is a placeholder such as ``???``
+  * a **lecturer** layout — column A names the lecturer, and the class name
+    comes from the skill-set description instead
 
-  A  BB Shell / class label (merged clusters leave this blank on continuation rows)
-  B  Hrs in class (weekly contact hours for the class)
-  F  Skill set / description (used when BB Shell is ``???``)
-  H  TPN unit code
-  I  Unit of competency title
+Common to both: the class's weekly hours, a TPN unit code per row, and the unit
+of competency title. A class spanning several units is one block — the first
+row carries the name and hours, and continuation rows carry only their TPN.
 
-Multi-unit classes share one BB Shell block; continuation rows only populate TPN (col H).
+Bands (``Semester 1``, ``Part 2 • …``) group the rows visually. They are read
+when present but are not required: the importer produces one qualification
+regardless, because the bands describe the curriculum's shape rather than the
+timetable's.
 """
 from __future__ import annotations
 
@@ -36,6 +38,7 @@ from ..core.models import Course, Qualification, Unit, UnitQualification
 from ..core.qualification_schedule import SCHEDULE_PERIOD_DAY, replace_qualification_time_windows
 from ..core.unit_brackets import apply_unit_bracket_fields_from_names, normalize_component_codes_commas
 
+#: Fallback positions, used only when a header row does not name the column.
 _COL_BB_SHELL = 0
 _COL_HOURS = 1
 _COL_SKILL_SET = 5
@@ -43,8 +46,54 @@ _COL_TPN = 7
 _COL_UOC_TITLE = 8
 _COL_SEMESTER = 1
 
-_SEMESTER_RE = re.compile(r"^semester\s+(\d+)", re.IGNORECASE)
-_PLACEHOLDER_SHELLS = frozenset({"???", "?", "-", "—"})
+#: Bands that group rows. "Part 1 • Thursday night" is as common as "Semester 1",
+#: and neither is required — see the module docstring. Deliberately excludes
+#: "Term N": real unit descriptions begin with it, and treating those as bands
+#: chopped a semester's classes in half.
+_BAND_RE = re.compile(r"^(semester|part|stage)\s+(\d+)", re.IGNORECASE)
+#: A band is a heading, so its row is nearly empty. A populated row that merely
+#: mentions a band is a class row.
+_MAX_CELLS_ON_A_BAND_ROW = 3
+#: Column A sometimes holds a stand-in rather than a class name.
+_PLACEHOLDER_SHELLS = frozenset({"???", "??", "?", "-", "—", "n/a", "na"})
+#: Given to a class whose name is blank in the workbook, so the units still
+#: import and the gap is obvious enough to be filled in afterwards.
+_UNNAMED_PREFIX = "Unnamed class"
+
+
+class _Layout:
+    """Where the columns are, read from the workbook's own header row.
+
+    These workbooks are maintained by people, and the columns move. Reading the
+    header is the difference between supporting one variant and supporting the
+    ones that have not been written yet.
+    """
+
+    def __init__(self, row: tuple) -> None:
+        self.label: int | None = None
+        self.hours: int = _COL_HOURS
+        self.skill: int = _COL_SKILL_SET
+        self.tpn: int = _COL_TPN
+        self.uoc: int = _COL_UOC_TITLE
+        for index, value in enumerate(row):
+            text = (_clean_cell(value) or "").lower()
+            if not text:
+                continue
+            if text.startswith("bb shell"):
+                self.label = index
+            elif text.startswith("hrs"):
+                self.hours = index
+            elif text.startswith("skill set"):
+                self.skill = index
+            elif text == "tpn":
+                self.tpn = index
+            elif text.startswith("uoc"):
+                self.uoc = index
+
+    @property
+    def names_the_class_in_column_a(self) -> bool:
+        """True for the BB Shell layout, false where column A is the lecturer."""
+        return self.label is not None
 
 
 def _clean_cell(v) -> str | None:
@@ -65,52 +114,86 @@ def _parse_hours(v) -> float | None:
 
 
 def _is_header_row(row: tuple) -> bool:
-    bb = _clean_cell(row[_COL_BB_SHELL] if len(row) > _COL_BB_SHELL else None)
-    tpn = _clean_cell(row[_COL_TPN] if len(row) > _COL_TPN else None)
-    return bool(bb and bb.lower() == "bb shell" and tpn and tpn.lower() == "tpn")
+    """A row that names its columns.
+
+    Keyed on TPN plus one other recognisable heading rather than on "BB Shell",
+    which only one of the layouts has.
+    """
+    labels = {(_clean_cell(v) or "").lower() for v in row}
+    if "tpn" not in labels:
+        return False
+    others = {"bb shell", "sin", "lecturer(s)", "lecturers", "core / elect"}
+    if labels & others:
+        return True
+    return any(
+        text.startswith(("hrs", "skill set", "uoc")) for text in labels if text
+    )
 
 
-def _semester_label(row: tuple) -> str | None:
-    val = _clean_cell(row[_COL_SEMESTER] if len(row) > _COL_SEMESTER else None)
-    if not val:
+def _band_label(row: tuple) -> str | None:
+    """A grouping band such as "Semester 1" or "Part 2 • Monday night".
+
+    Scanned across the row, because the band is a hand-written heading and its
+    column is not a promise — but only on rows sparse enough to *be* a heading.
+    A full class row that happens to start with a band-like word is a class row.
+    """
+    populated = [t for t in (_clean_cell(v) for v in row) if t]
+    if not populated or len(populated) > _MAX_CELLS_ON_A_BAND_ROW:
         return None
-    m = _SEMESTER_RE.match(val)
-    if not m:
-        return None
-    return f"Semester {m.group(1)}"
+    for text in populated:
+        m = _BAND_RE.match(text)
+        if m:
+            return f"{m.group(1).capitalize()} {m.group(2)}"
+    return None
 
 
 def _qualification_title_from_sheet(ws) -> str:
-    title = _text(ws.cell(row=1, column=1).value)
-    if title:
-        return title
+    """The first real text on row 1 — the title is not always in column A."""
+    for column in range(1, min(ws.max_column or 1, 12) + 1):
+        title = _text(ws.cell(row=1, column=column).value)
+        if title:
+            return title
     return "Imported qualification"
 
 
-def _class_name_from_row(row: tuple, *, tpn: str) -> str:
-    bb = _clean_cell(row[_COL_BB_SHELL] if len(row) > _COL_BB_SHELL else None)
-    skill = _clean_cell(row[_COL_SKILL_SET] if len(row) > _COL_SKILL_SET else None)
-    uoc = _clean_cell(row[_COL_UOC_TITLE] if len(row) > _COL_UOC_TITLE else None)
+def _cell(row: tuple, index: int | None) -> str | None:
+    if index is None or len(row) <= index:
+        return None
+    return _clean_cell(row[index])
 
-    if bb and bb.lower() not in _PLACEHOLDER_SHELLS:
-        return bb
+
+def _class_name_from_row(row: tuple, layout: "_Layout") -> str | None:
+    """The class's name, or None when the workbook does not give one.
+
+    The skill-set description is the name in the lecturer layout and the
+    fallback in the BB Shell one, so it is consulted in both. None here is not
+    a failure — the caller supplies a placeholder, because a class with no name
+    is still a class with units worth importing.
+    """
+    if layout.names_the_class_in_column_a:
+        label = _cell(row, layout.label)
+        if label and label.lower() not in _PLACEHOLDER_SHELLS:
+            return label
+
+    skill = _cell(row, layout.skill)
     if skill and skill.lower() not in _PLACEHOLDER_SHELLS:
         return skill.replace("\n", " ").strip()
-    if uoc:
-        return uoc.replace("\n", " ").strip()
-    return tpn
+    return None
 
 
-def _is_subtotal_row(row: tuple) -> bool:
-    bb = _clean_cell(row[_COL_BB_SHELL] if len(row) > _COL_BB_SHELL else None)
-    if bb and bb.lower() in {"course total", "total"}:
+def _is_subtotal_row(row: tuple, layout: "_Layout") -> bool:
+    first = _cell(row, 0)
+    if first and first.lower() in {"course total", "total"}:
         return True
-    tpn = _clean_cell(row[_COL_TPN] if len(row) > _COL_TPN else None)
-    if tpn:
+    if _cell(row, layout.tpn):
         return False
-    hrs = _parse_hours(row[_COL_HOURS] if len(row) > _COL_HOURS else None)
-    # Semester summary rows (e.g. 19 hrs / 310 actual) have no TPN.
+    hrs = _parse_hours(row[layout.hours] if len(row) > layout.hours else None)
+    # Band summary rows (e.g. 19 hrs / 310 actual) carry hours but no TPN.
     return hrs is not None and hrs >= 10
+
+
+def _qualification_title_from_sheet_has_text(ws) -> bool:
+    return _qualification_title_from_sheet(ws) != "Imported qualification"
 
 
 def is_ep_nb_csp_workbook(path: str | Path) -> bool:
@@ -121,17 +204,12 @@ def is_ep_nb_csp_workbook(path: str | Path) -> bool:
         return False
     try:
         ws = wb.active
-        title = _text(ws.cell(row=1, column=1).value)
-        if not title:
+        if not _qualification_title_from_sheet_has_text(ws):
             return False
-        saw_semester = False
-        saw_header = False
+        # A header row is the only structural requirement. Bands are not: some
+        # of these workbooks have none, and rejecting those was the whole bug.
         for row in ws.iter_rows(min_row=2, max_row=min(ws.max_row or 0, 120), values_only=True):
-            if _semester_label(row):
-                saw_semester = True
             if _is_header_row(row):
-                saw_header = True
-            if saw_semester and saw_header:
                 return True
         return False
     finally:
@@ -145,62 +223,72 @@ def extract_ep_nb_csp_stages(path: str | Path) -> list[CspStage]:
         ws = wb.active
         base_title = _qualification_title_from_sheet(ws)
         stages: list[CspStage] = []
-        pending_semester: str | None = None
-        in_data = False
+        pending_band: str | None = None
+        layout: _Layout | None = None
         current: CspClass | None = None
         current_classes: list[CspClass] = []
+        unnamed_count = 0
 
         def flush_stage() -> None:
-            nonlocal current, current_classes, pending_semester, in_data
-            if pending_semester and current_classes:
+            nonlocal current, current_classes, pending_band, layout
+            if current_classes:
+                # A workbook with no bands still yields a stage — everything is
+                # flattened into one qualification downstream either way.
+                label = pending_band
+                name = f"{base_title} – {label}" if label else base_title
                 stages.append(
                     CspStage(
-                        qualification_name=f"{base_title} – {pending_semester}",
-                        stage_label=pending_semester,
+                        qualification_name=name,
+                        stage_label=label,
                         classes=current_classes,
                     )
                 )
             current = None
             current_classes = []
-            in_data = False
+            layout = None
 
         for row in ws.iter_rows(min_row=2, values_only=True):
-            sem = _semester_label(row)
-            if sem:
+            band = _band_label(row)
+            if band:
                 flush_stage()
-                pending_semester = sem
+                pending_band = band
                 continue
 
             if _is_header_row(row):
-                in_data = True
-                current = None
+                # A repeated header inside the same band continues it; the
+                # layout is re-read in case the columns moved.
+                classes_so_far = list(current_classes)
+                flush_stage()
+                current_classes = classes_so_far
+                layout = _Layout(row)
                 continue
 
-            if not in_data or not pending_semester:
+            if layout is None:
+                continue
+            if _is_subtotal_row(row, layout):
                 continue
 
-            if _is_subtotal_row(row):
-                continue
-
-            tpn = _clean_cell(row[_COL_TPN] if len(row) > _COL_TPN else None)
+            tpn = _cell(row, layout.tpn)
             if not tpn or tpn.lower() == "tpn":
                 continue
 
-            bb = _clean_cell(row[_COL_BB_SHELL] if len(row) > _COL_BB_SHELL else None)
-            row_hours = _parse_hours(row[_COL_HOURS] if len(row) > _COL_HOURS else None)
-            starts_new_class = bool(bb) or current is None
+            row_hours = _parse_hours(row[layout.hours] if len(row) > layout.hours else None)
+            name = _class_name_from_row(row, layout)
+
+            if layout.names_the_class_in_column_a:
+                starts_new_class = bool(_cell(row, layout.label)) or current is None
+            else:
+                # No label column, so hours mark the first row of a block and
+                # continuation rows carry only their unit code.
+                starts_new_class = row_hours is not None or current is None
 
             if starts_new_class:
-                name = _class_name_from_row(row, tpn=tpn)
-                hours = row_hours
-                key = (name, hours)
-                if current is None or (current.name, current.hours) != key:
-                    current = CspClass(name=name, hours=hours, unit_codes=[])
+                if name is None:
+                    unnamed_count += 1
+                    name = f"{_UNNAMED_PREFIX} {unnamed_count}"
+                if current is None or (current.name, current.hours) != (name, row_hours):
+                    current = CspClass(name=name, hours=row_hours, unit_codes=[])
                     current_classes.append(current)
-            elif current is None:
-                name = _class_name_from_row(row, tpn=tpn)
-                current = CspClass(name=name, hours=row_hours, unit_codes=[])
-                current_classes.append(current)
             elif row_hours is not None and current.hours is None:
                 current.hours = row_hours
 
@@ -223,14 +311,29 @@ def import_qualifications_from_ep_nb_csp(
     path = Path(path)
     if not is_ep_nb_csp_workbook(path):
         raise ValueError(
-            "Workbook does not look like an EP-NB CSP export "
-            "(expected qualification title, Semester bands, and BB Shell/TPN rows)."
+            "Workbook does not look like a CSP planning spreadsheet "
+            "(expected a title on row 1 and a header row naming a TPN column)."
         )
 
     stages = extract_ep_nb_csp_stages(path)
     if not stages:
-        rep.warnings.append(f"No EP-NB CSP semester data found in {path.name}")
+        rep.warnings.append(f"No class rows found in {path.name}")
         return rep
+
+    # Say which classes came in without a name, so they can be renamed rather
+    # than quietly living as "Unnamed class 3" for a term.
+    unnamed = [
+        c.name
+        for stage in stages
+        for c in stage.classes
+        if c.name.startswith(_UNNAMED_PREFIX)
+    ]
+    if unnamed:
+        rep.warnings.append(
+            f"{len(unnamed)} class(es) had no skill set/description in the workbook "
+            f"and were imported with placeholder names ({', '.join(unnamed)}). "
+            "Rename them on the Classes tab."
+        )
 
     # Same reasoning as the .docx importer: the workbook's Semester bands are
     # the curriculum's shape, not the timetable's. One qualification in.
