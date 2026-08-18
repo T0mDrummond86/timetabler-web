@@ -21,6 +21,11 @@ browser, with a companion phone app so lecturers can check their own week.
 
 ## The main picture
 
+![TAFEtabler architecture overview](diagrams/architecture-overview.png)
+
+<details>
+<summary>Diagram source (for editing — see diagrams/README.md)</summary>
+
 ```mermaid
 graph TB
     subgraph people["People using it"]
@@ -62,6 +67,8 @@ graph TB
     TUTOR -.creates.-> SESSION
 ```
 
+</details>
+
 **Reading it left to right and top to bottom:**
 
 - **Browser app** — where the timetabling is done. Drag a class onto the grid,
@@ -97,6 +104,11 @@ graph TB
 
 ## What flows in and out
 
+![What flows in and out of TAFEtabler](diagrams/data-in-and-out.png)
+
+<details>
+<summary>Diagram source (for editing — see diagrams/README.md)</summary>
+
 ```mermaid
 graph LR
     CSP["Course study plan<br/>(Word document)"] -->|import| APP
@@ -111,6 +123,8 @@ graph LR
     APP -->|export| PRINT["Printable timetables<br/>(PDF)"]
     APP -->|shared record| COVER["Cover log<br/>who covered what, and the hours"]
 ```
+
+</details>
 
 **Coming in:**
 

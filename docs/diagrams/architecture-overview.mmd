@@ -1,0 +1,40 @@
+graph TB
+    subgraph people["PEOPLE USING IT"]
+        direction LR
+        BROWSER["Browser app<br/><i>timetablers and admins</i>"]
+        PHONE["Phone app<br/><i>lecturers, read-only</i>"]
+    end
+
+    TUTOR["Built-in tutorial<br/><i>guides the browser app,<br/>practises in a private sandbox</i>"]
+
+    GATE["Sign-in and permissions<br/><i>passphrase + code, and who may edit what</i>"]
+
+    subgraph server["THE SERVER"]
+        direction LR
+        RULES["Timetabling rules<br/><i>clash checking, hours</i>"]
+        API["Request handler<br/><i>every action passes through here</i>"]
+        DOCS["Document handling<br/><i>Word and Excel files</i>"]
+        RULES --- API --- DOCS
+    end
+
+    subgraph stored["WHAT IS STORED"]
+        direction LR
+        DB[("Database<br/><i>the single source of truth</i>")]
+        CACHE[("Fast recall<br/><i>recent clash results</i>")]
+        DB ~~~ CACHE
+    end
+
+    subgraph concepts["HOW THE WORK IS ORGANISED"]
+        direction LR
+        SESSION["Timetable session<br/><i>one campus or area's timetable</i>"]
+        WORKSPACE["Global workspace<br/><i>groups sessions that share people</i>"]
+        SESSION -->|"belongs to"| WORKSPACE
+    end
+
+    BROWSER --> GATE
+    PHONE --> GATE
+    TUTOR -.-> BROWSER
+    GATE --> API
+    API --> DB
+    RULES -.->|"caches in"| CACHE
+    DB --> SESSION

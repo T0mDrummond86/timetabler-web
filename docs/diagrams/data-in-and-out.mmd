@@ -1,0 +1,12 @@
+graph LR
+    CSP["Course study plan<br/>(Word document)"] -->|import| APP
+    PREFS["Lecturer preferences<br/>(Excel workbook)"] -->|import| APP
+    BACKUP_IN["A previous backup<br/>(Excel workbook)"] -->|restore| APP
+
+    APP{{"TAFEtabler"}}
+
+    APP -->|export| ADMIN["Admin grid<br/>changes marked in red"]
+    APP -->|export| TT["Full timetable<br/>(Excel workbook)"]
+    APP -->|export| LISTS["Working lists<br/>staff hours, class owners"]
+    APP -->|export| PRINT["Printable timetables<br/>(PDF)"]
+    APP -->|shared record| COVER["Cover log<br/>who covered what, and the hours"]
