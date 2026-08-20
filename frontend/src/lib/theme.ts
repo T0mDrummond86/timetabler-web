@@ -16,8 +16,14 @@ export function getStoredTheme(): Theme {
   return "dark";
 }
 
+/** Matches --bg in each theme, so the PWA's browser chrome and iOS status
+ *  bar sit flush with the page instead of the old fixed blue. */
+const THEME_COLOUR: Record<Theme, string> = { light: "#e3e6ec", dark: "#0f172a" };
+
 export function applyTheme(theme: Theme): void {
   document.documentElement.setAttribute("data-theme", theme);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", THEME_COLOUR[theme]);
 }
 
 export function setTheme(theme: Theme): void {

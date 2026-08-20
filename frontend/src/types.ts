@@ -407,3 +407,36 @@ export type StageSplitResult = {
   unassigned_classes_kept_on_first_stage: number;
   summary: string;
 };
+
+/** One of the two qualifications going into a merge. */
+export type QualificationMergeSide = {
+  id: number;
+  name: string;
+  num_groups: number;
+  schedule_period: string;
+  delivery_mode: string;
+  class_count: number;
+  /** Bookings on this qualification's own cohorts. Shown for reassurance —
+   *  a merge never touches them — not as a blocker. */
+  booking_count: number;
+};
+
+export type QualificationMergePreview = {
+  first: QualificationMergeSide;
+  second: QualificationMergeSide;
+  shared_class_count: number;
+  combined_class_count: number;
+  combined_classes: { id: number; name: string }[];
+  suggested_name: string;
+  suggested_num_groups: number;
+  warnings: string[];
+};
+
+export type QualificationMergeResult = {
+  qualification_id: number;
+  name: string;
+  class_count: number;
+  shared_class_count: number;
+  num_groups: number;
+  summary: string;
+};

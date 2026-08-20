@@ -13,8 +13,16 @@ from ..services.qualification_stages import (
     split_qualification_into_stages,
     stage_split_preview,
 )
+from ..services.qualification_merge import (
+    QualificationMergeError,
+    merge_preview,
+    merge_qualifications,
+)
 from ..database import get_db
 from ..schemas import (
+    QualificationMergePreviewOut,
+    QualificationMergeRequest,
+    QualificationMergeResultOut,
     StageSplitPreviewOut,
     StageSplitRequest,
     StageSplitResultOut,
@@ -726,6 +734,67 @@ def qualification_stage_split(
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except StageSplitError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+
+
+@router.get(
+    "/sessions/{session_id}/qualifications/merge-preview",
+    response_model=QualificationMergePreviewOut,
+)
+def qualification_merge_preview(
+    session_id: int,
+    first: int,
+    second: int,
+    ctx: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    """What the two qualifications hold, and what the merged one would hold."""
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        return merge_preview(
+            db,
+            timetable_session_id=session_id,
+            first_qualification_id=first,
+            second_qualification_id=second,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except QualificationMergeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+
+
+@router.post(
+    "/sessions/{session_id}/qualifications/merge",
+    response_model=QualificationMergeResultOut,
+    status_code=201,
+)
+def qualification_merge(
+    session_id: int,
+    body: QualificationMergeRequest,
+    ctx: AuthContext = Depends(require_session_editor),
+    db: Session = Depends(get_db),
+):
+    """Create a qualification holding both sources' classes. Both sources stay."""
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        return merge_qualifications(
+            db,
+            timetable_session_id=session_id,
+            first_qualification_id=body.first_qualification_id,
+            second_qualification_id=body.second_qualification_id,
+            name=body.name,
+            num_groups=body.num_groups,
+            schedule_period=body.schedule_period,
+            delivery_mode=body.delivery_mode,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (QualificationMergeError, ValueError) as exc:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)

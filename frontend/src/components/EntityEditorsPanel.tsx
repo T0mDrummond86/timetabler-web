@@ -8,6 +8,7 @@ import {
   StaffAvailabilityGrid,
 } from "./StaffAvailabilityGrid";
 import { StaffHoursTable } from "./StaffHoursTable";
+import { QualificationMergeDialog } from "./QualificationMergeDialog";
 import { StageSplitDialog } from "./StageSplitDialog";
 import { LinkedSessionImportPanel } from "./LinkedSessionImportPanel";
 import { useConfirmPrompt } from "../hooks/useConfirmPrompt";
@@ -99,6 +100,7 @@ export function EntityEditorsPanel({
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [stageSplitFor, setStageSplitFor] = useState<number | null>(null);
+  const [mergeFor, setMergeFor] = useState<number | null>(null);
   // Bumped after a split so the open editor refetches: the split renames the
   // qualification and moves its classes without changing the selected id, so
   // nothing else would tell this panel its data went stale.
@@ -1260,6 +1262,15 @@ export function EntityEditorsPanel({
                 >
                   Stage split
                 </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={saving}
+                  title="Combine this qualification with another into a new one. Both are kept."
+                  onClick={() => setMergeFor(selectedQual.id)}
+                >
+                  Merge
+                </button>
               </div>
             </form>
           )}
@@ -1268,6 +1279,24 @@ export function EntityEditorsPanel({
         </div>
       </div>
       {dialogs}
+      {mergeFor != null && (
+        <QualificationMergeDialog
+          sessionId={sessionId}
+          qualificationId={mergeFor}
+          qualifications={qualifications}
+          onClose={() => setMergeFor(null)}
+          onMerge={(summary, newId) => {
+            setMergeFor(null);
+            setMessage(summary);
+            setQualRefresh((n) => n + 1);
+            // A new qualification with new group courses -- the sidebar and
+            // every list of qualifications is stale until the caller reloads.
+            // Select the new one, since it is what the user just made.
+            setSelectedId(newId);
+            onUpdated({ qualificationId: newId });
+          }}
+        />
+      )}
       {stageSplitFor != null && (
         <StageSplitDialog
           sessionId={sessionId}

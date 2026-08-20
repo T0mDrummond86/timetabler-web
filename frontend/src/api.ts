@@ -1289,6 +1289,29 @@ export const api = {
       { method: "POST", body: JSON.stringify(body) },
     ),
 
+  /** What two qualifications hold, and what merging them would produce. */
+  qualificationMergePreview: (sessionId: number, first: number, second: number) =>
+    apiFetch<import("./types").QualificationMergePreview>(
+      `/sessions/${sessionId}/qualifications/merge-preview?first=${first}&second=${second}`,
+    ),
+
+  /** Create a qualification holding both sources' classes. Both sources stay. */
+  mergeQualifications: (
+    sessionId: number,
+    body: {
+      first_qualification_id: number;
+      second_qualification_id: number;
+      name: string;
+      num_groups: number;
+      schedule_period?: string;
+      delivery_mode?: string;
+    },
+  ) =>
+    apiFetch<import("./types").QualificationMergeResult>(
+      `/sessions/${sessionId}/qualifications/merge`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+
   classCustodians: (sessionId: number) =>
     apiFetch<import("./types").ClassCustodians>(`/sessions/${sessionId}/class-custodians`),
 

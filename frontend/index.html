@@ -10,7 +10,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#2563eb" />
+    <meta name="theme-color" content="#0f172a" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -20,11 +20,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <script>
       (function () {
+        // Mirrors getStoredTheme() in src/lib/theme.ts, including its default.
+        // Runs before paint so a first-time visitor does not get a flash of
+        // the light stylesheet before the bundle loads and corrects it.
+        var theme = "dark";
         try {
-          if (localStorage.getItem("timetabler-theme") === "dark") {
-            document.documentElement.setAttribute("data-theme", "dark");
-          }
+          var stored = localStorage.getItem("timetabler-theme");
+          if (stored === "light" || stored === "dark") theme = stored;
         } catch (e) {}
+        document.documentElement.setAttribute("data-theme", theme);
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute("content", theme === "dark" ? "#0f172a" : "#e3e6ec");
       })();
     </script>
   </head>

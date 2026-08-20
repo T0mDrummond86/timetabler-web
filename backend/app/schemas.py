@@ -1081,6 +1081,49 @@ class StageSplitResultOut(BaseModel):
     summary: str
 
 
+class QualificationMergeSideOut(BaseModel):
+    """One of the two qualifications going into a merge, as the dialog shows it."""
+    id: int
+    name: str
+    num_groups: int
+    schedule_period: str
+    delivery_mode: str
+    class_count: int
+    #: Bookings on this qualification's own cohorts. Shown for reassurance --
+    #: a merge never touches them -- not as a blocker.
+    booking_count: int
+
+
+class QualificationMergePreviewOut(BaseModel):
+    first: QualificationMergeSideOut
+    second: QualificationMergeSideOut
+    shared_class_count: int
+    combined_class_count: int
+    combined_classes: list[dict] = Field(default_factory=list)
+    suggested_name: str
+    suggested_num_groups: int
+    warnings: list[str] = Field(default_factory=list)
+
+
+class QualificationMergeRequest(BaseModel):
+    first_qualification_id: int
+    second_qualification_id: int
+    #: Length is checked by the service so it owns every message the user sees.
+    name: str
+    num_groups: int = Field(default=1, ge=1, le=26)
+    schedule_period: str | None = Field(default=None, pattern="^(day|night)$")
+    delivery_mode: str | None = Field(default=None, pattern="^(regular|block)$")
+
+
+class QualificationMergeResultOut(BaseModel):
+    qualification_id: int
+    name: str
+    class_count: int
+    shared_class_count: int
+    num_groups: int
+    summary: str
+
+
 class UnitCustodianPatch(BaseModel):
     #: Null clears the override and returns to the derived custodian.
     staff_id: int | None = None
