@@ -6300,6 +6300,217 @@ body.staff-editor-resizing {
   font-weight: 600;
 }
 
+/* ---------------- help panel ---------------- */
+
+/* Same shape as the tutorial panel -- fixed to the right edge, under modals --
+   so the two feel like siblings rather than two ideas of what a side panel is. */
+
+.help-open {
+  font-weight: 700;
+  min-width: 2rem;
+}
+
+.help-panel {
+  position: fixed;
+  top: 64px;
+  right: 12px;
+  bottom: 12px;
+  width: min(400px, calc(100vw - 24px));
+  z-index: 95; /* over the tutorial panel (90), under modals (100) */
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 0.85rem 1rem 1rem;
+}
+
+.help-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.help-title {
+  flex: 1;
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+
+.help-search .field-input {
+  width: 100%;
+}
+
+.help-status {
+  margin: var(--space-2) 0 var(--space-2);
+  font-size: var(--text-xs);
+}
+
+/* The one scrolling region; the search box above it stays put. */
+.help-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.help-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.help-result {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  color: var(--text);
+}
+
+.help-result:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.help-result-title {
+  font-weight: 600;
+  font-size: var(--text-md);
+}
+
+.help-result-snippet {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.help-result-cat {
+  font-size: var(--text-3xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.help-empty p {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-md);
+  color: var(--text-secondary);
+}
+
+.help-cat {
+  margin-bottom: var(--space-4);
+}
+
+.help-cat-title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-3xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.help-cat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.help-cat-link,
+.help-back,
+.help-inline-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.help-cat-link {
+  display: block;
+  padding: 3px 0;
+  font-size: var(--text-md);
+}
+
+.help-cat-link:hover,
+.help-inline-link:hover,
+.help-back:hover {
+  text-decoration: underline;
+}
+
+.help-inline-link {
+  display: inline;
+}
+
+.help-back {
+  font-size: var(--text-xs);
+  margin-bottom: var(--space-2);
+}
+
+.help-article-title {
+  margin: 0 0 2px;
+  font-size: var(--text-2xl);
+}
+
+.help-article-cat {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-3xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.help-article-body {
+  font-size: var(--text-md);
+  line-height: 1.6;
+}
+
+.help-article-body p {
+  margin: 0 0 var(--space-3);
+}
+
+.help-article-body h3,
+.help-article-body h4 {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-lg);
+}
+
+.help-article-body ul,
+.help-article-body ol {
+  margin: 0 0 var(--space-3);
+  padding-left: 1.2rem;
+}
+
+.help-article-body li {
+  margin-bottom: var(--space-1);
+}
+
+.help-article-body code {
+  font-size: var(--text-xs);
+}
+
+@media (max-width: 640px) {
+  .help-panel {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+  }
+}
+
 /* ---------------- reduced motion ---------------- */
 /* Honours the OS setting. The two infinite tutorial animations (the hint
    nudge and the ring pulse) are the ones that actually matter here -- they

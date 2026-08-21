@@ -1,7 +1,25 @@
 import { Link } from "react-router-dom";
-import type { ReactNode } from "react";
+import { Suspense, lazy, useEffect, useState, type ReactNode } from "react";
 import { APP_NAME } from "../branding";
 import { ThemeToggle } from "./ThemeToggle";
+
+// The help panel carries an embedding model behind it, so it is never part of
+// the main bundle -- nothing is fetched until someone actually asks for help.
+const HelpPanel = lazy(() => import("../help/HelpPanel"));
+
+function HelpButton({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      className="btn-secondary btn-xs help-open"
+      onClick={onOpen}
+      aria-label="Help"
+      title="Help — search for how to do something"
+    >
+      ?
+    </button>
+  );
+}
 
 // The same file the browser tab and the installed app use, referenced rather
 // than copied so the three can never drift apart. Its squares sit on a
@@ -34,6 +52,27 @@ export function AppShell({
   fillViewport = false,
   compact = false,
 }: Props) {
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  // "?" from anywhere that is not a text field, the way most tools do it.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (minimal) return;
+      if (e.key !== "?" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = document.activeElement;
+      const typing =
+        el instanceof HTMLInputElement ||
+        el instanceof HTMLTextAreaElement ||
+        el instanceof HTMLSelectElement ||
+        (el instanceof HTMLElement && el.isContentEditable);
+      if (typing) return;
+      e.preventDefault();
+      setHelpOpen(true);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [minimal]);
+
   return (
     <div className={`app-shell${fillViewport ? " app-shell--fill" : ""}`}>
       {!minimal && compact && (
@@ -51,6 +90,7 @@ export function AppShell({
           {subtitle && <span className="topbar-subtitle">{subtitle}</span>}
           <span className="topbar-spacer" />
           {actions}
+          <HelpButton onOpen={() => setHelpOpen(true)} />
           <ThemeToggle />
         </header>
       )}
@@ -62,6 +102,7 @@ export function AppShell({
             </Link>
           </div>
           <div className="app-topbar-end">
+            <HelpButton onOpen={() => setHelpOpen(true)} />
             <ThemeToggle />
             {actions}
           </div>
@@ -80,6 +121,12 @@ export function AppShell({
         )}
         {children}
       </main>
+
+      {helpOpen && (
+        <Suspense fallback={null}>
+          <HelpPanel onClose={() => setHelpOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }

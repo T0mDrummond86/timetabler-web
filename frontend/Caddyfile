@@ -10,6 +10,40 @@
 		reverse_proxy api:8000
 	}
 
+	# The help search model. The defaults get two things wrong for it.
+	#
+	# It is served as application/octet-stream, which the global `encode` set
+	# skips -- and the .onnx gzips from 22 MB to 15 MB, which is worth having
+	# on a first visit. The narrow path scope matters: compressing every
+	# octet-stream would mean re-compressing the .xlsx exports, which are
+	# already zip containers and would gain nothing for the CPU.
+	#
+	# And the files never change: the weights are pinned to one model, and a
+	# new model would live at a new path. So they can be cached permanently
+	# rather than revalidated on every open of the help panel.
+	handle /models/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		# Level 9 rather than the default: this is a 22 MB file that each
+		# user fetches once and then caches forever, so trading server CPU
+		# for 5 MB off the wire is clearly the right way round.
+		encode {
+			gzip 9
+			match {
+				header Content-Type application/octet-stream*
+			}
+		}
+		root * /srv
+		file_server
+	}
+
+	# The ONNX runtime's wasm. Already compressed by the global encode
+	# (application/wasm is in its default set), but equally immutable.
+	handle /ort/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		root * /srv
+		file_server
+	}
+
 	# Everything else is the SPA; unknown paths fall back to index.html.
 	handle {
 		root * /srv
