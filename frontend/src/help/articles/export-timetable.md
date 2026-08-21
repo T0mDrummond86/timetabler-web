@@ -8,6 +8,8 @@ keywords: export, excel, xlsm, spreadsheet, download timetable, save timetable, 
 **Export ▾ → Timetable** downloads the whole session as an `.xlsm` workbook with
 a tab per course, per lecturer and per room.
 
+![The Export menu, listing Timetable, Admin export, Print timetables and JSON backup](/help/toolbar-export.png)
+
 It respects the **Colour by class** setting, so the workbook comes out coloured
 the same way the grid is.
 

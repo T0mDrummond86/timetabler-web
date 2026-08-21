@@ -8,6 +8,8 @@ keywords: holding area, unscheduled, not placed, waiting, bottom panel, leftover
 The holding area sits under the grid and lists every class in the selected
 groups that is **not yet scheduled**.
 
+![The holding area, listing classes that are not yet scheduled](/help/holding-area.png)
+
 - Drag from it onto the grid to schedule a class.
 - Drag a placecard back onto it to unschedule one.
 - Use the arrow control to **Collapse holding area** when you want the grid to

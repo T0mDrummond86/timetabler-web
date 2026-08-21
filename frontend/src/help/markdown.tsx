@@ -2,9 +2,10 @@
  *
  * A full markdown library would be several times the size of every article put
  * together. The articles are ours, so the subset they use is a closed set:
- * paragraphs, bullets, numbered steps, bold, inline code, and internal links of
- * the form [text](#article-id). Anything outside that renders as plain text
- * rather than breaking, which is the right failure for a help page.
+ * paragraphs, bullets, numbered steps, bold, inline code, internal links of the
+ * form [text](#article-id), and screenshots as ![alt](/help/name.png) on a line
+ * of their own. Anything outside that renders as plain text rather than
+ * breaking, which is the right failure for a help page.
  */
 import { Fragment, type ReactNode } from "react";
 
@@ -77,6 +78,22 @@ export function HelpMarkdown({ markdown, onNavigate }: Props) {
       continue;
     }
 
+    // A screenshot on its own line. Checked before the paragraph branch, or it
+    // would be swallowed as prose and rendered as literal markdown.
+    const image = /^!\[([^\]]*)\]\(([^)\s]+)\)$/.exec(line.trim());
+    if (image) {
+      const [, alt, src] = image;
+      blocks.push(
+        <figure key={key++} className="help-figure">
+          {/* Lazy: an article the reader never scrolls to should not cost a
+              request, and several are illustrated. */}
+          <img src={src} alt={alt} loading="lazy" className="help-shot" />
+        </figure>,
+      );
+      i++;
+      continue;
+    }
+
     // Bulleted list — items may wrap onto continuation lines.
     if (/^[-*]\s+/.test(line)) {
       const items: ReactNode[] = [];
@@ -126,7 +143,8 @@ export function HelpMarkdown({ markdown, onNavigate }: Props) {
       lines[i].trim() &&
       !/^[-*]\s+/.test(lines[i]) &&
       !/^\d+\.\s+/.test(lines[i]) &&
-      !/^#{2,4}\s+/.test(lines[i])
+      !/^#{2,4}\s+/.test(lines[i]) &&
+      !/^!\[[^\]]*\]\([^)\s]+\)$/.test(lines[i].trim())
     ) {
       paragraph.push(lines[i].trim());
       i++;

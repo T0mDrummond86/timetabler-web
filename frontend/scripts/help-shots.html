@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>help shots harness</title>
+    <script>
+      document.documentElement.setAttribute("data-theme", "dark");
+      // The holding area remembers "collapsed" in localStorage and defaults to
+      // collapsed; the screenshot wants it open.
+      try { localStorage.setItem("timetabler-holding-collapsed", "0"); } catch (e) {}
+    </script>
+    <style>
+      body { margin: 0; }
+      /* Each scene is laid out on its own, away from the page edges, so a crop
+         with padding never runs off the canvas. */
+      .scene { padding: 28px; display: inline-block; }
+      .scene-grid { width: 760px; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/scripts/help-shots.jsx"></script>
+  </body>
+</html>

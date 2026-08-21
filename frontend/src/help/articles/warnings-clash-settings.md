@@ -5,6 +5,8 @@ category: Warnings and clashes
 keywords: clash settings, disable check, turn off warning, ignore rule, too many warnings, settings, enable check
 ---
 
+![Clash settings, with each check listed under its category and a tick to enable it](/help/clash-settings.png)
+
 The **Clash settings** tab lists every check, grouped into:
 
 - **Double-booking & clashes**

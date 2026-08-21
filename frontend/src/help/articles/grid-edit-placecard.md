@@ -5,6 +5,8 @@ category: The timetable grid
 keywords: assign lecturer, set room, teacher, who teaches, notes, card id, edit booking, placecard details
 ---
 
+![A placecard showing the time, class name, lecturer and room](/help/placecard.png)
+
 Click a placecard to open its editor. From there you can set:
 
 - **Lecturer** — who teaches it. Lecturers who are competent in the class are

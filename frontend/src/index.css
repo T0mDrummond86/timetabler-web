@@ -6501,6 +6501,23 @@ body.staff-editor-resizing {
   font-size: var(--text-xs);
 }
 
+/* Screenshots. Captured at panel width in the dark theme, so they are shown at
+   their natural size rather than scaled -- a resampled UI screenshot goes
+   mushy exactly where the detail matters. The frame stops a dark capture from
+   bleeding into the dark panel behind it. */
+.help-figure {
+  margin: 0 0 var(--space-3);
+}
+
+.help-shot {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
 @media (max-width: 640px) {
   .help-panel {
     top: 8px;

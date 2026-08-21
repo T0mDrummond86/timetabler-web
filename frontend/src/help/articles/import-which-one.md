@@ -7,6 +7,8 @@ keywords: import, which import, upload, load data, bring in, import menu, file t
 
 **Import ▾** on the timetable toolbar offers:
 
+![The Import menu, listing Session backup, Qualifications CSP, EP-NB CSP and aSc export](/help/toolbar-import.png)
+
 - **Session backup** — a full round-trip restore from a previous export
   (`.xlsm` / `.xlsx`). See [Backup and restore](#export-backup-restore).
 - **Qualifications template** — classes and qualifications from the

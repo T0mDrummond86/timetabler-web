@@ -27,6 +27,7 @@ const ROOT = process.env.HELP_ROOT
   : path.resolve(HERE, "..");
 const ARTICLES = path.join(ROOT, "src/help/articles");
 const MODELS = path.join(ROOT, "public/models");
+const PUBLIC = path.join(ROOT, "public");
 const OUT = path.join(ROOT, "src/help/help-index.generated.json");
 const MODEL_ID = "Xenova/all-MiniLM-L6-v2";
 
@@ -60,9 +61,12 @@ function parseArticle(raw, file) {
   };
 }
 
-/** Plain text for the encoder: no markdown syntax, no link targets. */
+/** Plain text for the encoder: no markdown syntax, no link or image targets. */
 function toPlainText(body) {
   return body
+    // Screenshots first: their alt text describes a picture, not the topic, and
+    // the file path is pure noise in an embedding.
+    .replace(/!\[[^\]]*\]\([^)\s]+\)/g, "")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1") // links keep their words
     .replace(/[*_`#>]/g, "")
     .replace(/\r?\n[-*]\s+/g, ". ")
@@ -115,6 +119,24 @@ async function main() {
     }
   }
   if (broken.length) throw new Error(`Broken help links:\n  ${broken.join("\n  ")}`);
+
+  // Same reasoning for screenshots: a missing file would be a silent broken
+  // image in the panel, which is worse than a build that stops and says so.
+  const missingShots = [];
+  for (const article of articles) {
+    for (const [, src] of article.body.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)) {
+      if (!src.startsWith("/")) {
+        missingShots.push(`${article.id} -> ${src} (must be an absolute path under public/)`);
+        continue;
+      }
+      if (!existsSync(path.join(PUBLIC, src.replace(/^\//, "")))) {
+        missingShots.push(`${article.id} -> ${src}`);
+      }
+    }
+  }
+  if (missingShots.length) {
+    throw new Error(`Missing help screenshots:\n  ${missingShots.join("\n  ")}`);
+  }
 
   const { env, pipeline } = await import("@huggingface/transformers");
   env.allowRemoteModels = false;

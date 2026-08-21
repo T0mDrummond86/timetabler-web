@@ -13,6 +13,8 @@ A coloured border means the booking breaks a rule:
 - **Orange** — a **soft** warning. Allowed but worth a look: a lecturer who is
   not on the class's list, an awkward gap, a short teaching day.
 
+![A normal placecard above one with the red border that marks a hard clash](/help/placecard-warning.png)
+
 Hover or open the card to see which rule fired. The full list is on the
 **Warnings** tab — see [The warnings report](#warnings-report).
 

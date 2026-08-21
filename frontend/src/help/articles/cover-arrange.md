@@ -7,6 +7,8 @@ keywords: cover, absent, sick, relief, replace lecturer, arrange cover, away, su
 
 The **Lecturer cover** tab builds a cover plan for one week.
 
+![The Week beginning date box on the Lecturer cover tab](/help/cover-week-beginning.png)
+
 1. Set **Week beginning** — the **Monday** of the week being covered. Every
    request is dated from it, so a class on the Wednesday is automatically dated
    to that Wednesday.

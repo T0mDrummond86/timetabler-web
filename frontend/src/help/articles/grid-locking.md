@@ -13,6 +13,8 @@ Right-click a placecard for two locks:
 Locked cards show a padlock and refuse to be dragged. Use the same menu items
 (now reading **Unlock time** / **Unlock lecturer**) to release them.
 
+![A locked placecard, with the padlock beside its time](/help/placecard-locked.png)
+
 Locks also protect a card when the timetable is rebuilt or cleared, which makes
 them the right tool for anything already published to students.
 

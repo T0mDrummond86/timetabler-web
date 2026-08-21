@@ -1,0 +1,228 @@
+/** Capture the annotated screenshots used by the help articles.
+ *
+ * Shoots the scenes in scripts/help-shots.jsx — the app's own components and
+ * stylesheet with stand-in data — rather than a live session. Driving the real
+ * app headlessly needs an authenticated session, and the only way to get one
+ * was to weaken auth on the dev stack; not worth it for illustrations.
+ *
+ * The red marker is an absolutely-positioned overlay drawn over the element's
+ * own bounding box just before the capture, not an edit to the image
+ * afterwards, so it always lands exactly on the control however the layout has
+ * shifted since the shot was last taken.
+ *
+ * Re-runnable. After changing a component, re-run this and the pictures follow.
+ *
+ *   cd frontend && node scripts/capture-help-shots.mjs          # all
+ *   cd frontend && node scripts/capture-help-shots.mjs holding  # just one
+ *
+ * Needs the dev server up (docker compose up -d frontend) and Google Chrome.
+ */
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(HERE, "..");
+const OUT_DIR = path.join(ROOT, "public/help");
+
+const APP = process.env.HELP_APP_URL || "http://localhost:5173";
+const HARNESS = `${APP}/scripts/help-shots.html`;
+const CHROME =
+  process.env.HELP_CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+
+/** The help panel's content column, measured in the running app.
+ *
+ * Everything is displayed at this width, so a capture much wider than twice it
+ * arrives squeezed and unreadable. Crops are kept tight and deliberately
+ * narrow: better to show the one control the article is about than the whole
+ * bar it sits in.
+ */
+const PANEL_WIDTH = 366;
+
+/** 2x device scale, so a 366px crop lands as a 732px PNG and stays crisp. */
+const DEVICE_SCALE = 2;
+
+const VIEWPORT = { width: 1200, height: 800, deviceScaleFactor: DEVICE_SCALE };
+
+/** Viewport for scenes whose component is naturally wider than the panel.
+ *
+ * Cropping a 1400px-wide tab strip down to fit would either truncate it or
+ * shrink the text to half size. Laying it out in a narrow window instead lets
+ * the component wrap the way it does on a small screen, so the capture is both
+ * complete and legible at the width it will actually be shown.
+ */
+const NARROW = { width: 470, height: 900, deviceScaleFactor: DEVICE_SCALE };
+
+/**
+ *   id      output file name
+ *   scene   ?scene= in the harness
+ *   click   optional button text to press first (opens a menu)
+ *   ring    selector to outline in red
+ *   pad     context kept around the ring, in CSS px
+ *   alt     alt text, written into the article
+ */
+const SHOTS = [
+  {
+    id: "placecard",
+    scene: "placecard",
+    ring: ".booking-card",
+    pad: 26,
+    alt: "A placecard showing the time, class name, lecturer and room",
+  },
+  {
+    id: "placecard-locked",
+    scene: "placecard-locked",
+    ring: ".booking-card",
+    pad: 26,
+    alt: "A locked placecard, showing the padlock badge beside the class name",
+  },
+  {
+    id: "placecard-warning",
+    scene: "placecard-warning",
+    // ring: none -- the red border is the subject; see PlacecardPair.
+    ring: ".scene",
+    pad: 0,
+    annotate: false,
+    alt: "A normal placecard beside one with the red border that marks a hard clash",
+  },
+  {
+    id: "toolbar-import",
+    scene: "toolbar-import",
+    click: "Import",
+    ring: ".tt-dropdown-menu",
+    pad: 12,
+    alt: "The Import menu open, listing Session backup, Qualifications CSP, EP-NB CSP and aSc export",
+  },
+  {
+    id: "toolbar-export",
+    scene: "toolbar-export",
+    click: "Export",
+    ring: ".tt-dropdown-menu",
+    pad: 12,
+    alt: "The Export menu open, listing Timetable, Admin export, Print timetables and JSON backup",
+  },
+  {
+    id: "holding-area",
+    viewport: NARROW,
+    scene: "holding",
+    ring: ".holding-panel",
+    pad: 14,
+    alt: "The holding area, listing classes that are not yet scheduled",
+  },
+  {
+    id: "cover-week-beginning",
+    scene: "cover-toolbar",
+    ring: ".cover-request-date",
+    pad: 90,
+    alt: "The Week beginning date box on the Lecturer cover tab",
+  },
+  {
+    id: "clash-settings",
+    viewport: NARROW,
+    scene: "clash-settings",
+    ring: ".clash-settings-group",
+    pad: 14,
+    alt: "Clash settings, with each check listed under its category and a tick to enable it",
+  },
+];
+
+/** Injected into the page: draw the marker, report the crop rectangle. */
+function ringAndMeasure(selector, pad, maxWidth, annotate) {
+  const el = document.querySelector(selector);
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+
+  const ring = annotate ? document.createElement("div") : null;
+  if (ring) {
+  Object.assign(ring.style, {
+    position: "fixed",
+    left: `${r.left - 3}px`,
+    top: `${r.top - 3}px`,
+    width: `${r.width + 6}px`,
+    height: `${r.height + 6}px`,
+    border: "2.5px solid #ef4444",
+    borderRadius: "8px",
+    boxShadow: "0 0 0 2px rgba(239,68,68,0.25)",
+    pointerEvents: "none",
+    zIndex: "2147483647",
+  });
+  ring.setAttribute("data-help-ring", "1");
+  document.body.appendChild(ring);
+  }
+
+  const x = Math.max(0, r.left - pad);
+  const y = Math.max(0, r.top - pad);
+  const wanted = r.width + pad * 2;
+  const width = Math.min(maxWidth, Math.min(window.innerWidth - x, wanted));
+  const height = Math.min(window.innerHeight - y, r.height + pad * 2);
+  return { x, y, width, height, truncated: width < wanted - 1 };
+}
+
+async function main() {
+  const only = process.argv[2];
+  const puppeteer = await import("puppeteer-core");
+  const browser = await puppeteer.launch({
+    executablePath: CHROME,
+    headless: true,
+    args: ["--no-sandbox"],
+    defaultViewport: VIEWPORT,
+  });
+
+  try {
+    const page = await browser.newPage();
+    await mkdir(OUT_DIR, { recursive: true });
+    const written = [];
+
+    for (const shot of SHOTS) {
+      if (only && shot.id !== only) continue;
+      await page.setViewport(shot.viewport ?? VIEWPORT);
+      await page.goto(`${HARNESS}?scene=${shot.scene}`, { waitUntil: "networkidle2" });
+      await new Promise((r) => setTimeout(r, 500));
+
+      if (shot.click) {
+        await page.evaluate((label) => {
+          const btn = [...document.querySelectorAll("button")].find((b) =>
+            b.textContent.includes(label),
+          );
+          if (btn) btn.click();
+        }, shot.click);
+        await new Promise((r) => setTimeout(r, 300));
+      }
+
+      await page.waitForSelector(shot.ring, { timeout: 10000 });
+      const clip = await page.evaluate(
+        ringAndMeasure,
+        shot.ring,
+        shot.pad,
+        PANEL_WIDTH * 2,
+        shot.annotate !== false,
+      );
+      if (!clip || clip.width < 20 || clip.height < 20) {
+        console.warn(`  ! ${shot.id}: could not measure ${shot.ring}, skipped`);
+        continue;
+      }
+
+      if (clip.truncated) {
+        console.warn(
+          `  ! ${shot.id}: ${shot.ring} is wider than the crop, so the marker is cut off. ` +
+            `Give this shot a narrower viewport.`,
+        );
+      }
+      const buffer = await page.screenshot({ clip, type: "png" });
+      await writeFile(path.join(OUT_DIR, `${shot.id}.png`), buffer);
+      written.push({ ...shot, bytes: buffer.length, clip });
+      console.log(
+        `  ${shot.id}.png  ${Math.round(clip.width * DEVICE_SCALE)}x` +
+          `${Math.round(clip.height * DEVICE_SCALE)}  ${(buffer.length / 1024).toFixed(0)} kB`,
+      );
+    }
+
+    console.log("\nMarkdown:");
+    for (const w of written) console.log(`![${w.alt}](/help/${w.id}.png)`);
+    console.log(`\n${written.length} shot(s) -> ${path.relative(ROOT, OUT_DIR)}`);
+  } finally {
+    await browser.close();
+  }
+}
+
+await main();
