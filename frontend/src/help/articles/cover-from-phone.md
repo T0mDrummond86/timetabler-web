@@ -1,12 +1,13 @@
 ---
 id: cover-from-phone
-title: Arranging cover from the phone app
+title: Arranging cover from the phone
 category: Lecturer cover
 keywords: phone cover, mobile cover, arrange cover phone, who is free, send to cover log, pwa cover
 ---
 
-The [phone app](#phone-app-what-lecturers-see) can arrange cover too, which is
-useful when someone calls in sick before you are at a desk.
+The [phone viewer](#phone-app) can arrange cover too, which is what makes it
+worth having: when a lecturer calls in sick first thing, you can sort the
+cover out before you reach a desk.
 
 Tap a class and choose **Arrange cover**. The app works out who is free at that
 time and offers them; *No lecturers available* means nobody is both free and

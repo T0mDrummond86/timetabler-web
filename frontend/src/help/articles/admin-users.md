@@ -19,3 +19,7 @@ Administrators get an **Administration** area on the Dashboard.
 
 *Username already taken* means that username exists. Self-registration is
 switched off; accounts are created here.
+
+Accounts are for people doing timetabling work. Lecturers are not given
+accounts — they receive printouts, emails and cover requests instead. See
+[Who TAFEtabler is for](#who-the-app-is-for).

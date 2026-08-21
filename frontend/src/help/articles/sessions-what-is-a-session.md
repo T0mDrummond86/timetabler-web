@@ -18,3 +18,6 @@ you have opened lately under *Recently opened*.
 
 Several sessions can be joined into a **global workspace** when they share
 lecturers — see [Global workspace](#global-what-is-it).
+
+TAFEtabler is a management tool throughout: the lecturers in a session are
+data, not users of it. See [Who TAFEtabler is for](#who-the-app-is-for).

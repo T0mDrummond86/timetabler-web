@@ -11,7 +11,7 @@ The Dashboard is the front door. It has:
   and *Recently updated* groupings so the one you want is near the top.
 - **Global sessions** — the shared workspaces your sessions belong to.
 - **Timetables on your phone** — the QR code and address for the
-  [lecturer phone app](#phone-app-what-lecturers-see).
+  [phone viewer](#phone-app), for checking timetables away from a desk.
 - **Administration** — only if you are an admin. See
   [Managing users](#admin-users).
 

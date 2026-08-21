@@ -16,3 +16,8 @@ Levels are **Always edit**, **Read-only**, and **Group default** — which follo
 whatever the workspace grants.
 
 Whoever created a session always keeps edit access to it.
+
+Read-only is for colleagues who need to see a timetable without changing it —
+a head of department, someone covering for you. It is **not** a way to give a
+lecturer access to their own timetable; lecturers do not get accounts at all.
+See [Who TAFEtabler is for](#who-the-app-is-for).
