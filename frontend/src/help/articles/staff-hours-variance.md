@@ -7,6 +7,8 @@ keywords: hours, variance, workload, overloaded, underloaded, balanced, fte, 21 
 
 The **Staff** tab's hours table shows each lecturer's workload.
 
+![The lecturer hours table, with a green over-hours and a red under-hours variance badge](/help/staff-hours.png)
+
 - **In-class contact** — weekly scheduled hours in non-online rooms, adjusted
   for the session.
 - **Online / collaborate load** — hours from online cohorts.

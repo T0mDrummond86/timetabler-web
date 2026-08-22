@@ -85,9 +85,12 @@ export function HelpMarkdown({ markdown, onNavigate }: Props) {
       const [, alt, src] = image;
       blocks.push(
         <figure key={key++} className="help-figure">
-          {/* Lazy: an article the reader never scrolls to should not cost a
-              request, and several are illustrated. */}
-          <img src={src} alt={alt} loading="lazy" className="help-shot" />
+          {/* Deliberately not loading="lazy". The panel swaps article content
+              without scrolling, so a lazy image sits unloaded as a 1px hairline
+              until the reader happens to scroll -- which looks broken. At most
+              one image per article, already downloaded once and cached, so
+              there is nothing to defer. */}
+          <img src={src} alt={alt} decoding="async" className="help-shot" />
         </figure>,
       );
       i++;

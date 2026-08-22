@@ -8,6 +8,8 @@ keywords: zoom, bigger, smaller, too small, cannot read, scale, fit more, grid s
 **Display ▾** has **Grid zoom** with **Zoom in**, **Zoom out** and **Reset
 zoom**.
 
+![The Display menu, with grid zoom at the foot](/help/toolbar-display.png)
+
 Zooming out fits more groups on screen at once, which helps when you are
 looking for a free slot across many cohorts. Zooming in makes the class names
 on each placecard readable again.

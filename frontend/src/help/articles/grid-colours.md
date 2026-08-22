@@ -8,9 +8,11 @@ keywords: colours, colors, colour by class, class colour, change colour, recolou
 By default placecards are coloured by **qualification**, so one qualification's
 classes read as a family.
 
-Turn on **Colour by class** in the **Display ▾** menu to colour by class
+Turn on **Class colours** in the **Display ▾** menu to colour by class
 instead — useful when you are chasing one particular class across several
 groups.
+
+![The Display menu, with class colours, alerts, auto-detect clashes and grid zoom](/help/toolbar-display.png)
 
 To set a specific colour by hand, right-click a placecard and choose the class
 colour option, then pick from the presets or enter a hex value. Colours must be

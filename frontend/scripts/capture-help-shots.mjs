@@ -124,13 +124,53 @@ const SHOTS = [
     pad: 14,
     alt: "Clash settings, with each check listed under its category and a tick to enable it",
   },
+  {
+    id: "staff-hours",
+    scene: "hours",
+    ring: ".staff-col-variance",
+    crop: ".staff-hours-table-wrap, table",
+    pad: 8,
+    maxHeight: 420,
+    alt: "The lecturer hours table, with a green over-hours and a red under-hours variance badge",
+  },
+  {
+    id: "staff-availability",
+    scene: "availability",
+    ring: ".staff-availability-grid",
+    pad: 10,
+    maxHeight: 300,
+    alt: "The availability grid, with blocked half-hour slots ticked",
+  },
+  {
+    id: "class-custodians",
+    scene: "custodians",
+    ring: ".data-table, table",
+    pad: 10,
+    alt: "The class custodians table, showing who owns each class",
+  },
+  {
+    id: "toolbar-display",
+    scene: "toolbar-display",
+    click: "Display",
+    ring: ".tt-dropdown-menu",
+    pad: 12,
+    alt: "The Display menu, with colour by class, show alerts, auto clash detect and grid zoom",
+  },
 ];
 
-/** Injected into the page: draw the marker, report the crop rectangle. */
-function ringAndMeasure(selector, pad, maxWidth, annotate) {
+/** Injected into the page: draw the marker, report the crop rectangle.
+ *
+ * `cropSelector` lets the crop be anchored somewhere other than the marker.
+ * Ringing one column of a table is the case that needs it: centring the crop
+ * on the marker slices the row labels in half, which reads as a mistake rather
+ * than as a close-up.
+ */
+function ringAndMeasure(selector, pad, maxWidth, annotate, maxHeight, cropSelector) {
   const el = document.querySelector(selector);
   if (!el) return null;
   const r = el.getBoundingClientRect();
+  const cropEl = cropSelector ? document.querySelector(cropSelector) : null;
+  const cr = cropEl ? cropEl.getBoundingClientRect() : r;
 
   const ring = annotate ? document.createElement("div") : null;
   if (ring) {
@@ -150,11 +190,14 @@ function ringAndMeasure(selector, pad, maxWidth, annotate) {
   document.body.appendChild(ring);
   }
 
-  const x = Math.max(0, r.left - pad);
-  const y = Math.max(0, r.top - pad);
-  const wanted = r.width + pad * 2;
+  const x = Math.max(0, cr.left - pad);
+  const y = Math.max(0, cr.top - pad);
+  const wanted = cr.width + pad * 2;
   const width = Math.min(maxWidth, Math.min(window.innerWidth - x, wanted));
-  const height = Math.min(window.innerHeight - y, r.height + pad * 2);
+  const height = Math.min(
+    maxHeight || Infinity,
+    Math.min(window.innerHeight - y, cr.height + pad * 2),
+  );
   return { x, y, width, height, truncated: width < wanted - 1 };
 }
 
@@ -189,13 +232,20 @@ async function main() {
         await new Promise((r) => setTimeout(r, 300));
       }
 
-      await page.waitForSelector(shot.ring, { timeout: 10000 });
+      try {
+        await page.waitForSelector(shot.ring, { timeout: 8000 });
+      } catch {
+        console.warn(`  ! ${shot.id}: no element matching ${shot.ring} -- skipped`);
+        continue;
+      }
       const clip = await page.evaluate(
         ringAndMeasure,
         shot.ring,
         shot.pad,
         PANEL_WIDTH * 2,
         shot.annotate !== false,
+        shot.maxHeight,
+        shot.crop,
       );
       if (!clip || clip.width < 20 || clip.height < 20) {
         console.warn(`  ! ${shot.id}: could not measure ${shot.ring}, skipped`);

@@ -15,5 +15,5 @@ A freshly imported session often lights up. Work through it like this:
 3. If the noise is mostly *Staff unavailable*, the
    [preferences import](#import-lecturer-preferences) probably needs checking
    before the timetable does.
-4. Turn off **Show alerts** in **Display ▾** while you concentrate on placement,
+4. Turn off **Alerts** in **Display ▾** while you concentrate on placement,
    and turn it back on to review.

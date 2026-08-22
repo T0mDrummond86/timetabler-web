@@ -8,6 +8,8 @@ keywords: availability, unavailable, blocked, cannot teach, days off, not availa
 Each lecturer has an availability grid — the half-hour slots across the week
 when they can be timetabled. Blocked slots are the times they cannot.
 
+![The availability grid, with blocked half-hour slots ticked](/help/staff-availability.png)
+
 Scheduling a class outside a lecturer's availability raises
 [Staff unavailable](#warnings-staff-unavailable), which is a hard clash.
 

@@ -10,7 +10,7 @@ a tab per course, per lecturer and per room.
 
 ![The Export menu, listing Timetable, Admin export, Print timetables and JSON backup](/help/toolbar-export.png)
 
-It respects the **Colour by class** setting, so the workbook comes out coloured
+It respects the **Class colours** setting, so the workbook comes out coloured
 the same way the grid is.
 
 This is also the file you feed back in to restore a session — see

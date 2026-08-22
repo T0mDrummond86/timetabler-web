@@ -13,6 +13,8 @@ inside a session and aggregated across the workspace. Where the derived answer
 is wrong, you can pin a custodian by hand; *Unpinned (derived)* returns it to
 being worked out.
 
+![The class custodians table, showing who owns each class](/help/class-custodians.png)
+
 In the workspace, pinning applies across **every** member session that teaches
 the class, so you set it once. **Export to Excel** downloads the list.
 

@@ -19,6 +19,9 @@ import { createRoot } from "react-dom/client";
 import "../src/index.css";
 import { HoldingAreaPanel } from "../src/components/HoldingAreaPanel";
 import { DataToolbar } from "../src/components/DataToolbar";
+import { StaffHoursTable } from "../src/components/StaffHoursTable";
+import { StaffAvailabilityGrid } from "../src/components/StaffAvailabilityGrid";
+import { ClassCustodiansTable } from "../src/components/ClassCustodiansTable";
 
 /* ---------------------------------------------------------------- fixtures */
 
@@ -28,6 +31,51 @@ const HOLDING = [
   { unit_id: 3, unit_name: "Gather and interpret threat data", duration_slots: 6, session_part: 1 },
   { unit_id: 4, unit_name: "Manage client problems", duration_slots: 2, session_part: 1 },
 ];
+
+function hoursRow(id, name, fte, inClass, variance, category) {
+  return {
+    id, name, cost_centre: "IT", fte,
+    lecturing_hours: fte * 21,
+    in_class_timetabled_hours: inClass,
+    session_schedule_avg: null,
+    variance, variance_category: category,
+    bulk_online_detail: null, bulk_online_hours_avg: 0,
+    development_project_hours: 0, development_project_description: null,
+    tae_hours: 0, supervision_hours: 0,
+    total_hours: fte * 21 + variance,
+    non_teaching_day: null,
+    preferences_first: "", preferences_second: "", preferences_third: "",
+  };
+}
+
+const HOURS = [
+  hoursRow(1, "A. Rivers", 1, 18, 3.5, "overtime"),
+  hoursRow(2, "B. Nakamura", 1, 15, -2, "shortfall"),
+  hoursRow(3, "C. Okonkwo", 0.5, 9, 0, "balanced"),
+];
+
+const CUSTODIANS = [
+  {
+    unit_id: 1, unit_name: "Design and implement a server solution",
+    qualifications: "Cert IV Cyber Security", lecturers: "A. Rivers, B. Nakamura",
+    custodian: "A. Rivers", custodian_staff_id: 1, custodian_deliveries: 4,
+    custodian_is_manual: false,
+    candidates: [
+      { staff_id: 1, name: "A. Rivers", deliveries: 4 },
+      { staff_id: 2, name: "B. Nakamura", deliveries: 1 },
+    ],
+  },
+  {
+    unit_id: 2, unit_name: "Gather and interpret threat data",
+    qualifications: "Cert IV Cyber Security", lecturers: "C. Okonkwo",
+    custodian: "C. Okonkwo", custodian_staff_id: 3, custodian_deliveries: 2,
+    custodian_is_manual: true,
+    candidates: [{ staff_id: 3, name: "C. Okonkwo", deliveries: 2 }],
+  },
+];
+
+/** A few blocked slots, so the grid shows both states. */
+const BLOCKED = new Set(["0:0", "0:1", "0:2", "0:3", "2:16", "2:17", "2:18", "4:20", "4:21"]);
 
 /* ------------------------------------------------------------------ scenes */
 
@@ -170,6 +218,38 @@ function PlacecardPair() {
   );
 }
 
+function Hours() {
+  return (
+    <div className="scene" style={{ background: "var(--zone-main)", width: 470 }}>
+      <StaffHoursTable rows={HOURS} selectedId={1} onSelect={() => {}} />
+    </div>
+  );
+}
+
+function Availability() {
+  return (
+    <div className="scene" style={{ background: "var(--zone-main)", width: 420 }}>
+      <StaffAvailabilityGrid blocked={BLOCKED} onChange={() => {}} />
+    </div>
+  );
+}
+
+function Custodians() {
+  return (
+    <div className="scene" style={{ background: "var(--zone-main)", width: 560 }}>
+      <ClassCustodiansTable
+        rows={CUSTODIANS}
+        allStaff={[
+          { id: 1, name: "A. Rivers" },
+          { id: 2, name: "B. Nakamura" },
+          { id: 3, name: "C. Okonkwo" },
+        ]}
+        onReassign={() => {}}
+      />
+    </div>
+  );
+}
+
 const SCENES = {
   placecard: <Placecard variant="plain" />,
   "placecard-locked": <Placecard variant="locked" />,
@@ -179,6 +259,10 @@ const SCENES = {
   holding: <Holding />,
   "cover-toolbar": <CoverToolbar />,
   "clash-settings": <ClashSettings />,
+  "toolbar-display": <Toolbar open="display" />,
+  hours: <Hours />,
+  availability: <Availability />,
+  custodians: <Custodians />,
 };
 
 const scene = new URLSearchParams(location.search).get("scene") || "placecard";
