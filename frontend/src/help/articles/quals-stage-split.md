@@ -12,6 +12,8 @@ one qualification per stage.
 On the **Qualifications** tab, select the qualification and press **Stage
 split**. Then:
 
+![The Stage split dialog, with the stage count and the class assignment table](/help/stage-split.png)
+
 1. Choose how many stages (up to 6).
 2. Name each stage and give it a group count.
 3. Assign each class to a stage using the dropdown on its row.

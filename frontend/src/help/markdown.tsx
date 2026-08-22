@@ -2,9 +2,9 @@
  *
  * A full markdown library would be several times the size of every article put
  * together. The articles are ours, so the subset they use is a closed set:
- * paragraphs, bullets, numbered steps, bold, inline code, internal links of the
- * form [text](#article-id), and screenshots as ![alt](/help/name.png) on a line
- * of their own. Anything outside that renders as plain text rather than
+ * paragraphs, bullets, numbered steps, bold, italic, inline code, internal
+ * links of the form [text](#article-id), and screenshots as
+ * ![alt](/help/name.png) on a line of their own. Anything outside that renders as plain text rather than
  * breaking, which is the right failure for a help page.
  */
 import { Fragment, type ReactNode } from "react";
@@ -18,18 +18,24 @@ type Props = {
 /** Split one line into bold / code / link runs. */
 function renderInline(line: string, onNavigate: (id: string) => void): ReactNode[] {
   const parts: ReactNode[] = [];
-  const pattern = /\*\*([^*]+)\*\*|`([^`]+)`|\[([^\]]+)\]\(#([a-z0-9-]+)\)/g;
+  // Bold is matched before italic, or "**x**" would be read as an empty italic
+  // followed by stray asterisks. The articles quote UI labels as *Admin export*
+  // constantly, so italic is not optional decoration here.
+  const pattern =
+    /\*\*([^*]+)\*\*|`([^`]+)`|\[([^\]]+)\]\(#([a-z0-9-]+)\)|\*([^*\n]+)\*/g;
   let last = 0;
   let match: RegExpExecArray | null;
   let key = 0;
 
   while ((match = pattern.exec(line)) !== null) {
     if (match.index > last) parts.push(line.slice(last, match.index));
-    const [, bold, code, linkText, linkTarget] = match;
+    const [, bold, code, linkText, linkTarget, italic] = match;
     if (bold !== undefined) {
       parts.push(<strong key={key++}>{bold}</strong>);
     } else if (code !== undefined) {
       parts.push(<code key={key++}>{code}</code>);
+    } else if (italic !== undefined) {
+      parts.push(<em key={key++}>{italic}</em>);
     } else if (linkText !== undefined && linkTarget !== undefined) {
       parts.push(
         <button

@@ -11,6 +11,8 @@ ones. Select a qualification on the **Qualifications** tab and press **Merge**.
 Then pick the other qualification, check the summary, name the result and give
 it a group count.
 
+![The Merge dialog, showing both sources and what the merged qualification will hold](/help/quals-merge.png)
+
 **Both original qualifications survive the merge, unchanged.** Their names,
 groups, bookings and class links are all left exactly as they were — a merge
 only ever adds a record. That is why it works on a fully timetabled session,

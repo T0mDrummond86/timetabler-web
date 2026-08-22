@@ -117,14 +117,6 @@ const SHOTS = [
     alt: "The Week beginning date box on the Lecturer cover tab",
   },
   {
-    id: "clash-settings",
-    viewport: NARROW,
-    scene: "clash-settings",
-    ring: ".clash-settings-group",
-    pad: 14,
-    alt: "Clash settings, with each check listed under its category and a tick to enable it",
-  },
-  {
     id: "staff-hours",
     scene: "hours",
     ring: ".staff-col-variance",
@@ -155,6 +147,52 @@ const SHOTS = [
     ring: ".tt-dropdown-menu",
     pad: 12,
     alt: "The Display menu, with colour by class, show alerts, auto clash detect and grid zoom",
+  },
+  {
+    id: "changelog",
+    scene: "changelog",
+    ring: ".change-log-toolbar",
+    pad: 10,
+    alt: "The Change log toolbar, with the resolved view and the copy-for-email actions",
+  },
+  {
+    id: "warnings-report",
+    scene: "warnings",
+    viewport: NARROW,
+    ring: ".violations-report-panel",
+    pad: 10,
+    maxHeight: 420,
+    alt: "The Warnings tab, listing violations with the hard and soft filter",
+  },
+  {
+    id: "clash-settings",
+    scene: "clash-settings-real",
+    viewport: NARROW,
+    ring: ".clash-settings-group",
+    pad: 10,
+    maxHeight: 420,
+    alt: "Clash settings, with each check listed under its category and a tick to enable it",
+  },
+  {
+    id: "stage-split",
+    viewport: NARROW,
+    scene: "stage-split",
+    ring: ".stage-split-count",
+    crop: ".stage-split-card",
+    pad: 8,
+    maxHeight: 420,
+    alt: "The Stage split dialog, with the number of stages and the class assignment table",
+  },
+  {
+    id: "quals-merge",
+    viewport: NARROW,
+    scene: "merge",
+    select: { selector: ".qual-merge-card select", value: "2" },
+    ring: ".qual-merge-outcome",
+    crop: ".qual-merge-card",
+    pad: 8,
+    maxHeight: 460,
+    alt: "The Merge dialog, showing both source qualifications and what the merged one will hold",
   },
 ];
 
@@ -230,6 +268,24 @@ async function main() {
           if (btn) btn.click();
         }, shot.click);
         await new Promise((r) => setTimeout(r, 300));
+      }
+
+      // Some dialogs only show anything once a choice is made -- the merge
+      // preview does not load until the second qualification is picked. React
+      // ignores a plain value assignment, so the native setter is used and the
+      // change event raised by hand.
+      if (shot.select) {
+        await page.evaluate(({ selector, value }) => {
+          const el = document.querySelector(selector);
+          if (!el) return;
+          const setter = Object.getOwnPropertyDescriptor(
+            window.HTMLSelectElement.prototype,
+            "value",
+          ).set;
+          setter.call(el, value);
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        }, shot.select);
+        await new Promise((r) => setTimeout(r, 700));
       }
 
       try {

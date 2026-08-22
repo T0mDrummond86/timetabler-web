@@ -8,6 +8,8 @@ keywords: change log, history, what changed, audit, edits, log, track changes, w
 The **Change log** tab records every edit to the timetable — a class moved, a
 lecturer swapped, a room changed, a booking added or removed.
 
+![The Change log, with its toolbar and a net change showing what moved](/help/changelog.png)
+
 Each row shows the action, the class, the group, the lecturer, the card ID and
 any notes.
 

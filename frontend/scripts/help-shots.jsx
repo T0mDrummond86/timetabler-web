@@ -22,6 +22,116 @@ import { DataToolbar } from "../src/components/DataToolbar";
 import { StaffHoursTable } from "../src/components/StaffHoursTable";
 import { StaffAvailabilityGrid } from "../src/components/StaffAvailabilityGrid";
 import { ClassCustodiansTable } from "../src/components/ClassCustodiansTable";
+import { ChangeLogPanel } from "../src/components/ChangeLogPanel";
+import { ViolationsReportPanel } from "../src/components/ViolationsReportPanel";
+import { ClashSettingsPanel } from "../src/components/ClashSettingsPanel";
+import { StageSplitDialog } from "../src/components/StageSplitDialog";
+import { QualificationMergeDialog } from "../src/components/QualificationMergeDialog";
+
+/* ------------------------------------------------------------- fetch stub */
+
+/** Canned responses, so components that load their own data can be mounted.
+ *
+ * Matched on the path only, ignoring query strings, because most of these
+ * endpoints carry filters the screenshot does not care about. Anything
+ * unmatched rejects loudly rather than hanging: a scene quietly showing its
+ * loading state would be captured as a picture of the word "Loading".
+ */
+const STUB = [
+  [/\/change-log/, () => ({
+    mode: "resolved",
+    rows: [
+      {
+        when: "2026-03-02T09:15:00Z", action: "net", booking_id: 11, entry_id: 1, note: "",
+        lecturers: ["A. Rivers"],
+        current: { lecturer: "A. Rivers", time: "09:00–11:00", day: "Mon", room: "B2.14" },
+        row: {
+          id: "C-114", group: "Cert IV Cyber GrpA",
+          class: "Design and implement a server solution",
+          day_change: "Tue → Mon", time_change: "13:00 → 09:00",
+        },
+      },
+      {
+        when: "2026-03-02T10:02:00Z", action: "net", booking_id: 12, entry_id: 2, note: "swapped at short notice",
+        lecturers: ["B. Nakamura", "C. Okonkwo"],
+        current: { lecturer: "C. Okonkwo", time: "11:00–13:00", day: "Wed", room: "B2.09" },
+        row: {
+          id: "C-118", group: "Cert IV Cyber GrpB",
+          class: "Gather and interpret threat data",
+          lecturer_change: "B. Nakamura → C. Okonkwo",
+        },
+      },
+    ],
+  })],
+  [/\/violations-report/, () => ({
+    summary: "2 hard, 1 soft",
+    headers: ["severity", "rule", "class", "group", "lecturer", "room", "when"],
+    rows: [
+      { severity: "hard", rule: "Room double-booking", class: "Design and implement a server solution",
+        group: "Cert IV Cyber GrpA", lecturer: "A. Rivers", room: "B2.14", when: "Mon 09:00" },
+      { severity: "hard", rule: "Staff double-booking", class: "Gather and interpret threat data",
+        group: "Cert IV Cyber GrpB", lecturer: "A. Rivers", room: "B2.09", when: "Mon 09:00" },
+      { severity: "soft", rule: "Lecturer not on allowed list", class: "Manage client problems",
+        group: "Cert IV Cyber GrpA", lecturer: "C. Okonkwo", room: "A1.02", when: "Thu 14:00" },
+    ],
+  })],
+  [/\/clash-settings/, () => [
+    { code: "room_double_booking", label: "Room double-booking", severity: "hard", category: "clashes",
+      description: "Same physical room booked twice at overlapping times.", enabled: true },
+    { code: "staff_double_booking", label: "Staff double-booking", severity: "hard", category: "clashes",
+      description: "Same lecturer assigned to overlapping classes.", enabled: true },
+    { code: "course_clash", label: "Course class overlap", severity: "hard", category: "clashes",
+      description: "Two classes for the same course cohort overlap in time.", enabled: true },
+    { code: "room_capacity", label: "Room too small", severity: "hard", category: "rooms",
+      description: "Room capacity is below the class required capacity.", enabled: true },
+    { code: "room_type", label: "Wrong room type", severity: "hard", category: "rooms",
+      description: "Room type does not match the class requirement.", enabled: false },
+  ]],
+  [/\/stage-split/, () => ({
+    qualification_id: 1, name: "Cert IV Cyber Security", num_groups: 2,
+    can_split: true, blocked_reason: "",
+    classes: [
+      { id: 1, name: "Design and implement a server solution" },
+      { id: 2, name: "Gather and interpret threat data" },
+      { id: 3, name: "Manage client problems" },
+      { id: 4, name: "Originate and develop concepts" },
+    ],
+  })],
+  [/\/qualifications\/merge-preview/, () => ({
+    first: { id: 1, name: "Cert IV Cyber Stg1", num_groups: 2, schedule_period: "day",
+      delivery_mode: "regular", class_count: 4, booking_count: 6 },
+    second: { id: 2, name: "Cert IV Cyber Stg2", num_groups: 1, schedule_period: "day",
+      delivery_mode: "regular", class_count: 3, booking_count: 2 },
+    shared_class_count: 1, combined_class_count: 6,
+    combined_classes: [
+      { id: 1, name: "Design and implement a server solution" },
+      { id: 2, name: "Gather and interpret threat data" },
+      { id: 3, name: "Manage client problems" },
+    ],
+    suggested_name: "Cert IV Cyber Stg1 + Cert IV Cyber Stg2",
+    suggested_num_groups: 2,
+    warnings: ["1 class(es) already belong to both, and are counted once."],
+  })],
+];
+
+const realFetch = window.fetch.bind(window);
+window.fetch = async (input, init) => {
+  const url = typeof input === "string" ? input : input.url;
+  const path = url.replace(/^https?:\/\/[^/]+/, "").split("?")[0];
+  for (const [re, body] of STUB) {
+    if (re.test(path)) {
+      return new Response(JSON.stringify(body()), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
+  // Only the app's own API is stubbed; module and asset loads must pass through.
+  if (/^\/(sessions|orgs|global-sessions|auth)\//.test(path)) {
+    throw new Error(`help-shots: no stub for ${path}`);
+  }
+  return realFetch(input, init);
+};
 
 /* ---------------------------------------------------------------- fixtures */
 
@@ -250,6 +360,49 @@ function Custodians() {
   );
 }
 
+function ChangeLog() {
+  return (
+    <div className="scene" style={{ background: "var(--zone-main)", width: 430 }}>
+      <ChangeLogPanel sessionId={1} />
+    </div>
+  );
+}
+
+function Warnings() {
+  return (
+    <div className="scene" style={{ background: "var(--zone-main)", width: 420 }}>
+      <ViolationsReportPanel sessionId={1} />
+    </div>
+  );
+}
+
+function RealClashSettings() {
+  return (
+    <div className="scene" style={{ background: "var(--zone-main)", width: 470 }}>
+      <ClashSettingsPanel sessionId={1} />
+    </div>
+  );
+}
+
+function StageSplit() {
+  return <StageSplitDialog sessionId={1} qualificationId={1} onClose={() => {}} onSplit={() => {}} />;
+}
+
+function Merge() {
+  return (
+    <QualificationMergeDialog
+      sessionId={1}
+      qualificationId={1}
+      qualifications={[
+        { id: 1, name: "Cert IV Cyber Stg1", num_groups: 2, schedule_period: "day" },
+        { id: 2, name: "Cert IV Cyber Stg2", num_groups: 1, schedule_period: "day" },
+      ]}
+      onClose={() => {}}
+      onMerge={() => {}}
+    />
+  );
+}
+
 const SCENES = {
   placecard: <Placecard variant="plain" />,
   "placecard-locked": <Placecard variant="locked" />,
@@ -263,6 +416,11 @@ const SCENES = {
   hours: <Hours />,
   availability: <Availability />,
   custodians: <Custodians />,
+  changelog: <ChangeLog />,
+  warnings: <Warnings />,
+  "clash-settings-real": <RealClashSettings />,
+  "stage-split": <StageSplit />,
+  merge: <Merge />,
 };
 
 const scene = new URLSearchParams(location.search).get("scene") || "placecard";

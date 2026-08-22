@@ -8,6 +8,8 @@ keywords: warnings tab, violations, report, list of clashes, all warnings, hard,
 The **Warnings** tab lists every violation in the session in one place, rather
 than making you hunt for coloured borders.
 
+![The Warnings tab, listing violations with the hard and soft filter](/help/warnings-report.png)
+
 Filter it with the dropdown:
 
 - **All warnings**
