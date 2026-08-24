@@ -25,6 +25,8 @@ STAFF_TAB_EXPORT_HEADERS = (
     "PD run training",
     "Supervision",
     "Total",
+    "Hours owed",
+    "Owed after cover",
 )
 
 
@@ -33,13 +35,22 @@ def _float_cell(v: float | None) -> str:
 
 
 def gather_staff_tab_main_rows(
-    session: Session, *, timetable_session_id: int | None = None
+    session: Session,
+    *,
+    timetable_session_id: int | None = None,
+    ledger_by_name: dict[str, dict] | None = None,
 ) -> list[dict[str, str]]:
     """One dict per lecturer; keys match ``STAFF_TAB_EXPORT_HEADERS``.
 
     ``timetable_session_id`` scopes the export to one session's staff. It is
     optional so single-session (desktop) callers keep the all-staff behaviour;
     the multi-tenant web app must pass it, or the export leaks other sessions.
+
+    ``ledger_by_name`` carries the cover ledger (hours owed, and what is left
+    after logged cover), keyed by casefolded lecturer name. It is passed in
+    rather than computed here because it depends on the global workspace, which
+    only the web app has -- the desktop caller omits it and those two columns
+    come out empty.
     """
     snap_map = staff_hours_snapshots_by_staff_id(session)
     out: list[dict[str, str]] = []
@@ -68,5 +79,8 @@ def gather_staff_tab_main_rows(
             "Supervision": _float_cell(getattr(s, "supervision_hours", None)),
             "Total": f"{staff_tab_total_hours(s, snap):.2f}",
         }
+        led = (ledger_by_name or {}).get((s.name or "").strip().casefold()) or {}
+        row["Hours owed"] = _float_cell(led.get("hours_owed"))
+        row["Owed after cover"] = _float_cell(led.get("still_to_make_up"))
         out.append(row)
     return out

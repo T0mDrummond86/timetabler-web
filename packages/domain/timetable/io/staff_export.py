@@ -67,19 +67,24 @@ def write_staff_tab_xlsx(
     *,
     workbook_title: str = "Staff",
     timetable_session_id: int | None = None,
+    ledger_by_name: dict[str, dict] | None = None,
 ) -> str:
     """Single sheet: main Staff hours table."""
     path = Path(path)
     wb = Workbook()
     ws0 = wb.active
     ws0.title = "Staff hours"[:31]
-    main_rows = gather_staff_tab_main_rows(session, timetable_session_id=timetable_session_id)
+    main_rows = gather_staff_tab_main_rows(
+        session,
+        timetable_session_id=timetable_session_id,
+        ledger_by_name=ledger_by_name,
+    )
     _write_sheet(
         ws0,
         STAFF_TAB_EXPORT_HEADERS,
         main_rows,
         header_fill="FF374151",
-        col_widths=(18, 8, 14, 18, 10, 48, 14, 14, 28, 12, 12, 10),
+        col_widths=(18, 8, 14, 18, 10, 48, 14, 14, 28, 12, 12, 10, 12, 16),
     )
     _shade_variance_column(ws0, len(main_rows))
 

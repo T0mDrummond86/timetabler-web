@@ -1173,6 +1173,10 @@ class StaffHoursRowOut(BaseModel):
     session_schedule_avg: str | None = None
     variance: float | None = None
     variance_category: str
+    #: Weekly shortfall x the semester, and what is left once logged cover is
+    #: credited. Both null for anyone on or over target -- see cover_hours.
+    hours_owed: float | None = None
+    hours_owed_after_cover: float | None = None
     bulk_online_detail: str | None = None
     bulk_online_hours_avg: float | None = None
     development_project_hours: float | None = None

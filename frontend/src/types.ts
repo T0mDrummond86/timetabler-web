@@ -316,6 +316,11 @@ export type StaffHoursRow = {
   session_schedule_avg: string | null;
   variance: number | null;
   variance_category: string;
+  /** Weekly shortfall across the semester; null for anyone on or over target,
+   *  and null when linked sessions disagree on this lecturer's variance. */
+  hours_owed?: number | null;
+  /** What is left once logged cover jobs are credited. Never negative. */
+  hours_owed_after_cover?: number | null;
   bulk_online_detail: string | null;
   bulk_online_hours_avg: number | null;
   development_project_hours: number | null;

@@ -293,6 +293,18 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
               >
                 Variance
               </th>
+              <th
+                className="staff-col-metric staff-col-owed"
+                title="Weekly shortfall across the semester, for lecturers under their hours"
+              >
+                Hours owed
+              </th>
+              <th
+                className="staff-col-metric staff-col-owed"
+                title="What is still owed once logged cover jobs are credited"
+              >
+                Owed after cover
+              </th>
               <th className="staff-col-meta">Cost centre</th>
               <th className="staff-col-metric staff-col-metric-group">Subst. FTE</th>
               <th
@@ -364,6 +376,25 @@ export function StaffHoursTable({ rows, selectedId, onSelect, loading }: Props) 
                 </td>
                 <td className="staff-col-metric staff-col-variance">
                   <VarianceBadge value={row.variance} category={row.variance_category} />
+                </td>
+                {/* Blank, not zero, for anyone on or over target -- and blank
+                    too when linked sessions disagree on a lecturer's variance,
+                    since there is then no single figure to publish. */}
+                <td className="staff-col-metric staff-col-owed">
+                  {row.hours_owed != null ? formatHours(row.hours_owed, 1) : ""}
+                </td>
+                <td className="staff-col-metric staff-col-owed">
+                  {row.hours_owed_after_cover != null ? (
+                    row.hours_owed_after_cover === 0 ? (
+                      <span className="staff-owed-clear" title="Cover has cleared what they owed">
+                        0
+                      </span>
+                    ) : (
+                      formatHours(row.hours_owed_after_cover, 1)
+                    )
+                  ) : (
+                    ""
+                  )}
                 </td>
                 <td className="staff-col-meta staff-hours-wrap">{row.cost_centre ?? ""}</td>
                 <td className="staff-col-metric staff-col-metric-group">

@@ -6300,6 +6300,20 @@ body.staff-editor-resizing {
   font-weight: 600;
 }
 
+/* The two cover-ledger columns on the Staff tab. Numbers, so tabular figures
+   keep the decimal points in a line down the column. */
+.staff-col-owed {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* A settled debt is worth seeing at a glance -- it is the one value in the
+   column that means "no action needed" rather than "less to do". */
+.staff-owed-clear {
+  color: var(--success);
+  font-weight: 600;
+}
+
 /* ---------------- help panel ---------------- */
 
 /* Same shape as the tutorial panel -- fixed to the right edge, under modals --

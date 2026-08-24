@@ -142,8 +142,10 @@ const HOLDING = [
   { unit_id: 4, unit_name: "Manage client problems", duration_slots: 2, session_part: 1 },
 ];
 
-function hoursRow(id, name, fte, inClass, variance, category) {
+function hoursRow(id, name, fte, inClass, variance, category, owed, afterCover) {
   return {
+    hours_owed: owed ?? null,
+    hours_owed_after_cover: afterCover ?? null,
     id, name, cost_centre: "IT", fte,
     lecturing_hours: fte * 21,
     in_class_timetabled_hours: inClass,
@@ -159,9 +161,12 @@ function hoursRow(id, name, fte, inClass, variance, category) {
 }
 
 const HOURS = [
+  // Over target: the owed columns stay blank.
   hoursRow(1, "A. Rivers", 1, 18, 3.5, "overtime"),
-  hoursRow(2, "B. Nakamura", 1, 15, -2, "shortfall"),
-  hoursRow(3, "C. Okonkwo", 0.5, 9, 0, "balanced"),
+  // 2 hours short each week -> 40 over the semester, 12 of it covered.
+  hoursRow(2, "B. Nakamura", 1, 15, -2, "shortfall", 40, 28),
+  // Was short, has covered it all off.
+  hoursRow(3, "C. Okonkwo", 0.5, 9, -1, "shortfall", 20, 0),
 ];
 
 const CUSTODIANS = [
@@ -330,7 +335,7 @@ function PlacecardPair() {
 
 function Hours() {
   return (
-    <div className="scene" style={{ background: "var(--zone-main)", width: 470 }}>
+    <div className="scene" style={{ background: "var(--zone-main)", width: 700 }}>
       <StaffHoursTable rows={HOURS} selectedId={1} onSelect={() => {}} />
     </div>
   );

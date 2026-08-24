@@ -11,6 +11,11 @@ from timetable.core.staff_hours import (
     staff_tab_total_hours,
 )
 
+from .cover_ledger import (
+    ledger_for,
+    normalize_staff_name,
+    session_ledger_by_lecturer,
+)
 from .global_staff_hours import staff_hours_snapshot_for_staff
 
 
@@ -43,6 +48,10 @@ def staff_hours_table_rows(db: Session, *, timetable_session_id: int) -> list[di
         groups = pref_by_staff.setdefault(p.staff_id, {1: [], 2: [], 3: []})
         groups.setdefault(p.priority, []).append(label)
 
+    # Cover ledger for the whole workspace, looked up once rather than per row.
+    # Empty when this session belongs to no workspace -- see below.
+    ledger = session_ledger_by_lecturer(db, timetable_session_id)
+
     out: list[dict] = []
     for s in rows:
         snap = staff_hours_snapshot_for_staff(db, s)
@@ -54,6 +63,13 @@ def staff_hours_table_rows(db: Session, *, timetable_session_id: int) -> list[di
             if lh is not None
             else "unknown"
         )
+        # Prefer the workspace-aggregated ledger so this column agrees with the
+        # Lecturer cover panel. With no workspace there is no cover log either,
+        # so the local variance stands and nothing has been covered against it:
+        # "owed after cover" then equals "owed", which is the right answer
+        # rather than a missing one.
+        led = ledger.get(normalize_staff_name(s.name)) or ledger_for(variance, 0.0)
+
         prefs = pref_by_staff.get(s.id, {1: [], 2: [], 3: []})
         out.append(
             {
@@ -66,6 +82,8 @@ def staff_hours_table_rows(db: Session, *, timetable_session_id: int) -> list[di
                 "session_schedule_avg": snap.session_schedule_breakdown if snap else None,
                 "variance": variance,
                 "variance_category": category,
+                "hours_owed": led["hours_owed"],
+                "hours_owed_after_cover": led["still_to_make_up"],
                 "bulk_online_detail": snap.online_breakdown if snap else None,
                 "bulk_online_hours_avg": snap.online_avg if snap else None,
                 "development_project_hours": getattr(s, "development_project_hours", None),

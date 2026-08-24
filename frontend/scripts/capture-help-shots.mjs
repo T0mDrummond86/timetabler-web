@@ -119,11 +119,11 @@ const SHOTS = [
   {
     id: "staff-hours",
     scene: "hours",
-    ring: ".staff-col-variance",
+    ring: ".staff-col-owed",
     crop: ".staff-hours-table-wrap, table",
     pad: 8,
-    maxHeight: 420,
-    alt: "The lecturer hours table, with a green over-hours and a red under-hours variance badge",
+    maxHeight: 460,
+    alt: "The lecturer hours table, showing the hours owed and owed after cover columns",
   },
   {
     id: "staff-availability",
