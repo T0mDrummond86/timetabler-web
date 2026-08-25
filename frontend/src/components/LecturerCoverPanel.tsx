@@ -357,20 +357,23 @@ export function LecturerCoverPanel({
     }
   }
 
-  async function duplicateWeek() {
+  /** Walk one request forward a week.
+   *
+   * Per request rather than per week: absences rarely line up, and repeating
+   * the whole plan to extend one class leaves rows to delete afterwards. The
+   * planning week is deliberately left where it is -- this acts on one row, so
+   * moving the whole panel underneath the user would be a surprise.
+   */
+  async function repeatRequestNextWeek(r: CoverRequest) {
     setDuplicating(true);
     try {
-      const res = await api.duplicateCoverWeek(sessionId);
+      const res = await api.repeatCoverRequestNextWeek(sessionId, r.id);
       await loadRequests();
       if (res.created === 0) {
-        onError?.("That week is already covered — nothing left to copy forward.");
-      } else {
-        // Move the planning week along too, so the next class picked lands in
-        // the week just created rather than the one already dealt with.
-        setWeekStart(res.week_beginning);
+        onError?.(`${r.unit_name ?? "That class"} is already covered that week.`);
       }
     } catch (err) {
-      onError?.(err instanceof Error ? err.message : "Failed to duplicate the week");
+      onError?.(err instanceof Error ? err.message : "Failed to repeat the request");
     } finally {
       setDuplicating(false);
     }
@@ -592,15 +595,6 @@ export function LecturerCoverPanel({
       <section className="lecturer-cover-requests">
         <header className="lecturer-cover-pane-title lecturer-cover-requests-head">
           <span>Pending cover requests ({requests.length})</span>
-          <button
-            type="button"
-            className="btn-secondary btn-xs"
-            disabled={duplicating || !requests.some((r) => r.cover_date)}
-            title="Copy the last week of this plan forward by one week"
-            onClick={() => void duplicateWeek()}
-          >
-            {duplicating ? "Copying…" : "Repeat next week"}
-          </button>
         </header>
         {requests.length === 0 ? (
           <p className="muted lecturer-cover-empty">
@@ -696,6 +690,19 @@ export function LecturerCoverPanel({
                           onClick={() => void pushRequestToLog(r)}
                         >
                           Push to log
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-xs"
+                          disabled={busy || duplicating || !r.cover_date}
+                          title={
+                            r.cover_date
+                              ? "Copy this one request forward by a week"
+                              : "Set a cover date first."
+                          }
+                          onClick={() => void repeatRequestNextWeek(r)}
+                        >
+                          Repeat next week
                         </button>
                         <button
                           type="button"

@@ -434,9 +434,15 @@ export function EntityEditorsPanel({
           const firstHours = form.get("double_session_first_hours")
             ? Number(form.get("double_session_first_hours"))
             : lengthHours / 2;
+          // The only real constraint is that the second session gets something:
+          // a "double" whose first half is the whole class is just a single.
+          // Anything up to that is allowed, so a 3-hour class can be split
+          // 2.5 + 0.5 as readily as 1.5 + 1.5. Trimming to the largest legal
+          // value rather than silently halving keeps the saved figure close to
+          // what was typed.
           let firstSlots = Math.max(1, Math.round(firstHours * 2));
           if (firstSlots >= lengthSlots) {
-            firstSlots = Math.max(1, Math.floor(lengthSlots / 2));
+            firstSlots = Math.max(1, lengthSlots - 1);
           }
           double_session_first_slots = firstSlots;
         }
@@ -1010,11 +1016,11 @@ export function EntityEditorsPanel({
                     type="number"
                     step={0.5}
                     min={0.5}
-                    max={
-                      selectedUnit.length_slots && selectedUnit.length_slots / 2 > 0.5
-                        ? selectedUnit.length_slots / 2 - 0.5
-                        : undefined
-                    }
+                    /* No max. It used to be derived from the *saved* length, so
+                       after lengthening a class the old ceiling still applied
+                       and the field refused a perfectly valid figure until the
+                       class was saved and reopened. The save path trims
+                       anything that would leave the second session empty. */
                     defaultValue={
                       selectedUnit.double_session_first_slots != null
                         ? selectedUnit.double_session_first_slots / 2

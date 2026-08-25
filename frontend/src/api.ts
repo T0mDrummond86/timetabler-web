@@ -1222,6 +1222,13 @@ export const api = {
     }),
 
   /** Copy the last week of the pending cover plan forward by one week. */
+  /** Copy one pending cover request forward by a week. */
+  repeatCoverRequestNextWeek: (sessionId: number, requestId: number) =>
+    apiFetch<{ created: number; cover_date: string; id: number }>(
+      `/sessions/${sessionId}/cover-requests/${requestId}/repeat-next-week`,
+      { method: "POST" },
+    ),
+
   duplicateCoverWeek: (sessionId: number) =>
     apiFetch<{ created: number; week_beginning: string; copied_from_week_beginning: string }>(
       `/sessions/${sessionId}/cover-requests/duplicate-week`,

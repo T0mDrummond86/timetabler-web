@@ -302,3 +302,66 @@ def duplicate_latest_week(db: Session, *, timetable_session_id: int) -> dict:
         "week_beginning": (monday + _dt.timedelta(days=7)).isoformat(),
         "copied_from_week_beginning": monday.isoformat(),
     }
+
+
+def duplicate_request_next_week(
+    db: Session, *, timetable_session_id: int, request_id: int
+) -> dict:
+    """Copy one pending cover request forward by a week.
+
+    The per-row counterpart to :func:`duplicate_latest_week`. Absences rarely
+    line up: one class might need covering for three weeks while the rest of
+    the plan is a single day, and repeating the whole week to get there creates
+    rows that then have to be deleted one by one.
+
+    Pressing it again on the copy walks the same class further forward, since
+    the copy is itself a request with a later date.
+    """
+    row = (
+        db.query(CoverRequest)
+        .filter(
+            CoverRequest.id == request_id,
+            CoverRequest.timetable_session_id == timetable_session_id,
+        )
+        .one_or_none()
+    )
+    if row is None:
+        raise LookupError("Cover request not found")
+    if row.cover_date is None:
+        raise ValueError(
+            "This request has no date yet, so there is no next week to copy it to."
+        )
+
+    new_date = row.cover_date + _dt.timedelta(days=7)
+    clash = (
+        db.query(CoverRequest)
+        .filter(
+            CoverRequest.timetable_session_id == timetable_session_id,
+            CoverRequest.booking_id == row.booking_id,
+            CoverRequest.cover_date == new_date,
+        )
+        .first()
+    )
+    if clash is not None:
+        # Idempotent, like the whole-week copy: pressing twice must not stack
+        # two identical requests on the same day.
+        return {"created": 0, "cover_date": new_date.isoformat(), "id": clash.id}
+
+    copy = CoverRequest(
+        timetable_session_id=timetable_session_id,
+        booking_id=row.booking_id,
+        cover_date=new_date,
+        semester=row.semester,
+        week_number=(row.week_number + 1) if row.week_number is not None else None,
+        day_label=row.day_label,
+        time_label=row.time_label,
+        group_name=row.group_name,
+        unit_name=row.unit_name,
+        room_code=row.room_code,
+        away_staff_name=row.away_staff_name,
+        cover_staff_id=row.cover_staff_id,
+        cover_staff_name=row.cover_staff_name,
+    )
+    db.add(copy)
+    db.commit()
+    return {"created": 1, "cover_date": new_date.isoformat(), "id": copy.id}

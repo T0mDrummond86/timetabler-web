@@ -396,14 +396,25 @@ def create_booking(
         start = max(0, min(slot, NUM_SLOTS - duration))
         return start, start + duration
 
-    def _make(part: int, duration: int, d: int, slot: int) -> Booking:
+    def _make(
+        part: int,
+        duration: int,
+        d: int,
+        slot: int,
+        *,
+        inherit_from: Booking | None = None,
+    ) -> Booking:
+        """Create one booking. ``inherit_from`` supplies the lecturer and room
+        when this call did not name them -- the second half of a double class
+        follows the first by default, since it is the same class taught to the
+        same group."""
         s, e = _clamp_start(slot, duration)
         b = Booking(
             week_id=week.id,
             course_id=course_id,
             unit_id=unit_id,
-            staff_id=staff_id,
-            room_id=room_id,
+            staff_id=staff_id if staff_id is not None else getattr(inherit_from, "staff_id", None),
+            room_id=room_id if room_id is not None else getattr(inherit_from, "room_id", None),
             day=d,
             start_slot=s,
             end_slot=e,
@@ -431,7 +442,10 @@ def create_booking(
         if 1 not in existing:
             b1 = _make(1, slots1, day, start_slot)
             created.append(b1)
-        elif session_part == 1:
+        else:
+            # Part one is already on the grid. Find it whichever part this call
+            # is about: part two needs it both to sit after it on the day and to
+            # copy its lecturer and room.
             b1 = (
                 db.query(Booking)
                 .filter(
@@ -454,7 +468,7 @@ def create_booking(
                 d2, s2 = (day + 1) % NUM_DAYS, start_slot
             else:
                 d2, s2 = (day + 1) % NUM_DAYS, start_slot
-            created.append(_make(2, slots2, d2, s2))
+            created.append(_make(2, slots2, d2, s2, inherit_from=b1))
     else:
         if start_slot < 0 or end_slot > NUM_SLOTS or end_slot <= start_slot:
             raise ValueError("Invalid slot range")
