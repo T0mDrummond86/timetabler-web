@@ -18,6 +18,12 @@ from .global_sessions import global_session_for_timetable
 from timetable.core.cover_hours import hours_from_slots
 
 
+#: Distinguishes "this field was not in the request" from "set it to null",
+#: which for hours is the difference between leaving an override alone and
+#: deliberately going back to the derived figure.
+_UNSET = object()
+
+
 def _parse_date(value: str | None) -> _dt.date | None:
     if not value:
         return None
@@ -42,6 +48,7 @@ def _out(r: CoverRequest) -> dict:
         "away_staff_name": r.away_staff_name,
         "cover_staff_id": r.cover_staff_id,
         "cover_staff_name": r.cover_staff_name,
+        "hours_manual": r.hours,
     }
 
 
@@ -72,8 +79,11 @@ def _with_ledger(
     out: list[dict] = []
     for r in rows:
         item = _out(r)
-        booking = db.get(Booking, r.booking_id) if r.booking_id else None
-        hours = hours_from_slots(booking.start_slot, booking.end_slot) if booking else None
+        # A figure set by hand wins over the class's own length, and drives the
+        # debt arithmetic below too -- an adjusted cover has to pay back the
+        # adjusted amount, or the preview would promise something the log then
+        # contradicts.
+        hours = effective_hours(db, r)
         item["hours"] = hours
 
         key = (r.cover_staff_name or "").strip().casefold()
@@ -90,6 +100,17 @@ def _with_ledger(
             item["hours_owed_after"] = round(max(0.0, before - spent), 2)
         out.append(item)
     return out
+
+
+def effective_hours(db: Session, row: CoverRequest) -> float | None:
+    """Hours this job counts for: the manual figure if there is one, else the
+    length of the class being covered."""
+    if row.hours is not None:
+        return round(float(row.hours), 2)
+    booking = db.get(Booking, row.booking_id) if row.booking_id else None
+    if booking is None:
+        return None
+    return hours_from_slots(booking.start_slot, booking.end_slot)
 
 
 def create_cover_request(
@@ -180,6 +201,7 @@ def update_cover_request(
     cover_staff_id: int | None = None,
     cover_staff_name: str | None = None,
     cover_date: str | None = None,
+    hours: float | None | object = _UNSET,
 ) -> dict:
     row = _get(db, timetable_session_id, request_id)
     if cover_staff_id is not None or cover_staff_name is not None:
@@ -187,6 +209,16 @@ def update_cover_request(
         row.cover_staff_name = cover_staff_name or ""
     if cover_date is not None:
         row.cover_date = _parse_date(cover_date)
+    if hours is not _UNSET:
+        if hours is None:
+            row.hours = None  # back to the class's own length
+        else:
+            value = float(hours)
+            if value < 0:
+                raise ValueError("Cover hours cannot be negative.")
+            if value > 24:
+                raise ValueError("Cover hours must be less than a day.")
+            row.hours = round(value, 2)
     db.flush()
     db.commit()
     return _out(row)
@@ -209,11 +241,9 @@ def promote_cover_request(db: Session, *, timetable_session_id: int, request_id:
 
     from .export_filenames import timetable_session_name
 
-    # Exact length from the slot grid when the booking is still there.
-    booking = db.get(Booking, row.booking_id) if row.booking_id else None
-    hours = (
-        hours_from_slots(booking.start_slot, booking.end_slot) if booking else None
-    )
+    # A hand-set figure if there is one, else the exact length from the slot
+    # grid. What the panel previewed is what gets logged.
+    hours = effective_hours(db, row)
 
     entry = create_cover_log_entry(
         db,
@@ -292,6 +322,7 @@ def duplicate_latest_week(db: Session, *, timetable_session_id: int) -> dict:
                 away_staff_name=r.away_staff_name,
                 cover_staff_id=r.cover_staff_id,
                 cover_staff_name=r.cover_staff_name,
+                hours=r.hours,
             )
         )
         created += 1
@@ -361,6 +392,8 @@ def duplicate_request_next_week(
         away_staff_name=row.away_staff_name,
         cover_staff_id=row.cover_staff_id,
         cover_staff_name=row.cover_staff_name,
+        # The same arrangement next week means the same adjusted hours.
+        hours=row.hours,
     )
     db.add(copy)
     db.commit()

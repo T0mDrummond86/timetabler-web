@@ -401,6 +401,11 @@ def patch_cover_request(
             cover_staff_id=body.cover_staff_id,
             cover_staff_name=body.cover_staff_name,
             cover_date=body.cover_date,
+            # Only touch hours when the caller actually mentioned them:
+            # "hours": null means clear the override, while omitting the key
+            # entirely means leave it alone. A plain default cannot tell those
+            # apart, so the field's presence is what decides.
+            **({"hours": body.hours} if "hours" in body.model_fields_set else {}),
         )
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

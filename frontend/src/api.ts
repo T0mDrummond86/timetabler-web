@@ -275,8 +275,12 @@ export type CoverRequest = {
   away_staff_name: string;
   cover_staff_id: number | null;
   cover_staff_name: string;
-  /** Length of the job. */
+  /** Length of the job as it will be logged: the hand-set figure if there is
+   *  one, otherwise the class's own length. */
   hours?: number | null;
+  /** The override itself, so an adjusted figure can be shown as adjusted.
+   *  Null means the hours are simply the class's length. */
+  hours_manual?: number | null;
   /** What the cover lecturer still owes before and after doing it. */
   hours_owed_before?: number | null;
   hours_owed_after?: number | null;
@@ -1206,7 +1210,14 @@ export const api = {
   updateCoverRequest: (
     sessionId: number,
     requestId: number,
-    body: { cover_staff_id?: number | null; cover_staff_name?: string | null; cover_date?: string | null },
+    body: {
+      cover_staff_id?: number | null;
+      cover_staff_name?: string | null;
+      cover_date?: string | null;
+      /** Hours to credit. Send null to clear an override and go back to the
+       *  class's own length; omit the key entirely to leave it alone. */
+      hours?: number | null;
+    },
   ) =>
     apiFetch<CoverRequest>(`/sessions/${sessionId}/cover-requests/${requestId}`, {
       method: "PATCH",

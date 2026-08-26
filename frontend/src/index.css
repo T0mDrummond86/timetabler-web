@@ -6314,6 +6314,16 @@ body.staff-editor-resizing {
   font-weight: 600;
 }
 
+/* The editable hours box on a pending cover request. Narrow, because it holds
+   at most "10.5", and a full-width field would read as the most important
+   thing in the row rather than an occasional correction. */
+.cover-request-hours-input {
+  width: 4.5rem;
+  padding: 0.15rem 0.35rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------------- help panel ---------------- */
 
 /* Same shape as the tutorial panel -- fixed to the right edge, under modals --

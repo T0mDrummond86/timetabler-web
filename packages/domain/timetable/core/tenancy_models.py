@@ -362,6 +362,13 @@ class CoverRequest(Base):
     away_staff_name: Mapped[str] = mapped_column(String(200), default="")
     cover_staff_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cover_staff_name: Mapped[str] = mapped_column(String(200), default="")
+    #: Hours credited for this job, when someone has set it by hand.
+    #:
+    #: Null means "work it out from the class", which is right almost always.
+    #: The override exists for the times the timetable does not tell the whole
+    #: story -- a lecturer asked to stay for half of a three-hour class, or one
+    #: covering a session that ran short.
+    hours: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[_dt.datetime] = mapped_column(
         DateTime,
         default=lambda: _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None),

@@ -949,6 +949,10 @@ class CoverRequestUpdate(BaseModel):
     cover_staff_id: int | None = None
     cover_staff_name: str | None = None
     cover_date: str | None = None
+    #: Hours to credit for this job. Sending null clears an override and goes
+    #: back to the class's own length, so the router has to tell "sent as null"
+    #: from "not sent at all" -- see model_fields_set there.
+    hours: float | None = None
 
 
 class CoverRequestOut(BaseModel):
@@ -967,7 +971,11 @@ class CoverRequestOut(BaseModel):
     cover_staff_name: str = ""
     #: Length of the job, and what the cover lecturer still owes before and
     #: after doing it. Null when nobody is assigned or they are not behind.
+    #: ``hours`` is what will be logged: the hand-set figure when there is one,
+    #: otherwise the class's own length. ``hours_manual`` is the override
+    #: itself, so the panel can show that a figure was adjusted.
     hours: float | None = None
+    hours_manual: float | None = None
     hours_owed_before: float | None = None
     hours_owed_after: float | None = None
 

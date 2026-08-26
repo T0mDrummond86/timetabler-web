@@ -357,6 +357,36 @@ export function LecturerCoverPanel({
     }
   }
 
+  /** Set what this cover is worth, or clear the override.
+   *
+   * An empty box means "however long the class is", which is the sensible
+   * default and the state almost every request stays in. A figure only sticks
+   * when someone deliberately types one.
+   */
+  async function setRequestHours(r: CoverRequest, raw: string) {
+    const text = raw.trim();
+    const next = text === "" ? null : Number(text);
+    if (next !== null && (!Number.isFinite(next) || next < 0)) {
+      onError?.("Cover hours must be a positive number.");
+      return;
+    }
+    // Nothing to save if it already reads that way -- avoids a write (and a
+    // full reload of the list) every time the field is tabbed through.
+    const current = r.hours_manual ?? null;
+    if (current === next) return;
+
+    setBusyRequestId(r.id);
+    try {
+      await api.updateCoverRequest(sessionId, r.id, { hours: next });
+      await loadRequests();
+    } catch (err) {
+      onError?.(err instanceof Error ? err.message : "Could not set the cover hours");
+      await loadRequests();
+    } finally {
+      setBusyRequestId(null);
+    }
+  }
+
   /** Walk one request forward a week.
    *
    * Per request rather than per week: absences rarely line up, and repeating
@@ -613,6 +643,12 @@ export function LecturerCoverPanel({
                   <th>Room</th>
                   <th>Away lecturer</th>
                   <th>Cover lecturer</th>
+                  <th
+                    className="cover-request-hours-col"
+                    title="Hours credited for this job. Defaults to the length of the class; type to adjust."
+                  >
+                    Hours
+                  </th>
                   <th className="cover-request-hours-col" title="Hours this lecturer still owes">
                     Owed
                   </th>
@@ -664,6 +700,31 @@ export function LecturerCoverPanel({
                             </option>
                           ))}
                         </select>
+                      </td>
+                      <td className="cover-request-hours-col">
+                        <input
+                          type="number"
+                          className="field-input cover-request-hours-input"
+                          step={0.5}
+                          min={0}
+                          max={24}
+                          disabled={busy}
+                          defaultValue={r.hours ?? ""}
+                          title={
+                            r.hours_manual != null
+                              ? "Adjusted by hand. Clear the box to go back to the class length."
+                              : "Length of the class. Type to adjust what this cover is worth."
+                          }
+                          aria-label={`Hours for ${r.unit_name || "this cover"}`}
+                          /* Committed on blur or Enter rather than per keystroke:
+                             every save re-runs the running debt down the whole
+                             list, and doing that mid-number would make the
+                             figures below jump about as you type. */
+                          onBlur={(e) => void setRequestHours(r, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.currentTarget.blur();
+                          }}
+                        />
                       </td>
                       <td className="cover-request-hours-col">{owedLabel(r.hours_owed_before)}</td>
                       <td className="cover-request-hours-col">
