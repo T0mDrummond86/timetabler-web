@@ -142,10 +142,31 @@ class TestNewSections:
         hours = _find_label(ws, "Delivery hours requested")
         notes = _find_label(ws, "Additional notes")
         grid = _find_label(ws, "Blocked times")
-        # The importer reads the non-teaching day from a fixed row, so nothing
-        # may be inserted above it.
-        assert day == 14
         assert day < hours < notes < grid
+
+    def test_the_cells_the_importer_reads_by_position_have_not_moved(self, db, tmp_path):
+        _, ws = _sheet(db, tmp_path)
+
+        # Three positions are load-bearing. Everything else on the sheet may be
+        # laid out freely, so these are worth asserting on their own rather
+        # than inferring from wherever a heading happens to sit.
+        assert str(ws["A1"].value or "").startswith("Preferences —")
+        assert [ws.cell(row=r, column=1).value for r in range(6, 12)] == [
+            "First",
+            "First",
+            "Second",
+            "Second",
+            "Third",
+            "Third",
+        ]
+        # The non-teaching day is read from B14, whatever labels it.
+        day_dv = [
+            dv
+            for dv in ws.data_validations.dataValidation
+            if "B14" in dv.sqref and dv.type == "list"
+        ]
+        assert day_dv, "B14 is not the non-teaching day dropdown"
+        assert "Monday" in day_dv[0].formula1
 
 
 class TestTheRoundTripStillWorks:
@@ -198,3 +219,82 @@ class TestTheRoundTripStillWorks:
         import_lecturer_preferences(db, path, timetable_session_id=SID)
 
         assert db.query(StaffAvailability).count() == 0
+
+
+class TestHowTheFormLooks:
+    """It goes out to people who do not use the app, so this is not decoration.
+
+    Gridlines are off and the answer cells are the only ruled, shaded things on
+    the page — that pairing is what makes "where do I type" answerable at a
+    glance, and either half alone would undo it.
+    """
+
+    def test_sheet_gridlines_are_off(self, db, tmp_path):
+        _, ws = _sheet(db, tmp_path)
+
+        assert ws.sheet_view.showGridLines is False
+
+    def test_there_are_no_frozen_panes(self, db, tmp_path):
+        _, ws = _sheet(db, tmp_path)
+
+        assert not ws.freeze_panes
+
+    def test_every_answer_cell_is_shaded_and_boxed(self, db, tmp_path):
+        _, ws = _sheet(db, tmp_path)
+
+        answer_cells = [
+            ws.cell(row=r, column=c) for r in range(6, 12) for c in (2, 3)
+        ] + [
+            ws.cell(row=14, column=2),
+            ws.cell(row=_hours_cell_row(ws), column=2),
+            ws.cell(row=_find_label(ws, "Additional notes") + 2, column=1),
+        ]
+        for cell in answer_cells:
+            assert cell.fill.fill_type == "solid", f"{cell.coordinate} is not shaded"
+            assert cell.border.left.style, f"{cell.coordinate} has no box round it"
+
+    def test_a_label_is_not_dressed_up_as_an_answer_cell(self, db, tmp_path):
+        _, ws = _sheet(db, tmp_path)
+
+        # The priority column is filled in for you; shading it like the cells
+        # beside it would invite people to type over it.
+        answer = ws.cell(row=6, column=2).fill.start_color.rgb
+        assert ws.cell(row=6, column=1).fill.start_color.rgb != answer
+
+    def test_the_title_reads_as_a_banner(self, db, tmp_path):
+        _, ws = _sheet(db, tmp_path)
+
+        title = ws["A1"]
+        assert any(r.min_row == 1 and r.max_col >= 1 + NUM_DAYS
+                   for r in ws.merged_cells.ranges)
+        assert title.font.color.rgb.endswith("FFFFFF")
+        assert title.fill.fill_type == "solid"
+
+    def test_the_grid_is_banded_by_the_hour(self, db, tmp_path):
+        _, ws = _sheet(db, tmp_path)
+
+        first = next(
+            r for r in range(1, 80)
+            if str(ws.cell(row=r, column=1).value or "").startswith("08:00")
+        )
+        shade = lambda r: ws.cell(row=r, column=2).fill.start_color.rgb  # noqa: E731
+        # Both halves of an hour share a shade; the next hour differs. Counting
+        # half-hour lines across five columns is what this saves.
+        assert shade(first) == shade(first + 1)
+        assert shade(first) != shade(first + 2)
+        assert shade(first + 2) == shade(first + 3)
+
+    def test_the_day_columns_are_all_the_same_width(self, db, tmp_path):
+        _, ws = _sheet(db, tmp_path)
+
+        widths = {
+            ws.column_dimensions[chr(ord("B") + d)].width for d in range(NUM_DAYS)
+        }
+        assert len(widths) == 1, f"the grid is lopsided: {widths}"
+
+    def test_it_is_set_up_to_print_on_one_page_wide(self, db, tmp_path):
+        _, ws = _sheet(db, tmp_path)
+
+        assert ws.page_setup.fitToWidth == 1
+        assert ws.sheet_properties.pageSetUpPr.fitToPage is True
+        assert ws.print_area

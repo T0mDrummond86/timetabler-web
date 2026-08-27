@@ -27,6 +27,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
+from openpyxl.worksheet.page import PageMargins
+from openpyxl.worksheet.properties import PageSetupProperties
 from sqlalchemy.orm import Session
 
 from ..constants import DAYS, NUM_DAYS, NUM_SLOTS, slot_to_time
@@ -39,6 +41,68 @@ CLASS_LIST_SHEET = "_classes"
 #: every lecturer is asking for exactly this, so the cell arrives filled in and
 #: the few who want more or less are the only ones who have to type.
 DEFAULT_REQUESTED_HOURS = 21
+
+# ---------------------------------------------------------------------------
+# Palette
+#
+# This is a form that goes out to people who do not work in the app, so the
+# styling has one job: make it obvious what to read and where to type. Sheet
+# gridlines are switched off and the boxes are drawn instead, so the only ruled
+# areas on the page are the ones asking for an answer.
+# ---------------------------------------------------------------------------
+INK = "FF1F3A5F"          # headings and the title banner
+RULE = "FF2E5C8A"          # the line under a section heading
+HEADER_FILL = "FFE8EDF3"   # table header rows
+INPUT_FILL = "FFF4F8FC"    # every cell the lecturer fills in
+INPUT_EDGE = "FF8FAAC6"    # and its outline, darker than the hairlines
+BAND_FILL = "FFEDF2F8"     # alternating bands in the blocked-times grid
+HAIRLINE = "FFD6DEE7"
+MUTED = "FF5A6B7C"
+#: First preference reads as the strongest of the three, third as the faintest.
+PRIORITY_FILLS = {"First": "FFDCE9F7", "Second": "FFE8EFF7", "Third": "FFF2F5F9"}
+
+_HINT_FONT = Font(name="Calibri", size=9, italic=True, color=MUTED)
+_HINT_ALIGN = Alignment(horizontal="left", vertical="center")
+_CENTRE = Alignment(horizontal="center", vertical="center")
+
+
+def _fill(colour: str) -> PatternFill:
+    return PatternFill(start_color=colour, end_color=colour, fill_type="solid")
+
+
+def _box(colour: str = HAIRLINE, style: str = "thin") -> Border:
+    side = Side(border_style=style, color=colour)
+    return Border(top=side, bottom=side, left=side, right=side)
+
+
+def _input_cell(cell) -> None:
+    """A cell someone is being asked to type in."""
+    cell.fill = _fill(INPUT_FILL)
+    cell.border = _box(INPUT_EDGE)
+    cell.alignment = _CENTRE
+
+
+def _section_heading(ws, row: int, text: str, last_col: int) -> None:
+    """A heading with the row to itself and a rule under it.
+
+    Alone on the row on purpose: column A is only wide enough for the grid's
+    "08:00-08:30" labels, so a heading with a value beside it is clipped to
+    half a word.
+    """
+    cell = ws.cell(row=row, column=1, value=text)
+    cell.font = Font(name="Calibri", size=11, bold=True, color=INK)
+    cell.alignment = Alignment(horizontal="left", vertical="bottom")
+    ws.row_dimensions[row].height = 22
+    underline = Border(bottom=Side(border_style="medium", color=RULE))
+    for col in range(1, last_col + 1):
+        ws.cell(row=row, column=col).border = underline
+
+
+def _hint(ws, row: int, col: int, text: str):
+    cell = ws.cell(row=row, column=col, value=text)
+    cell.font = _HINT_FONT
+    cell.alignment = _HINT_ALIGN
+    return cell
 
 
 def _safe_sheet_name(name: str, used: set[str]) -> str:
@@ -94,30 +158,54 @@ def _populate_class_list_sheet(
 
 
 def _populate_lecturer_sheet(ws, staff: Staff, n_quals: int, n_map_rows: int) -> None:
-    title_font = Font(name="Tahoma", size=18, bold=True)
-    section_font = Font(name="Calibri", size=12, bold=True)
-    header_font = Font(name="Calibri", size=11, bold=True, color="FF1F2937")
-    header_fill = PatternFill(start_color="FFE9ECEF", end_color="FFE9ECEF", fill_type="solid")
-    grid_fill = PatternFill(start_color="FFFAFAFA", end_color="FFFAFAFA", fill_type="solid")
-    border_side = Side(border_style="thin", color="FFD0D7DE")
-    border = Border(top=border_side, bottom=border_side, left=border_side, right=border_side)
-    centre = Alignment(horizontal="center", vertical="center")
+    """Lay out and style one lecturer's tab.
 
-    ws["A1"] = f"Preferences — {staff.name}"
-    ws["A1"].font = title_font
-    ws.row_dimensions[1].height = 28
+    Three row positions are load-bearing and must not move: the title in A1,
+    the six preference rows at 6..11 and the non-teaching day in B14, all of
+    which the importer reads by position. Everything below that is found by its
+    content -- the blocked-times grid by its time labels -- so the lower half of
+    the sheet can be laid out freely.
+    """
+    last_col = 1 + NUM_DAYS  # A..F; the grid is the widest thing on the sheet
+    last_letter = get_column_letter(last_col)
+
+    # Gridlines off: the ruled boxes below are then the only ruled things on
+    # the page, which is what makes the answer cells findable at a glance.
+    ws.sheet_view.showGridLines = False
+    ws.sheet_properties.tabColor = INK[2:]
+
+    # ---- Title banner ----
+    ws.merge_cells(f"A1:{last_letter}1")
+    title = ws.cell(row=1, column=1, value=f"Preferences — {staff.name}")
+    title.font = Font(name="Tahoma", size=16, bold=True, color="FFFFFFFF")
+    title.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    for col in range(1, last_col + 1):
+        ws.cell(row=1, column=col).fill = _fill(INK)
+    ws.row_dimensions[1].height = 34
+
+    ws.merge_cells(f"A2:{last_letter}2")
+    strap = ws.cell(
+        row=2,
+        column=1,
+        value="Fill in the shaded boxes and return this workbook — every section is optional.",
+    )
+    strap.font = _HINT_FONT
+    strap.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    ws.row_dimensions[2].height = 16
 
     # ---- Class preferences ----
-    ws["A3"] = "Class preferences (2x first, 2x second, 2x third)"
-    ws["A3"].font = section_font
-    ws["A5"] = "Priority"
-    ws["B5"] = "Qualification"
-    ws["C5"] = "Class"
-    for c in (ws["A5"], ws["B5"], ws["C5"]):
-        c.font = header_font
-        c.fill = header_fill
-        c.alignment = centre
-        c.border = border
+    _section_heading(ws, 3, "Class preferences", last_col)
+    _hint(ws, 4, 1, "Two firsts, two seconds, two thirds. Pick the qualification, then the class.")
+    ws.row_dimensions[4].height = 14
+
+    header_row = 5
+    for col, label in enumerate(("Priority", "Qualification", "Class"), start=1):
+        cell = ws.cell(row=header_row, column=col, value=label)
+        cell.font = Font(name="Calibri", size=10, bold=True, color=INK)
+        cell.fill = _fill(HEADER_FILL)
+        cell.alignment = _CENTRE
+        cell.border = _box()
+    ws.row_dimensions[header_row].height = 20
 
     qual_dv = None
     if n_quals > 0:
@@ -143,23 +231,30 @@ def _populate_lecturer_sheet(ws, staff: Staff, n_quals: int, n_map_rows: int) ->
 
     priorities = ("First", "First", "Second", "Second", "Third", "Third")
     for idx, priority in enumerate(priorities, start=1):
-        row = 5 + idx
-        ws.cell(row=row, column=1, value=priority).alignment = centre
-        ws.cell(row=row, column=1).border = border
-        qual_cell = ws.cell(row=row, column=2)
-        qual_cell.border = border
-        qual_cell.alignment = centre
-        class_cell = ws.cell(row=row, column=3)
-        class_cell.border = border
-        class_cell.alignment = centre
-        if qual_dv is not None:
-            qual_dv.add(qual_cell)
-        if class_dv is not None:
-            class_dv.add(class_cell)
+        row = header_row + idx
+        # Repeated rather than merged across the pair: the importer reads the
+        # priority from every one of rows 6..11, and the second cell of a merge
+        # reads back empty, which would silently drop that preference.
+        rank_cell = ws.cell(row=row, column=1, value=priority)
+        rank_cell.font = Font(name="Calibri", size=10, bold=True, color=INK)
+        rank_cell.alignment = _CENTRE
+        rank_cell.fill = _fill(PRIORITY_FILLS[priority])
+        rank_cell.border = _box()
+        for col, dv in ((2, qual_dv), (3, class_dv)):
+            cell = ws.cell(row=row, column=col)
+            _input_cell(cell)
+            # Names run past the column width, and the grid below fixes that
+            # width, so they wrap instead of disappearing under the next cell.
+            cell.alignment = Alignment(
+                horizontal="center", vertical="center", wrap_text=True
+            )
+            if dv is not None:
+                dv.add(cell)
+        ws.row_dimensions[row].height = 28
 
     # ---- Non-teaching day ----
+    _section_heading(ws, 13, "Non-teaching day", last_col)
     nt_row = 14
-    ws.cell(row=nt_row, column=1, value="Non-teaching day").font = section_font
     day_dv = DataValidation(
         type="list",
         formula1='"' + ",".join(DAYS) + '"',
@@ -169,22 +264,20 @@ def _populate_lecturer_sheet(ws, staff: Staff, n_quals: int, n_map_rows: int) ->
     day_dv.errorTitle = "Unknown day"
     ws.add_data_validation(day_dv)
     day_cell = ws.cell(row=nt_row, column=2)
-    day_cell.border = border
-    day_cell.alignment = centre
+    _input_cell(day_cell)
     day_dv.add(day_cell)
+    _hint(ws, nt_row, 3, "One weekday, or leave blank.")
+    ws.row_dimensions[nt_row].height = 22
 
     # ---- Requested delivery hours ----
-    # Section headings sit alone on their row, as the ones above and below do:
-    # column A is only 14 wide (it has to fit "08:00–08:30" in the grid), so a
-    # heading with anything beside it would be clipped to half a word.
-    hint_font = Font(name="Calibri", size=9, italic=True, color="FF555555")
-    hint_align = Alignment(horizontal="left", vertical="center")
-
     hours_row = nt_row + 2
-    ws.cell(row=hours_row, column=1, value="Delivery hours requested").font = section_font
+    _section_heading(ws, hours_row, "Delivery hours requested", last_col)
     hours_cell = ws.cell(row=hours_row + 1, column=2, value=DEFAULT_REQUESTED_HOURS)
-    hours_cell.border = border
-    hours_cell.alignment = centre
+    _input_cell(hours_cell)
+    hours_cell.font = Font(name="Calibri", size=11, bold=True, color=INK)
+    # General, not "0.#": a literal format code always shows its decimal
+    # separator, so 21 rendered as "21." — General gives 21 and 18.5 alike.
+    hours_cell.number_format = "General"
     hours_dv = DataValidation(
         type="decimal", operator="between", formula1=0, formula2=40, allow_blank=True
     )
@@ -192,85 +285,115 @@ def _populate_lecturer_sheet(ws, staff: Staff, n_quals: int, n_map_rows: int) ->
     hours_dv.errorTitle = "Hours out of range"
     ws.add_data_validation(hours_dv)
     hours_dv.add(hours_cell)
-    hours_hint = ws.cell(
-        row=hours_row + 1,
-        column=3,
-        value=f"Hours per week. {DEFAULT_REQUESTED_HOURS} is a full load — change it if yours differs.",
+    _hint(
+        ws,
+        hours_row + 1,
+        3,
+        f"Hours per week. {DEFAULT_REQUESTED_HOURS} is a full load — change it if yours differs.",
     )
-    hours_hint.font = hint_font
-    hours_hint.alignment = hint_align
+    ws.row_dimensions[hours_row + 1].height = 22
 
     # ---- Additional notes ----
     notes_row = hours_row + 3
-    ws.cell(row=notes_row, column=1, value="Additional notes").font = section_font
-    notes_hint = ws.cell(
-        row=notes_row + 1,
-        column=1,
-        value="Anything the sections above cannot say — job-share, travel between campuses, study leave.",
+    _section_heading(ws, notes_row, "Additional notes", last_col)
+    _hint(
+        ws,
+        notes_row + 1,
+        1,
+        "Anything the sections above cannot say — job-share, travel between campuses, study leave.",
     )
-    notes_hint.font = hint_font
-    notes_hint.alignment = hint_align
+    ws.row_dimensions[notes_row + 1].height = 14
     # One merged box rather than ruled lines: a lecturer with two sentences and
     # a lecturer with ten both get somewhere obvious to put them.
     notes_top = notes_row + 2
     notes_bottom = notes_top + 5
-    notes_last_col = get_column_letter(1 + NUM_DAYS)
-    ws.merge_cells(f"A{notes_top}:{notes_last_col}{notes_bottom}")
-    notes_box = ws.cell(row=notes_top, column=1)
-    notes_box.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+    ws.merge_cells(f"A{notes_top}:{last_letter}{notes_bottom}")
     for r in range(notes_top, notes_bottom + 1):
         ws.row_dimensions[r].height = 18
-        for c in range(1, 2 + NUM_DAYS):
-            ws.cell(row=r, column=c).border = border
+        for c in range(1, last_col + 1):
+            cell = ws.cell(row=r, column=c)
+            cell.fill = _fill(INPUT_FILL)
+            cell.border = _box(INPUT_EDGE)
+    ws.cell(row=notes_top, column=1).alignment = Alignment(
+        horizontal="left", vertical="top", wrap_text=True, indent=1
+    )
 
     # ---- Blocked times grid ----
     grid_top = notes_bottom + 2
-    ws.cell(row=grid_top, column=1, value="Blocked times — write X in slots you cannot teach").font = section_font
-    # Day headers.
-    header_row = grid_top + 2
-    ws.cell(row=header_row, column=1, value="Time")
-    for d, name in enumerate(DAYS):
-        c = ws.cell(row=header_row, column=2 + d, value=name)
-        c.font = header_font
-        c.fill = header_fill
-        c.alignment = centre
-        c.border = border
-    ws.cell(row=header_row, column=1).font = header_font
-    ws.cell(row=header_row, column=1).fill = header_fill
-    ws.cell(row=header_row, column=1).alignment = centre
-    ws.cell(row=header_row, column=1).border = border
+    _section_heading(ws, grid_top, "Blocked times", last_col)
+    _hint(ws, grid_top + 1, 1, "Write X in every half-hour you cannot teach. Leave the rest empty.")
+    ws.row_dimensions[grid_top + 1].height = 14
 
-    # Time rows.
+    day_header_row = grid_top + 2
+    for col, label in enumerate(("Time",) + tuple(DAYS), start=1):
+        cell = ws.cell(row=day_header_row, column=col, value=label)
+        cell.font = Font(name="Calibri", size=10, bold=True, color=INK)
+        cell.fill = _fill(HEADER_FILL)
+        cell.alignment = _CENTRE
+        cell.border = _box()
+    ws.row_dimensions[day_header_row].height = 20
+
+    hour_edge = Side(border_style="thin", color=INPUT_EDGE)
+    hairline = Side(border_style="thin", color=HAIRLINE)
     for s in range(max(0, NUM_SLOTS - 1)):
-        row = header_row + 1 + s
+        row = day_header_row + 1 + s
+        # Kept exactly as "08:00–08:30": this label is how the importer finds
+        # the grid, wherever on the sheet it has ended up.
         time_label = (
             f"{slot_to_time(s).strftime('%H:%M')}–"
             f"{slot_to_time(s + 1).strftime('%H:%M')}"
         )
-        c = ws.cell(row=row, column=1, value=time_label)
-        c.alignment = centre
-        c.font = Font(name="Calibri", size=9, color="FF555555")
-        c.border = border
+        starts_hour = s % 2 == 0
+        # Banded by the hour, not the half-hour, so a row is easy to follow
+        # across five columns without counting lines.
+        band = _fill(BAND_FILL) if (s // 2) % 2 else _fill("FFFFFFFF")
+        label_cell = ws.cell(row=row, column=1, value=time_label)
+        label_cell.alignment = _CENTRE
+        label_cell.font = Font(
+            name="Calibri", size=9, bold=starts_hour, color=INK if starts_hour else MUTED
+        )
+        label_cell.fill = _fill(HEADER_FILL) if starts_hour else _fill(BAND_FILL)
+        label_cell.border = Border(
+            top=hour_edge if starts_hour else hairline,
+            bottom=hairline,
+            left=hairline,
+            right=hour_edge,
+        )
         for d in range(NUM_DAYS):
             cell = ws.cell(row=row, column=2 + d)
-            cell.fill = grid_fill
-            cell.border = border
-            cell.alignment = centre
-        ws.row_dimensions[row].height = 16
+            cell.fill = band
+            cell.alignment = _CENTRE
+            cell.font = Font(name="Calibri", size=10, bold=True, color=INK)
+            cell.border = Border(
+                top=hour_edge if starts_hour else hairline,
+                bottom=hairline,
+                left=hairline,
+                right=hairline,
+            )
+        ws.row_dimensions[row].height = 15
 
-    # Column widths.
-    ws.column_dimensions["A"].width = 14
-    ws.column_dimensions["B"].width = 26
-    ws.column_dimensions["C"].width = 32
-    for d in range(NUM_DAYS):
-        ws.column_dimensions[get_column_letter(2 + d)].width = max(
-            ws.column_dimensions[get_column_letter(2 + d)].width or 0, 11
-        )
+    # ---- Column widths ----
+    # Every column past A is the same width, because the grid and the
+    # preference table share them: the grid wants five even day columns, and
+    # the preference table's long names wrap to suit rather than forcing B and
+    # C wide enough to leave the grid lopsided.
+    ws.column_dimensions["A"].width = 15
+    for col in range(2, last_col + 1):
+        ws.column_dimensions[get_column_letter(col)].width = 18
 
-    # Columns A and B are shared: A carries the priority labels and the time
-    # labels, B carries the qualification names and Monday. B is set wide for
-    # the qualification names, which is more than Monday needs and harmless.
-    ws.freeze_panes = "B6"
+    # No frozen panes: the sheet is a form to read top to bottom, and a split
+    # under the title only got in the way of that.
+    ws.freeze_panes = None
+
+    # ---- Print setup ----
+    # It gets printed and marked up on paper as often as it gets typed into.
+    ws.print_area = f"A1:{last_letter}{day_header_row + NUM_SLOTS - 1}"
+    ws.page_setup.orientation = "portrait"
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    ws.print_options.horizontalCentered = True
+    ws.page_margins = PageMargins(left=0.4, right=0.4, top=0.5, bottom=0.5)
 
 
 def write_lecturer_preferences_template(
