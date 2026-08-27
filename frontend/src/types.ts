@@ -438,17 +438,24 @@ export type QualificationMergePreview = {
 };
 
 export type QualificationDuplicatePreview = {
+  /** The root of the stage family, not whichever stage was open. */
   source_id: number;
+  /** The whole qualification's name, with any stage suffix taken off. */
   source_name: string;
+  stage_count: number;
+  stage_names: string[];
   class_count: number;
   num_groups: number;
   suggested_name: string;
 };
 
 export type QualificationDuplicateResult = {
+  /** The root of the new family — the stage to open. */
   qualification_id: number;
   name: string;
   source_name: string;
+  stage_count: number;
+  stage_names: string[];
   /** Classes shared with the source, not copies of them. */
   class_count: number;
   num_groups: number;

@@ -656,13 +656,20 @@ export function EntityEditorsPanel({
       setError(err instanceof Error ? err.message : "Could not load");
       return;
     }
+    // Named for the whole qualification, and it says how many stages are
+    // coming with it: the list shows a split qualification as one row, so the
+    // user never chose which stage record happens to be open.
+    const stages =
+      preview.stage_count > 1
+        ? ` All ${preview.stage_count} stages are copied (${preview.stage_names.join(", ")}).`
+        : "";
     const label = await prompt({
       title: `Duplicate ${preview.source_name}`,
       message:
         `The copy shares this qualification's ${preview.class_count} class(es) rather ` +
         `than making new ones, so editing a class changes it in both. It gets its own ` +
         `${preview.num_groups} group(s) with those classes ready to place, and starts ` +
-        `with an empty timetable.`,
+        `with an empty timetable.${stages}`,
       defaultValue: preview.suggested_name,
       placeholder: "New qualification name",
       confirmLabel: "Duplicate",

@@ -1135,8 +1135,12 @@ class QualificationMergeResultOut(BaseModel):
 
 
 class QualificationDuplicatePreviewOut(BaseModel):
+    #: The root of the stage family, not whichever stage was open.
     source_id: int
+    #: The whole qualification's name, with any stage suffix taken off.
     source_name: str
+    stage_count: int = 1
+    stage_names: list[str] = Field(default_factory=list)
     class_count: int
     num_groups: int
     suggested_name: str
@@ -1149,9 +1153,12 @@ class QualificationDuplicateRequest(BaseModel):
 
 
 class QualificationDuplicateResultOut(BaseModel):
+    #: The root of the new family — the stage the caller should open.
     qualification_id: int
     name: str
     source_name: str
+    stage_count: int = 1
+    stage_names: list[str] = Field(default_factory=list)
     #: Classes shared with the source, not copies of them.
     class_count: int
     num_groups: int
