@@ -1967,6 +1967,7 @@ export function TimetablePage() {
                   sessionId={sessionId}
                   viewKind={viewKind}
                   editable={editable}
+                  onCopyError={setError}
                   zoom={gridZoom}
                   fitToViewport
                   showAlerts={showAlerts}

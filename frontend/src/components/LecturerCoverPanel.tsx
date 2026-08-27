@@ -581,6 +581,7 @@ export function LecturerCoverPanel({
               sessionId={sessionId}
               viewKind="staff"
               editable={false}
+              onCopyError={(m) => onError?.(m)}
               zoom={gridZoom}
               showAlerts={showAlerts}
               colourByClass={colourByClass}
@@ -607,6 +608,7 @@ export function LecturerCoverPanel({
               sessionId={sessionId}
               viewKind="staff"
               editable={false}
+              onCopyError={(m) => onError?.(m)}
               zoom={gridZoom}
               showAlerts={showAlerts}
               colourByClass={colourByClass}

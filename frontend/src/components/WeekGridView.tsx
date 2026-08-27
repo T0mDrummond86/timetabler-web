@@ -33,6 +33,9 @@ type Props = {
   onUnmergeClasses?: (bookingId: number) => void;
   onDeletePlacecard?: (booking: BookingCard) => void;
   onLogManualChange?: (booking: BookingCard) => void;
+  /** Raised when copying a session's details to the clipboard fails, which is
+   *  otherwise silent -- the menu closes and nothing lands in the paste. */
+  onCopyError?: (message: string) => void;
   colourByClass?: boolean;
   /** Stretch rows to fill the grid area (full day visible, no dead space). */
   fitToViewport?: boolean;
@@ -155,6 +158,7 @@ export function WeekGridView({
   onUnmergeClasses,
   onDeletePlacecard,
   onLogManualChange,
+  onCopyError,
   colourByClass = true,
   fitToViewport = false,
   selectedBookingId: selectedBookingIdProp,
@@ -623,6 +627,7 @@ export function WeekGridView({
           onUnmergeClasses={onUnmergeClasses}
           onDeletePlacecard={onDeletePlacecard}
           onLogManualChange={onLogManualChange}
+          onCopyError={onCopyError}
           x={contextMenu.x}
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}

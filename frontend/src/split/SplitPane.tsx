@@ -216,6 +216,9 @@ export function SplitPane({
             sessionId={sessionId}
             viewKind={slot.viewKind}
             editable={editable}
+            /* Split view has no error banner of its own; an alert beats a
+               copy that silently did nothing. */
+            onCopyError={(m) => window.alert(m)}
             zoom={gridZoom}
             showAlerts={showAlerts}
             onMove={editable ? onMove : undefined}

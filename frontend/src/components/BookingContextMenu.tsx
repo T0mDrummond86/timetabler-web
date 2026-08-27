@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../api";
+import { copySessionDetails } from "../lib/sessionDetailsClipboard";
 import type { AlternatePlacementOption, AlternateSlots, BookingCard } from "../types";
 import type { ViewKind } from "../viewKinds";
 
@@ -22,6 +23,8 @@ type Props = {
   onUnmergeClasses?: (bookingId: number) => void;
   onDeletePlacecard?: (booking: BookingCard) => void;
   onLogManualChange?: (booking: BookingCard) => void;
+  /** Surfaces a clipboard failure, which is silent otherwise. */
+  onCopyError?: (message: string) => void;
   colourByClass?: boolean;
 };
 
@@ -42,6 +45,7 @@ export function BookingContextMenu({
   onUnmergeClasses,
   onDeletePlacecard,
   onLogManualChange,
+  onCopyError,
   colourByClass = true,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -109,6 +113,21 @@ export function BookingContextMenu({
     >
       <button type="button" className="ctx-item" onClick={() => { onEdit(); onClose(); }}>
         Edit booking…
+      </button>
+      <button
+        type="button"
+        className="ctx-item"
+        title="Copy the class, units, lecturer, room, day and time as a table"
+        onClick={() => {
+          // Closing first: the clipboard write is async, and leaving the menu
+          // open until it settles makes the click feel like it missed.
+          onClose();
+          void copySessionDetails(booking).catch(() =>
+            onCopyError?.("Could not copy the session details to the clipboard."),
+          );
+        }}
+      >
+        Copy session details
       </button>
       {canMerge && (
         <button
