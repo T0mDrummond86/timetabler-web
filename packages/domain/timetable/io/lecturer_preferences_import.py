@@ -71,12 +71,38 @@ def _windows_from_blocked(blocked: set[tuple[int, int]]) -> list[tuple[int, int,
     return out
 
 
-def import_lecturer_preferences(session: Session, xlsx_path: str | Path) -> LecturerPrefsImportReport:
+def import_lecturer_preferences(
+    session: Session,
+    xlsx_path: str | Path,
+    *,
+    timetable_session_id: int | None = None,
+) -> LecturerPrefsImportReport:
+    """Read a filled-in preferences workbook back in.
+
+    ``timetable_session_id`` restricts the lecturers and classes a sheet may
+    match. None means the whole database -- right for a desktop file, where one
+    file is one session, and wrong anywhere sessions share a database: a name
+    that happens to exist in another session would otherwise silently take the
+    preference, writing one session's data into another.
+    """
     rep = LecturerPrefsImportReport()
     wb = load_workbook(xlsx_path, data_only=True)
 
-    staff_by_name = {s.name.strip().lower(): s for s in session.query(Staff).all() if (s.name or "").strip()}
-    unit_by_name = {u.name.strip().lower(): u for u in session.query(Unit).all() if (u.name or "").strip()}
+    def scoped(query, model):
+        if timetable_session_id is None:
+            return query
+        return query.filter(model.timetable_session_id == timetable_session_id)
+
+    staff_by_name = {
+        s.name.strip().lower(): s
+        for s in scoped(session.query(Staff), Staff).all()
+        if (s.name or "").strip()
+    }
+    unit_by_name = {
+        u.name.strip().lower(): u
+        for u in scoped(session.query(Unit), Unit).all()
+        if (u.name or "").strip()
+    }
 
     for ws in wb.worksheets:
         if ws.title.startswith("_"):

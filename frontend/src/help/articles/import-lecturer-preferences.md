@@ -13,6 +13,11 @@ competency spreadsheet, setting each lecturer's
 Get the blank workbook first from **Export ▾ → Lecturer prefs template**, send
 it out, and import the completed copies.
 
+The template is **local to the session you export it from**: one tab per
+lecturer in this session, and the Qualification and Class dropdowns offer only
+this session's. Importing works the same way, so a sheet naming a lecturer or
+class that belongs to another session is reported rather than matched.
+
 Each sheet is one lecturer. Errors name the sheet, which makes them quick to
 chase:
 

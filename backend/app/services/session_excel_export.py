@@ -154,7 +154,9 @@ def export_lecturer_preferences_template(db: Session, *, timetable_session_id: i
     with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
         out = Path(tmp.name)
     try:
-        write_lecturer_preferences_template(db, out)
+        write_lecturer_preferences_template(
+            db, out, timetable_session_id=timetable_session_id
+        )
         return _read_bytes(out), session_export_filename(
             session_name,
             ".xlsx",

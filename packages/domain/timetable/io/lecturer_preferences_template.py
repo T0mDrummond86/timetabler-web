@@ -9,6 +9,12 @@ One tab per lecturer in `Staff`, each carrying:
   - a blocked-times grid (Mon–Sat × half-hour slots), ending at 21:30
 
 A hidden `_classes` sheet holds validation data.
+
+Everything is scoped to one timetable session. On the desktop that is implicit
+-- one `*.db` file holds one session -- but the web app keeps every session in
+one database, so an unscoped query put every lecturer, qualification and class
+in the whole organisation into the workbook. Pass `timetable_session_id` there;
+leaving it None keeps the desktop's whole-file behaviour.
 """
 from __future__ import annotations
 
@@ -216,21 +222,43 @@ def _populate_lecturer_sheet(ws, staff: Staff, n_quals: int, n_map_rows: int) ->
     ws.freeze_panes = "B6"
 
 
-def write_lecturer_preferences_template(session: Session, out_path: str | Path) -> Path:
-    """Build the workbook. Returns the saved path."""
+def write_lecturer_preferences_template(
+    session: Session,
+    out_path: str | Path,
+    *,
+    timetable_session_id: int | None = None,
+) -> Path:
+    """Build the workbook. Returns the saved path.
+
+    ``timetable_session_id`` restricts the lecturers, qualifications and classes
+    to one session. None means the whole database, which is right for a desktop
+    file and wrong for anything sharing a database.
+    """
     out_path = Path(out_path)
     wb = Workbook()
     # Use the default sheet for the class-list, then add lecturer sheets.
     classes_ws = wb.active
     classes_ws.title = CLASS_LIST_SHEET
 
-    classes = session.query(Unit).order_by(Unit.name).all()
-    qualifications = session.query(Qualification).order_by(Qualification.name).all()
+    def scoped(query, model):
+        if timetable_session_id is None:
+            return query
+        return query.filter(model.timetable_session_id == timetable_session_id)
+
+    classes = scoped(session.query(Unit), Unit).order_by(Unit.name).all()
+    qualifications = (
+        scoped(session.query(Qualification), Qualification).order_by(Qualification.name).all()
+    )
+    # Joined through Qualification rather than filtered on the link table, which
+    # carries no session of its own.
     unit_to_quals: dict[int, list[str]] = {}
     for unit_id, qname in (
-        session.query(UnitQualification.unit_id, Qualification.name)
-        .join(Qualification, Qualification.id == UnitQualification.qualification_id)
-        .all()
+        scoped(
+            session.query(UnitQualification.unit_id, Qualification.name).join(
+                Qualification, Qualification.id == UnitQualification.qualification_id
+            ),
+            Qualification,
+        ).all()
     ):
         unit_to_quals.setdefault(unit_id, []).append(qname)
     n_quals, n_map_rows = _populate_class_list_sheet(
@@ -238,7 +266,7 @@ def write_lecturer_preferences_template(session: Session, out_path: str | Path) 
     )
 
     used = {CLASS_LIST_SHEET}
-    staff_rows = session.query(Staff).order_by(Staff.name).all()
+    staff_rows = scoped(session.query(Staff), Staff).order_by(Staff.name).all()
     for s in staff_rows:
         sheet_name = _safe_sheet_name(s.name, used)
         ws = wb.create_sheet(sheet_name)

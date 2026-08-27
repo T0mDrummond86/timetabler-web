@@ -135,7 +135,9 @@ def import_asc_export_workbook(db: Session, timetable_session_id: int, file_path
 def import_lecturer_preferences_workbook(db: Session, timetable_session_id: int, file_path: str) -> dict:
     from timetable.io.lecturer_preferences_import import import_lecturer_preferences
 
-    rep = import_lecturer_preferences(db, file_path)
+    rep = import_lecturer_preferences(
+        db, file_path, timetable_session_id=timetable_session_id
+    )
     clear_all_dismissals(db, timetable_session_id=timetable_session_id)
     db.commit()
     return {
