@@ -463,6 +463,16 @@ export type QualificationDuplicateResult = {
   summary: string;
 };
 
+export type CommonClassSuggestions = {
+  seed_id: number;
+  seed_name: string;
+  seed_codes: string[];
+  /** Includes the seed, so the count agrees with the ticks on screen. */
+  unit_ids: number[];
+  /** Why the answer is empty, when that needs saying rather than showing zero. */
+  reason: string | null;
+};
+
 export type ClassConsolidationSide = {
   id: number;
   name: string;

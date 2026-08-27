@@ -27,7 +27,7 @@ from ..services.class_consolidation import (
     ClassConsolidationError,
     consolidate_classes,
     consolidation_preview,
-    suggested_common_class_ids,
+    suggestions_for_seed,
 )
 from ..database import get_db
 from ..schemas import (
@@ -899,18 +899,22 @@ def update_course(
 )
 def common_class_suggestions(
     session_id: int,
+    seed: int,
     ctx: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
-    """Classes that share a unit code with another class in this session.
+    """Classes delivering every unit the ``seed`` class delivers.
 
     A starting point for the marking, not an instruction: two classes can
-    legitimately teach the same code.
+    legitimately deliver the same units.
     """
     assert_session_in_org(db, session_id, ctx.organization.id)
-    return {
-        "unit_ids": sorted(suggested_common_class_ids(db, timetable_session_id=session_id))
-    }
+    try:
+        return suggestions_for_seed(
+            db, timetable_session_id=session_id, seed_unit_id=seed
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.post(

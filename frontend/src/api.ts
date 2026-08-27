@@ -1332,10 +1332,10 @@ export const api = {
       { method: "POST", body: JSON.stringify({ name }) },
     ),
 
-  /** Classes sharing a unit code with another class — a hint for the marking. */
-  commonClassSuggestions: (sessionId: number) =>
-    apiFetch<{ unit_ids: number[] }>(
-      `/sessions/${sessionId}/units/common-class-suggestions`,
+  /** Classes delivering every unit the seed class delivers — a hint, not a verdict. */
+  commonClassSuggestions: (sessionId: number, seedUnitId: number) =>
+    apiFetch<import("./types").CommonClassSuggestions>(
+      `/sessions/${sessionId}/units/common-class-suggestions?seed=${seedUnitId}`,
     ),
 
   /** Tick or untick several classes at once. */

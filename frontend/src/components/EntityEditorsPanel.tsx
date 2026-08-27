@@ -127,6 +127,10 @@ export function EntityEditorsPanel({
   // grows ticks and a filter of its own rather than putting it in the form.
   const [unitCommonFilter, setUnitCommonFilter] = useState<"" | "marked" | "suggested">("");
   const [commonSuggestions, setCommonSuggestions] = useState<Set<number>>(new Set());
+  const [suggestReason, setSuggestReason] = useState<string | null>(null);
+  // Tick order, so "the first class ticked" is a real answer. Selection order
+  // is not recoverable from the marks themselves -- they are just flags.
+  const [markOrder, setMarkOrder] = useState<number[]>([]);
   // Ticks show immediately and save in the background. Marking is a
   // tick-down-the-list job, so blocking the list on each round trip loses
   // ticks: a second click landing during the first save was simply dropped.
@@ -206,24 +210,58 @@ export function EntityEditorsPanel({
     onFocusConsumed?.();
   }, [focusEntityId, fixedTab, activeTab, onFocusConsumed]);
 
-  // Which classes share a unit code with another. Worked out server-side rather
-  // than stored, so it has to be fetched, and refetched after a consolidation
-  // removes one of a pair.
+  const isMarked = useCallback(
+    (unit: Unit) => markOverrides.get(unit.id) ?? !!unit.common_class,
+    [markOverrides],
+  );
+
+  const markedUnits = useMemo(() => units.filter(isMarked), [units, isMarked]);
+
+  /** The class the suggestions are measured against: the first one ticked.
+   *
+   * Falls back to the first marked class in list order, for marks that were
+   * already there when the tab opened — tick order is not recorded anywhere,
+   * so a reload has to pick something rather than offer nothing.
+   */
+  const seedUnitId = useMemo(() => {
+    const marked = new Set(markedUnits.map((u) => u.id));
+    const first = markOrder.find((id) => marked.has(id));
+    return first ?? markedUnits[0]?.id ?? null;
+  }, [markOrder, markedUnits]);
+
+  const seedUnit = units.find((u) => u.id === seedUnitId);
+  const seedCodes = (seedUnit?.component_codes ?? "")
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
+
+  // Classes delivering everything the first ticked class delivers. Worked out
+  // server-side rather than stored, so it has to be fetched -- and refetched
+  // when the seed changes or a consolidation removes one of a pair.
   useEffect(() => {
-    if (activeTab !== "units") return;
+    if (activeTab !== "units" || seedUnitId == null) {
+      setCommonSuggestions(new Set());
+      setSuggestReason(null);
+      return;
+    }
     let cancelled = false;
     void (async () => {
       try {
-        const data = await api.commonClassSuggestions(sessionId);
-        if (!cancelled) setCommonSuggestions(new Set(data.unit_ids));
+        const data = await api.commonClassSuggestions(sessionId, seedUnitId);
+        if (cancelled) return;
+        setCommonSuggestions(new Set(data.unit_ids));
+        setSuggestReason(data.reason);
       } catch {
-        if (!cancelled) setCommonSuggestions(new Set());
+        if (!cancelled) {
+          setCommonSuggestions(new Set());
+          setSuggestReason(null);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [sessionId, activeTab, units]);
+  }, [sessionId, activeTab, units, seedUnitId]);
 
   useEffect(() => {
     if (activeTab !== "staff" || selectedId == null) {
@@ -341,11 +379,6 @@ export function EntityEditorsPanel({
                 memberIds: f.stages.map((s) => s.id),
               }));
 
-  const isMarked = useCallback(
-    (unit: Unit) => markOverrides.get(unit.id) ?? !!unit.common_class,
-    [markOverrides],
-  );
-
   const rows = useMemo(() => {
     if (activeTab === "units") {
       const q = unitSearch.trim().toLowerCase();
@@ -386,8 +419,6 @@ export function EntityEditorsPanel({
     qualifications,
   ]);
 
-  const markedUnits = useMemo(() => units.filter(isMarked), [units, isMarked]);
-
   // Drop an override once the reloaded list agrees with it, so the two cannot
   // drift if a save fails somewhere else.
   useEffect(() => {
@@ -404,6 +435,9 @@ export function EntityEditorsPanel({
   /** Tick or untick one class. Saved in the background -- there is no form to submit. */
   async function toggleCommon(unitId: number, marked: boolean) {
     setMarkOverrides((prev) => new Map(prev).set(unitId, marked));
+    setMarkOrder((prev) =>
+      marked ? [...prev.filter((id) => id !== unitId), unitId] : prev.filter((id) => id !== unitId),
+    );
     setError(null);
     try {
       await api.markCommonClasses(sessionId, [unitId], marked);
@@ -419,13 +453,28 @@ export function EntityEditorsPanel({
   }
 
   async function markSuggested() {
+    if (suggestReason) {
+      // Nothing to tick, and the reason is more use than a silent no-op.
+      setMessage(null);
+      setError(suggestReason);
+      return;
+    }
     const ids = [...commonSuggestions];
     if (!ids.length) return;
     setSaving(true);
     setError(null);
     try {
       const result = await api.markCommonClasses(sessionId, ids, true);
-      setMessage(`Marked ${result.updated} class(es) that share a unit code.`);
+      // Keep the seed first, so the suggestions do not re-anchor themselves on
+      // whichever class they happened to tick.
+      setMarkOrder((prev) => [
+        ...prev,
+        ...ids.filter((id) => !prev.includes(id)),
+      ]);
+      const codes = seedCodes.join(", ");
+      setMessage(
+        `Marked ${result.updated} class(es) delivering ${codes || "the same units"}.`,
+      );
       onUpdated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save");
@@ -441,6 +490,7 @@ export function EntityEditorsPanel({
     setError(null);
     try {
       await api.markCommonClasses(sessionId, ids, false);
+      setMarkOrder([]);
       setMessage(null);
       onUpdated();
     } catch (err) {
@@ -820,7 +870,9 @@ export function EntityEditorsPanel({
                 <option value="">All classes</option>
                 <option value="marked">Marked common ({markedUnits.length})</option>
                 <option value="suggested">
-                  Suggested ({commonSuggestions.size})
+                  {seedUnit
+                    ? `Like ${seedUnit.name} (${commonSuggestions.size})`
+                    : "Suggested — tick a class first"}
                 </option>
               </select>
             </div>
@@ -829,15 +881,25 @@ export function EntityEditorsPanel({
             <div className="entity-list-toolbar common-class-toolbar">
               <span className="muted common-class-count">
                 {markedUnits.length} marked
+                {seedUnit && markedUnits.length > 0 && (
+                  <> · matching {seedCodes.join(", ") || seedUnit.name}</>
+                )}
               </span>
               <button
                 type="button"
                 className="btn-secondary btn-xs"
-                disabled={saving || commonSuggestions.size === 0}
+                disabled={saving || seedUnitId == null}
                 onClick={() => void markSuggested()}
-                title="Tick every class that shares a unit code with another"
+                title={
+                  seedUnit == null
+                    ? "Tick one class first — suggestions are measured against it"
+                    : suggestReason ??
+                      `Tick every class delivering ${
+                        seedCodes.join(", ") || "the same units"
+                      }, like ${seedUnit.name}`
+                }
               >
-                Mark suggested
+                Suggested
               </button>
               <button
                 type="button"

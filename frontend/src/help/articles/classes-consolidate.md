@@ -2,7 +2,7 @@
 id: classes-consolidate
 title: Consolidate duplicate classes
 category: Classes, groups and qualifications
-keywords: consolidate, duplicate classes, same class twice, class appears twice, common class, mark common, combine classes, fold classes, class in two qualifications
+keywords: consolidate, duplicate classes, same class twice, class appears twice, common class, mark common, suggested, same units, combine classes, fold classes, class in two qualifications
 ---
 
 **The same class appearing twice** in the Classes list, once for each
@@ -14,19 +14,28 @@ qualification that teaches it.
 
 ## Marking them
 
-On the **Classes** tab each class has a tick beside it. Tick the ones that are
-really the same class.
+On the **Classes** tab each class has a tick beside it. **Tick the class you
+want to find the duplicates of first** — everything else is measured against it.
 
 Two helpers sit above the list:
 
-- **Mark suggested** ticks every class that shares a unit code with another.
-  It is a starting point, not a verdict — two classes can legitimately teach the
-  same unit — so read the list before consolidating.
-- The **All classes / Marked common / Suggested** filter narrows the list to
-  just those, which is how you work through a large session.
+- **Suggested** ticks every class that delivers all of the same units as the
+  first class you ticked. A suggestion may deliver *more* — the same class run
+  under a Diploma often bundles an extra unit — but it must cover all of them,
+  so a class delivering only some is left alone. It is a starting point, not a
+  verdict: two classes can legitimately deliver the same units, so read the list
+  before consolidating.
+- The filter above it narrows the list to **Marked common**, or to **Like <the
+  first ticked class>** — the suggestions — which is how you work through a
+  large session.
 
-**Clear marks** unticks everything. Marks are saved as you tick them, so you can
-mark a session over several sittings.
+Both need a class ticked first. If the class you tick has no unit codes there is
+nothing to match on, and the button says so rather than ticking everything —
+fill its **Units** in first, or tick the duplicates by hand.
+
+**Clear marks** unticks everything and starts again from a new first class.
+Marks are saved as you tick them, so you can mark a session over several
+sittings.
 
 ## Consolidating them
 

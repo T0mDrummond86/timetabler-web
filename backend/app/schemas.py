@@ -1213,8 +1213,14 @@ class ClassConsolidationResultOut(BaseModel):
 
 
 class CommonClassSuggestionsOut(BaseModel):
-    #: Classes sharing a unit code with another class -- a hint, not a verdict.
+    """Classes delivering everything the ticked class delivers -- a hint, not a verdict."""
+    seed_id: int
+    seed_name: str = ""
+    seed_codes: list[str] = Field(default_factory=list)
+    #: Includes the seed, so the count agrees with the ticks the user will see.
     unit_ids: list[int] = Field(default_factory=list)
+    #: Why the answer is empty, when that needs saying rather than showing zero.
+    reason: str | None = None
 
 
 class CommonClassMarkRequest(BaseModel):

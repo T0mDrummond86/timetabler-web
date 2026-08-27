@@ -51,7 +51,7 @@ from timetable.core.tenancy_models import Organization, TimetableSession  # noqa
 from app.services.class_consolidation import (  # noqa: E402
     ClassConsolidationError,
     consolidate_classes,
-    suggested_common_class_ids,
+    suggestions_for_seed,
 )
 
 SID = 1
@@ -135,54 +135,126 @@ def _fold(db, survivor: Unit, *absorbed: Unit) -> dict:
 
 
 class TestSuggestions:
-    def test_classes_sharing_a_unit_code_are_suggested(self, db):
-        a = _unit(db, "ICTNWK540 CertIV", codes="ICTNWK540")
-        b = _unit(db, "ICTNWK540 Dip", codes="ICTNWK540, BSBCRT512")
+    """Which classes to offer once one has been ticked.
+
+    The question is "where else does this class run?", so the match is
+    containment: a candidate must deliver every unit the ticked class delivers.
+    It may deliver more -- the same class under a Diploma often bundles an extra
+    unit, and excluding it for that would miss the duplicates worth folding.
+    """
+
+    def _ids(self, db, seed) -> set[int]:
+        return set(
+            suggestions_for_seed(
+                db, timetable_session_id=SID, seed_unit_id=seed.id
+            )["unit_ids"]
+        )
+
+    def test_a_class_with_the_same_units_is_suggested(self, db):
+        seed = _unit(db, "ICTNWK540 CertIV", codes="ICTNWK540")
+        same = _unit(db, "ICTNWK540 Dip", codes="ICTNWK540")
+        db.commit()
+
+        assert self._ids(db, seed) == {seed.id, same.id}
+
+    def test_a_class_with_extra_units_is_suggested(self, db):
+        seed = _unit(db, "Network security", codes="ICTNWK540")
+        richer = _unit(db, "Network security (Dip)", codes="ICTNWK540, BSBCRT512")
+        db.commit()
+
+        assert self._ids(db, seed) == {seed.id, richer.id}
+
+    def test_a_class_missing_one_of_the_units_is_not_suggested(self, db):
+        seed = _unit(db, "Network security", codes="ICTNWK540, BSBCRT512")
+        _unit(db, "Half of it", codes="ICTNWK540")
+        db.commit()
+
+        # Containment runs one way only: the candidate must cover the seed.
+        assert self._ids(db, seed) == {seed.id}
+
+    def test_an_unrelated_class_is_not_suggested(self, db):
+        seed = _unit(db, "Network security", codes="ICTNWK540")
         _unit(db, "Something else", codes="ICTSAS527")
         db.commit()
 
-        assert suggested_common_class_ids(db, timetable_session_id=SID) == {a.id, b.id}
+        assert self._ids(db, seed) == {seed.id}
 
-    def test_codes_match_regardless_of_case_and_spacing(self, db):
-        a = _unit(db, "One", codes="  ictnwk540 ")
-        b = _unit(db, "Two", codes="ICTNWK540")
+    def test_the_seed_is_in_its_own_result(self, db):
+        seed = _unit(db, "Only one", codes="ICTNWK540")
         db.commit()
 
-        assert suggested_common_class_ids(db, timetable_session_id=SID) == {a.id, b.id}
+        # It is one of the classes being consolidated, so leaving it out would
+        # make the count disagree with the ticks on screen.
+        out = suggestions_for_seed(db, timetable_session_id=SID, seed_unit_id=seed.id)
+        assert out["unit_ids"] == [seed.id]
+        assert out["reason"] and "No other class" in out["reason"]
+
+    def test_codes_match_regardless_of_case_and_spacing(self, db):
+        seed = _unit(db, "One", codes="  ictnwk540 ")
+        other = _unit(db, "Two", codes="ICTNWK540")
+        db.commit()
+
+        assert self._ids(db, seed) == {seed.id, other.id}
+
+    def test_an_uncoded_seed_suggests_nothing_and_says_why(self, db):
+        seed = _unit(db, "No codes", codes=None)
+        _unit(db, "Has codes", codes="ICTNWK540")
+        db.commit()
+
+        out = suggestions_for_seed(db, timetable_session_id=SID, seed_unit_id=seed.id)
+
+        # Every set contains the empty set, so matching on nothing would tick
+        # the whole session.
+        assert out["unit_ids"] == []
+        assert "no unit codes" in out["reason"]
 
     def test_free_text_that_is_not_a_unit_code_is_ignored(self, db):
         # Real sessions have "LAB", "Robotics", "SfS" and lecturer surnames in
-        # this field. Matching on those made almost every class look like a
-        # duplicate of almost every other.
-        _unit(db, "One", codes="LAB, Robotics")
-        _unit(db, "Two", codes="LAB, SfS")
-        _unit(db, "Three", codes="C4")
+        # this field. They are not units, so they neither match nor exclude.
+        seed = _unit(db, "One", codes="ICTNWK540, LAB")
+        plain = _unit(db, "Two", codes="ICTNWK540")
+        _unit(db, "Three", codes="LAB, Robotics")
         db.commit()
 
-        assert suggested_common_class_ids(db, timetable_session_id=SID) == set()
+        assert self._ids(db, seed) == {seed.id, plain.id}
+
+    def test_a_seed_of_only_free_text_suggests_nothing(self, db):
+        seed = _unit(db, "One", codes="LAB, Robotics")
+        _unit(db, "Two", codes="LAB")
+        db.commit()
+
+        out = suggestions_for_seed(db, timetable_session_id=SID, seed_unit_id=seed.id)
+        assert out["unit_ids"] == []
+        assert "no unit codes" in out["reason"]
 
     def test_the_shapes_real_codes_come_in_are_all_matched(self, db):
-        pairs = [
-            ("ICTNWK540", "six letters, three digits"),
-            ("VU23213", "two letters, five digits"),
-            ("MEM30031", "three letters, five digits"),
-            ("BSBWHS411A", "a trailing letter"),
-        ]
-        expected = set()
-        for code, why in pairs:
-            a = _unit(db, f"A {why}", codes=code)
-            b = _unit(db, f"B {why}", codes=code)
-            expected |= {a.id, b.id}
+        for code in ("ICTNWK540", "VU23213", "MEM30031", "BSBWHS411A"):
+            seed = _unit(db, f"A {code}", codes=code)
+            other = _unit(db, f"B {code}", codes=code)
+            db.commit()
+            assert self._ids(db, seed) == {seed.id, other.id}, code
+
+    def test_the_seed_codes_are_reported_for_the_dialog(self, db):
+        seed = _unit(db, "One", codes="ictnwk540, bsbcrt512")
         db.commit()
 
-        assert suggested_common_class_ids(db, timetable_session_id=SID) == expected
+        out = suggestions_for_seed(db, timetable_session_id=SID, seed_unit_id=seed.id)
 
-    def test_a_class_with_no_codes_is_never_suggested(self, db):
-        _unit(db, "One", codes=None)
-        _unit(db, "Two", codes="")
+        assert out["seed_name"] == "One"
+        assert out["seed_codes"] == ["BSBCRT512", "ICTNWK540"]
+
+    def test_a_class_from_another_session_never_matches(self, db):
+        seed = _unit(db, "One", codes="ICTNWK540")
+        db.add(TimetableSession(id=2, organization_id=1, name="Other"))
+        db.flush()
+        db.add(Unit(timetable_session_id=2, name="Elsewhere", component_codes="ICTNWK540"))
         db.commit()
 
-        assert suggested_common_class_ids(db, timetable_session_id=SID) == set()
+        assert self._ids(db, seed) == {seed.id}
+
+    def test_a_missing_seed_is_not_found(self, db):
+        with pytest.raises(LookupError):
+            suggestions_for_seed(db, timetable_session_id=SID, seed_unit_id=99999)
 
 
 class TestQualificationLinks:

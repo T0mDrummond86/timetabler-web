@@ -60,26 +60,68 @@ def _codes(unit: Unit) -> set[str]:
     }
 
 
-def suggested_common_class_ids(db: Session, *, timetable_session_id: int) -> set[int]:
-    """Classes sharing a unit code with a different class in the same session.
+def suggestions_for_seed(
+    db: Session, *, timetable_session_id: int, seed_unit_id: int
+) -> dict:
+    """Classes that deliver everything the ticked class delivers.
 
-    A hint for the person doing the marking, computed rather than stored: the
-    answer changes whenever a code is edited, and a stored copy would go stale
-    without anything saying so.
+    The question a person is actually asking when they tick one class and look
+    for its duplicates is "where else does this run?" -- so the match is
+    containment, not overlap: a candidate qualifies when its unit codes include
+    every one of the seed's. It may carry more. The same class delivered under a
+    Diploma often bundles an extra unit or two, and excluding it for that would
+    miss the very duplicates worth folding.
+
+    Computed rather than stored: the answer changes whenever a code is edited,
+    and a stored copy would go stale without anything saying so.
+
+    ``reason`` is set when the answer is empty for a reason the user needs told,
+    rather than because nothing matched.
     """
+    seed = (
+        db.query(Unit)
+        .filter(
+            Unit.id == seed_unit_id,
+            Unit.timetable_session_id == timetable_session_id,
+        )
+        .one_or_none()
+    )
+    if seed is None:
+        raise LookupError(f"Class {seed_unit_id} not found in this session")
+
+    wanted = _codes(seed)
+    if not wanted:
+        # Every set contains the empty set, so an uncoded seed would suggest
+        # every class in the session. Say so instead.
+        return {
+            "seed_id": seed.id,
+            "seed_name": seed.name,
+            "seed_codes": [],
+            "unit_ids": [],
+            "reason": (
+                f"{seed.name} has no unit codes, so there is nothing to match on. "
+                "Add its codes on this tab first, or tick the duplicates by hand."
+            ),
+        }
+
     units = (
         db.query(Unit).filter(Unit.timetable_session_id == timetable_session_id).all()
     )
-    by_code: dict[str, list[int]] = {}
-    for u in units:
-        for code in _codes(u):
-            by_code.setdefault(code, []).append(u.id)
+    # The seed is in its own result: it is one of the classes being consolidated,
+    # and leaving it out would make the count disagree with the ticks.
+    matched = sorted(u.id for u in units if wanted <= _codes(u))
 
-    out: set[int] = set()
-    for ids in by_code.values():
-        if len(ids) > 1:
-            out.update(ids)
-    return out
+    return {
+        "seed_id": seed.id,
+        "seed_name": seed.name,
+        "seed_codes": sorted(c.upper() for c in wanted),
+        "unit_ids": matched,
+        "reason": (
+            None
+            if len(matched) > 1
+            else f"No other class delivers all of {', '.join(sorted(c.upper() for c in wanted))}."
+        ),
+    }
 
 
 def _load(db: Session, *, timetable_session_id: int, unit_ids: list[int]) -> list[Unit]:
