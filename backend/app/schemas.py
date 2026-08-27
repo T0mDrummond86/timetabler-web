@@ -1070,6 +1070,9 @@ class StagePlanIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     num_groups: int = Field(default=1, ge=1, le=26)
     unit_ids: list[int] = Field(default_factory=list)
+    #: The existing stage record this plan is for, when the qualification has
+    #: already been split. Omitted for a first split.
+    qualification_id: int | None = None
 
 
 class StageSplitRequest(BaseModel):
@@ -1080,6 +1083,11 @@ class StageSplitPreviewOut(BaseModel):
     qualification_id: int
     name: str
     num_groups: int
+    #: True when this qualification is already dealt out into stages, so the
+    #: dialog is a redeal of an existing split rather than a first split.
+    is_split: bool = False
+    #: Every stage of the family, in stage order; one entry when never split.
+    stages: list[dict] = Field(default_factory=list)
     can_split: bool
     blocked_reason: str = ""
     classes: list[dict] = Field(default_factory=list)

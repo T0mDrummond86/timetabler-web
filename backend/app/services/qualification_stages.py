@@ -1,9 +1,15 @@
-"""Split one qualification into per-stage qualifications.
+"""Split one qualification into per-stage qualifications, and re-split it later.
 
 A stage is not a new concept in the data: most qualifications here are already
 written as "… Stg1", "… Stg2", each its own record with its own groups. This
 turns that convention into an operation — take a qualification holding every
 class, and deal those classes out into a stage each.
+
+Everything here works on the whole *family*, not on the one stage record the
+user happens to have open. Splitting is not a one-shot decision: the first pass
+at which class sits in which year is usually wrong, so opening the dialog on an
+already-split qualification shows every class in it and lets the stages be
+redealt, renamed, added to or dropped.
 
 Deliberately refuses to run once anything is timetabled. Re-linking classes
 under a qualification whose groups already carry bookings would leave those
@@ -22,6 +28,7 @@ from timetable.core.models import (
     Booking,
     Course,
     Qualification,
+    QualificationTimeWindow,
     Unit,
     UnitQualification,
 )
@@ -95,21 +102,45 @@ class StagePlan:
     name: str
     num_groups: int
     unit_ids: tuple[int, ...]
+    #: The existing stage this plan is for, when the family has already been
+    #: split. Absent means "any stage record still going spare, else a new one",
+    #: which is what a first split of an unsplit qualification sends.
+    qualification_id: int | None = None
 
 
-def _blocking_bookings(db: Session, qualification_id: int) -> int:
+def _blocking_bookings(db: Session, qualification_ids: list[int]) -> int:
+    """Bookings on any group of any stage in the family.
+
+    The whole family is checked, not just the stage that was opened: a redeal
+    moves classes between stages, so a booking anywhere in the family is one
+    that could end up on a cohort that no longer teaches the class.
+    """
+    if not qualification_ids:
+        return 0
     course_ids = [
-        c.id for c in db.query(Course).filter(Course.qualification_id == qualification_id).all()
+        c.id
+        for c in db.query(Course).filter(Course.qualification_id.in_(qualification_ids)).all()
     ]
     if not course_ids:
         return 0
     return db.query(Booking).filter(Booking.course_id.in_(course_ids)).count()
 
 
+def _linked_unit_ids(db: Session, qualification_ids: list[int]) -> set[int]:
+    if not qualification_ids:
+        return set()
+    return {
+        uq.unit_id
+        for uq in db.query(UnitQualification)
+        .filter(UnitQualification.qualification_id.in_(qualification_ids))
+        .all()
+    }
+
+
 def _validate(
     db: Session,
     *,
-    qual: Qualification,
+    family: list[Qualification],
     stages: list[StagePlan],
     timetable_session_id: int,
 ) -> None:
@@ -123,13 +154,17 @@ def _validate(
     if len(set(lowered)) != len(lowered):
         raise StageSplitError("Stage names must differ from each other.")
 
+    family_ids = [q.id for q in family]
+
     # A stage name that already belongs to a different qualification would
-    # collide with the unique (session, name) constraint mid-write.
+    # collide with the unique (session, name) constraint mid-write. Names
+    # already held *inside* the family are fine — those records are being
+    # renamed or dropped by this same operation.
     clashes = (
         db.query(Qualification)
         .filter(
             Qualification.timetable_session_id == timetable_session_id,
-            Qualification.id != qual.id,
+            Qualification.id.notin_(family_ids),
         )
         .all()
     )
@@ -138,12 +173,17 @@ def _validate(
         if n.casefold() in taken:
             raise StageSplitError(f"A qualification named {n!r} already exists.")
 
-    linked_ids = {
-        uq.unit_id
-        for uq in db.query(UnitQualification)
-        .filter(UnitQualification.qualification_id == qual.id)
-        .all()
-    }
+    claimed: set[int] = set()
+    for stage in stages:
+        if stage.qualification_id is None:
+            continue
+        if stage.qualification_id not in family_ids:
+            raise StageSplitError("A stage can only reuse a stage of this qualification.")
+        if stage.qualification_id in claimed:
+            raise StageSplitError("Two stages cannot be the same stage record.")
+        claimed.add(stage.qualification_id)
+
+    linked_ids = _linked_unit_ids(db, family_ids)
     assigned: set[int] = set()
     for stage in stages:
         for uid in stage.unit_ids:
@@ -159,6 +199,27 @@ def _validate(
         raise StageSplitError("Each stage needs at least one group.")
 
 
+def _delete_stage(db: Session, qual: Qualification) -> None:
+    """Remove a stage the redeal no longer has a use for.
+
+    Only ever reached with the family's bookings already refused, and only for
+    a record every class has been dealt away from, so there is nothing left on
+    it worth keeping. Rows are removed explicitly rather than leaning on the
+    database cascade, which SQLite only honours with foreign keys switched on.
+    """
+    db.query(UnitQualification).filter(UnitQualification.qualification_id == qual.id).delete(
+        synchronize_session=False
+    )
+    db.query(QualificationTimeWindow).filter(
+        QualificationTimeWindow.qualification_id == qual.id
+    ).delete(synchronize_session=False)
+    for course in db.query(Course).filter(Course.qualification_id == qual.id).all():
+        db.delete(course)
+    db.flush()
+    db.delete(qual)
+    db.flush()
+
+
 def split_qualification_into_stages(
     db: Session,
     *,
@@ -168,69 +229,110 @@ def split_qualification_into_stages(
 ) -> dict:
     """Deal a qualification's classes into one qualification per stage.
 
-    The original record becomes the first stage — keeping its settings and id —
-    and the remaining stages are created alongside it. Classes not named in any
-    stage stay on the first stage rather than being dropped.
-    """
-    qual = (
-        db.query(Qualification)
-        .filter(
-            Qualification.id == qualification_id,
-            Qualification.timetable_session_id == timetable_session_id,
-        )
-        .one_or_none()
-    )
-    if qual is None:
-        raise LookupError("Qualification not found")
+    Works on the whole family the given qualification belongs to. A first split
+    has a family of one, so the original record becomes the first stage — its
+    id and settings survive — and the rest are created alongside it. A redeal
+    of an already-split family reuses the stage records the plans name, creates
+    any extra stages asked for, and drops the ones no plan wants (safe: every
+    class has been dealt away from them by then).
 
-    booked = _blocking_bookings(db, qual.id)
+    Classes not named in any stage stay on the first stage rather than being
+    dropped.
+    """
+    family = family_qualifications(
+        db, timetable_session_id=timetable_session_id, qualification_id=qualification_id
+    )
+    family_ids = [q.id for q in family]
+    was_split = len(family) > 1
+    title = family_title(family)
+
+    booked = _blocking_bookings(db, family_ids)
     if booked:
         raise StageSplitError(
-            f"{qual.name} has {booked} scheduled class(es) on its groups. "
+            f"{title} has {booked} scheduled class(es) on its groups. "
             "Splitting now would leave them attached to a cohort that no longer "
             "teaches them. Unschedule those bookings first, then split."
         )
 
-    _validate(db, qual=qual, stages=stages, timetable_session_id=timetable_session_id)
+    _validate(db, family=family, stages=stages, timetable_session_id=timetable_session_id)
 
     assigned = {uid for s in stages for uid in s.unit_ids}
-    all_linked = {
-        uq.unit_id
-        for uq in db.query(UnitQualification)
-        .filter(UnitQualification.qualification_id == qual.id)
-        .all()
-    }
+    all_linked = _linked_unit_ids(db, family_ids)
     # Anything left unassigned stays with stage one — losing a class silently
     # would be far worse than putting it somewhere obvious.
     leftovers = sorted(all_linked - assigned)
 
-    created: list[Qualification] = []
-    for index, stage in enumerate(stages):
-        if index == 0:
-            target = qual
-            target.name = stage.name.strip()
-            # Stage one points at itself, so every member of the family shares
-            # one parent id and the family is a single equality test. A split
-            # of an already-split stage keeps pointing at the original root.
-            target.parent_qualification_id = qual.parent_qualification_id or qual.id
+    # Match each plan to a stage record. A plan naming one takes it; a plan
+    # naming none takes the next record still going spare, which is how a first
+    # split keeps the original qualification as its stage one. Records nothing
+    # claims are dropped once their classes have moved off them.
+    by_id = {q.id: q for q in family}
+    claimed = {s.qualification_id for s in stages if s.qualification_id is not None}
+    spare = [q for q in family if q.id not in claimed]
+    reused: list[Qualification | None] = []
+    for stage in stages:
+        if stage.qualification_id is not None:
+            reused.append(by_id[stage.qualification_id])
+        elif spare:
+            reused.append(spare.pop(0))
         else:
-            target = Qualification(
-                timetable_session_id=timetable_session_id,
-                name=stage.name.strip(),
-                num_groups=stage.num_groups,
-                schedule_period=getattr(qual, "schedule_period", None) or "day",
-                delivery_mode=getattr(qual, "delivery_mode", None) or "regular",
-                block_week_count=getattr(qual, "block_week_count", None),
-                block_start_semester_week=getattr(qual, "block_start_semester_week", None),
-                parent_qualification_id=qual.parent_qualification_id or qual.id,
-            )
-            db.add(target)
-            db.flush()
-            created.append(target)
+            reused.append(None)
+    dropped = spare
+    dropped_names = [q.name for q in dropped]
 
-        # Group courses are named from the qualification, so the first stage's
-        # existing courses carry the pre-split name. With no bookings to lose,
-        # dropping and re-syncing is the clean way to get the codes right.
+    # Stages can be renamed into each other's names ("Stg1" and "Stg2" swapping
+    # what they hold). Park every existing name first so no intermediate write
+    # trips the unique (session, name) constraint.
+    for q in family:
+        q.name = f"__stage_split_{q.id}__"
+    db.flush()
+
+    # Dropped stages go now, before the kept ones are renamed and re-grouped:
+    # their group courses are named after them, and a kept stage taking a
+    # dropped one's name wants those course codes free. Nothing is lost — where
+    # each class ends up was worked out above, and is written below.
+    for stage_record in dropped:
+        _delete_stage(db, stage_record)
+
+    original_root_id = family[0].parent_qualification_id or family[0].id
+    retained_ids = {q.id for q in reused if q is not None}
+    # If the record the family is keyed on is being dropped, the family needs a
+    # new key, otherwise every stage would point at a row that no longer exists.
+    root_id = original_root_id if original_root_id in retained_ids else None
+
+    targets: list[Qualification] = []
+    for existing, stage in zip(reused, stages):
+        if existing is not None:
+            existing.name = stage.name.strip()
+            targets.append(existing)
+            continue
+        template = family[0]
+        created = Qualification(
+            timetable_session_id=timetable_session_id,
+            name=stage.name.strip(),
+            num_groups=stage.num_groups,
+            schedule_period=getattr(template, "schedule_period", None) or "day",
+            delivery_mode=getattr(template, "delivery_mode", None) or "regular",
+            block_week_count=getattr(template, "block_week_count", None),
+            block_start_semester_week=getattr(template, "block_start_semester_week", None),
+        )
+        db.add(created)
+        db.flush()
+        targets.append(created)
+
+    if root_id is None:
+        root_id = targets[0].id
+    # Every stage shares one parent id and stage one points at itself, so the
+    # family is a single equality test. A redeal of an already-split family
+    # keeps pointing at the original root.
+    for target in targets:
+        target.parent_qualification_id = root_id
+    db.flush()
+
+    for target, stage in zip(targets, stages):
+        # Group courses are named from the qualification, so a stage that kept
+        # its record still carries the pre-rename codes. With no bookings to
+        # lose, dropping and re-syncing is the clean way to get them right.
         for course in (
             db.query(Course).filter_by(qualification_id=target.id, is_block_cohort=0).all()
         ):
@@ -241,64 +343,82 @@ def split_qualification_into_stages(
 
     db.flush()
 
-    # Re-link classes. Only links to this qualification are touched: a class may
+    # Re-link classes. Only links within this family are touched: a class may
     # sit under other qualifications too, and those are none of our business.
+    # Cleared and rewritten rather than repointed, because a class linked to two
+    # stages of the same family would otherwise collide on the composite key.
     stage_by_unit: dict[int, int] = {}
-    for index, stage in enumerate(stages):
-        target_id = qual.id if index == 0 else created[index - 1].id
+    for target, stage in zip(targets, stages):
         for uid in stage.unit_ids:
-            stage_by_unit[uid] = target_id
+            stage_by_unit[uid] = target.id
     for uid in leftovers:
-        stage_by_unit[uid] = qual.id
+        stage_by_unit[uid] = targets[0].id
 
-    for link in (
-        db.query(UnitQualification)
-        .filter(UnitQualification.qualification_id == qualification_id)
-        .all()
-    ):
-        new_qual_id = stage_by_unit.get(link.unit_id)
-        if new_qual_id is not None and new_qual_id != qualification_id:
-            link.qualification_id = new_qual_id
+    if stage_by_unit:
+        db.query(UnitQualification).filter(
+            UnitQualification.qualification_id.in_(family_ids),
+            UnitQualification.unit_id.in_(list(stage_by_unit)),
+        ).delete(synchronize_session=False)
+        db.flush()
+        for uid, target_id in sorted(stage_by_unit.items()):
+            db.add(UnitQualification(unit_id=uid, qualification_id=target_id))
+        db.flush()
 
     db.commit()
 
-    result_ids = [qual.id] + [q.id for q in created]
+    verb = "Redealt into" if was_split else "Split into"
     return {
-        "stage_qualification_ids": result_ids,
+        "stage_qualification_ids": [t.id for t in targets],
         "unassigned_classes_kept_on_first_stage": len(leftovers),
         "summary": (
-            f"Split into {len(stages)} stages: "
+            f"{verb} {len(stages)} stages: "
             + ", ".join(f"{s.name.strip()} ({len(s.unit_ids)} class(es))" for s in stages)
             + (f"; {len(leftovers)} unassigned class(es) stayed on the first stage" if leftovers else "")
+            + (f"; removed {len(dropped_names)} empty stage(s)" if dropped_names else "")
         ),
     }
 
 
 def stage_split_preview(db: Session, *, timetable_session_id: int, qualification_id: int) -> dict:
-    """What the dialog needs: the classes to deal out, and whether it can run."""
-    qual = (
-        db.query(Qualification)
-        .filter(
-            Qualification.id == qualification_id,
-            Qualification.timetable_session_id == timetable_session_id,
-        )
-        .one_or_none()
-    )
-    if qual is None:
-        raise LookupError("Qualification not found")
+    """What the dialog needs: every class in the qualification, and where it sits.
 
-    booked = _blocking_bookings(db, qual.id)
-    classes = (
-        db.query(Unit)
+    Deliberately spans the whole family rather than the one stage that happens
+    to be open. Re-dealing a split only makes sense with all of the classes on
+    the table — a class in the wrong year is invisible from the stage it should
+    have been in.
+    """
+    family = family_qualifications(
+        db, timetable_session_id=timetable_session_id, qualification_id=qualification_id
+    )
+    family_ids = [q.id for q in family]
+    is_split = len(family) > 1
+
+    booked = _blocking_bookings(db, family_ids)
+    rows = (
+        db.query(Unit, UnitQualification.qualification_id)
         .join(UnitQualification, UnitQualification.unit_id == Unit.id)
-        .filter(UnitQualification.qualification_id == qual.id)
+        .filter(UnitQualification.qualification_id.in_(family_ids))
         .order_by(Unit.name)
         .all()
     )
+    classes: list[dict] = []
+    seen: set[int] = set()
+    for unit, stage_id in rows:
+        if unit.id in seen:
+            continue
+        seen.add(unit.id)
+        classes.append(
+            {"id": unit.id, "name": unit.name, "stage_qualification_id": int(stage_id)}
+        )
+
     return {
-        "qualification_id": qual.id,
-        "name": qual.name,
-        "num_groups": qual.num_groups or 1,
+        "qualification_id": qualification_id,
+        "name": family_title(family),
+        "num_groups": family[0].num_groups or 1,
+        "is_split": is_split,
+        "stages": [
+            {"id": q.id, "name": q.name, "num_groups": q.num_groups or 1} for q in family
+        ],
         "can_split": booked == 0 and len(classes) > 0,
         "blocked_reason": (
             f"{booked} class(es) are already scheduled on this qualification's groups. "
@@ -306,5 +426,5 @@ def stage_split_preview(db: Session, *, timetable_session_id: int, qualification
             if booked
             else ("This qualification has no classes to split." if not classes else "")
         ),
-        "classes": [{"id": u.id, "name": u.name} for u in classes],
+        "classes": classes,
     }

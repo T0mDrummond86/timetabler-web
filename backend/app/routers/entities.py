@@ -718,7 +718,7 @@ def qualification_stage_split_preview(
     ctx: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
-    """Classes available to deal out, and whether the split can run at all."""
+    """Every class in the qualification's stages, and whether a redeal can run."""
     assert_session_in_org(db, session_id, ctx.organization.id)
     try:
         return stage_split_preview(
@@ -741,7 +741,12 @@ def qualification_stage_split(
 ):
     assert_session_in_org(db, session_id, ctx.organization.id)
     plans = [
-        StagePlan(name=s.name, num_groups=s.num_groups, unit_ids=tuple(s.unit_ids))
+        StagePlan(
+            name=s.name,
+            num_groups=s.num_groups,
+            unit_ids=tuple(s.unit_ids),
+            qualification_id=s.qualification_id,
+        )
         for s in body.stages
     ]
     try:

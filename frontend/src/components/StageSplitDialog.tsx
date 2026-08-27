@@ -1,9 +1,16 @@
-/** Deal one qualification's classes out into a stage each.
+/** Deal one qualification's classes out into a stage each — and redeal them later.
  *
  * Each stage becomes its own qualification with its own groups, matching how
  * staged qualifications are already written by hand ("… Stg1", "… Stg2"). The
  * dialog therefore asks for the two things a qualification needs — a name and
  * a group count — plus which classes belong to it.
+ *
+ * It always shows every class in the whole qualification, not just the ones on
+ * the stage that happens to be open: which year a class belongs to is exactly
+ * the thing a first split gets wrong, and a class in the wrong stage is
+ * invisible from the stage it should have been in. So on an already-split
+ * qualification this is a redeal — the stages arrive filled in as they stand,
+ * and any class can be moved to any other stage.
  *
  * Assignment is one row per class with a stage dropdown, rather than a button
  * per stage on every row: the row count then depends only on how many classes
@@ -21,19 +28,47 @@ type Props = {
   onSplit: (summary: string) => void;
 };
 
-type StageDraft = { name: string; numGroups: number; unitIds: Set<number> };
+/** `id` is the existing stage record this row stands for; null means a new one. */
+type StageDraft = { id: number | null; name: string; numGroups: number; unitIds: Set<number> };
 
 const MAX_STAGES = 6;
 
-function defaultStages(baseName: string, count: number, groups: number): StageDraft[] {
+/** How the classes sit right now, so a redeal starts from the existing split. */
+function currentAssignment(preview: StageSplitPreview, stageId: number): Set<number> {
+  return new Set(
+    preview.classes.filter((c) => c.stage_qualification_id === stageId).map((c) => c.id),
+  );
+}
+
+/**
+ * Grow or shrink the stage list to `count` rows, keeping what the user has
+ * already touched. Rows the qualification really has come back as themselves —
+ * the same record, name, groups and classes — so dropping a stage and putting
+ * it back is not a way to accidentally create a duplicate.
+ */
+function buildStages(count: number, prev: StageDraft[], preview: StageSplitPreview): StageDraft[] {
   // Strip any stage suffix the name already carries, so splitting
   // "Cert IV Cyber Stg1" doesn't produce "Cert IV Cyber Stg1 Stg1".
-  const stem = stripStageSuffix(baseName);
-  return Array.from({ length: count }, (_, i) => ({
-    name: `${stem} Stg${i + 1}`,
-    numGroups: groups,
-    unitIds: new Set<number>(),
-  }));
+  const stem = stripStageSuffix(preview.name);
+  const existing = preview.is_split ? preview.stages : [];
+  return Array.from({ length: count }, (_, i) => {
+    if (prev[i]) return prev[i];
+    const stage = existing[i];
+    if (stage) {
+      return {
+        id: stage.id,
+        name: stage.name,
+        numGroups: stage.num_groups,
+        unitIds: currentAssignment(preview, stage.id),
+      };
+    }
+    return {
+      id: null,
+      name: `${stem} Stg${i + 1}`,
+      numGroups: preview.num_groups || 1,
+      unitIds: new Set<number>(),
+    };
+  });
 }
 
 export function StageSplitDialog({ sessionId, qualificationId, onClose, onSplit }: Props) {
@@ -49,7 +84,9 @@ export function StageSplitDialog({ sessionId, qualificationId, onClose, onSplit 
         const data = await api.stageSplitPreview(sessionId, qualificationId);
         if (cancelled) return;
         setPreview(data);
-        setStages(defaultStages(data.name, 2, data.num_groups || 1));
+        // An already-split qualification opens on the split it has, not on a
+        // blank two-stage form that would throw the existing deal away.
+        setStages(buildStages(data.is_split ? data.stages.length : 2, [], data));
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Could not load");
       }
@@ -67,19 +104,8 @@ export function StageSplitDialog({ sessionId, qualificationId, onClose, onSplit 
   }, [stages]);
 
   function setStageCount(count: number) {
-    setStages((prev) => {
-      const next = defaultStages(preview?.name ?? "", count, preview?.num_groups || 1);
-      // Keep what has already been assigned where the stage still exists.
-      for (let i = 0; i < Math.min(prev.length, count); i++) {
-        next[i] = {
-          ...next[i],
-          name: prev[i].name,
-          numGroups: prev[i].numGroups,
-          unitIds: prev[i].unitIds,
-        };
-      }
-      return next;
-    });
+    if (!preview) return;
+    setStages((prev) => buildStages(count, prev.slice(0, count), preview));
   }
 
   function assign(unitId: number, stageIndex: number | null) {
@@ -97,8 +123,15 @@ export function StageSplitDialog({ sessionId, qualificationId, onClose, onSplit 
     setStages((prev) => prev.map((s, j) => (j === index ? { ...s, ...patch } : s)));
   }
 
+  const isSplit = preview?.is_split ?? false;
   const classes = preview?.classes ?? [];
   const unassignedCount = classes.filter((c) => !stageOfUnit.has(c.id)).length;
+  // A family can already have more stages than the dialog would offer, and the
+  // count select must at least be able to show what is there.
+  const maxStages = Math.max(MAX_STAGES, preview?.stages.length ?? 0);
+  // Stages the qualification has that this deal no longer keeps. They are
+  // emptied by the redeal, so they go rather than linger with no classes.
+  const droppedStages = isSplit ? Math.max(0, (preview?.stages.length ?? 0) - stages.length) : 0;
 
   async function submit() {
     setBusy(true);
@@ -109,6 +142,7 @@ export function StageSplitDialog({ sessionId, qualificationId, onClose, onSplit 
           name: s.name.trim(),
           num_groups: s.numGroups,
           unit_ids: [...s.unitIds],
+          qualification_id: s.id,
         })),
       });
       onSplit(result.summary);
@@ -127,6 +161,14 @@ export function StageSplitDialog({ sessionId, qualificationId, onClose, onSplit 
         {!preview && !error && <p className="muted">Loading…</p>}
         {error && <p className="error">{error}</p>}
 
+        {preview && preview.can_split && isSplit && (
+          <p className="muted stage-split-note">
+            Already split into {preview.stages.length} stages. Every class in the qualification is
+            listed below, wherever it sits now — move any of them to another stage, rename a stage,
+            or change how many stages there are.
+          </p>
+        )}
+
         {preview && !preview.can_split && (
           <p className="error stage-split-blocked">{preview.blocked_reason}</p>
         )}
@@ -141,7 +183,7 @@ export function StageSplitDialog({ sessionId, qualificationId, onClose, onSplit 
                 onChange={(e) => setStageCount(Number(e.target.value))}
                 disabled={busy}
               >
-                {Array.from({ length: MAX_STAGES - 1 }, (_, i) => i + 2).map((n) => (
+                {Array.from({ length: maxStages - 1 }, (_, i) => i + 2).map((n) => (
                   <option key={n} value={n}>
                     {n}
                   </option>
@@ -231,8 +273,14 @@ export function StageSplitDialog({ sessionId, qualificationId, onClose, onSplit 
               </table>
               {!!unassignedCount && (
                 <p className="muted stage-split-note">
-                  {unassignedCount} class(es) still unassigned — anything left that way stays with
+                  {unassignedCount} class(es) still unassigned — anything left that way ends up on
                   the first stage.
+                </p>
+              )}
+              {!!droppedStages && (
+                <p className="muted stage-split-note">
+                  {droppedStages} existing stage(s) will be removed, and their classes go wherever
+                  you have put them above.
                 </p>
               )}
             </div>
@@ -246,7 +294,13 @@ export function StageSplitDialog({ sessionId, qualificationId, onClose, onSplit 
             disabled={busy || !preview?.can_split}
             onClick={() => void submit()}
           >
-            {busy ? "Splitting…" : "Split into stages"}
+            {busy
+              ? isSplit
+                ? "Saving…"
+                : "Splitting…"
+              : isSplit
+                ? "Save stages"
+                : "Split into stages"}
           </button>
           <button type="button" className="btn-secondary" disabled={busy} onClick={onClose}>
             Cancel

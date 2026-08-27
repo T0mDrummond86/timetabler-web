@@ -1302,7 +1302,14 @@ export const api = {
   stageSplit: (
     sessionId: number,
     qualificationId: number,
-    body: { stages: { name: string; num_groups: number; unit_ids: number[] }[] },
+    body: {
+      stages: {
+        name: string;
+        num_groups: number;
+        unit_ids: number[];
+        qualification_id?: number | null;
+      }[];
+    },
   ) =>
     apiFetch<import("./types").StageSplitResult>(
       `/sessions/${sessionId}/qualifications/${qualificationId}/stage-split`,

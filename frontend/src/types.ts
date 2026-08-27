@@ -402,9 +402,14 @@ export type StageSplitPreview = {
   qualification_id: number;
   name: string;
   num_groups: number;
+  /** Already dealt into stages, so the dialog is a redeal rather than a split. */
+  is_split: boolean;
+  /** Every stage of the family, in stage order; one entry when never split. */
+  stages: { id: number; name: string; num_groups: number }[];
   can_split: boolean;
   blocked_reason: string;
-  classes: { id: number; name: string }[];
+  /** Every class across the whole family, with the stage it sits in now. */
+  classes: { id: number; name: string; stage_qualification_id: number }[];
 };
 
 export type StageSplitResult = {

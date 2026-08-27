@@ -1424,7 +1424,7 @@ export function EntityEditorsPanel({
                 </fieldset>
               )}
               <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? "Saving…" : "Save unit"}
+                {saving ? "Saving…" : "Save class"}
               </button>
             </form>
           )}
@@ -1566,7 +1566,7 @@ export function EntityEditorsPanel({
                   type="button"
                   className="btn-secondary"
                   disabled={saving}
-                  title="Split this qualification's classes into a stage each"
+                  title="Deal this qualification's classes into a stage each, or redeal an existing split"
                   onClick={() => setStageSplitFor(selectedQual.id)}
                 >
                   Stage split

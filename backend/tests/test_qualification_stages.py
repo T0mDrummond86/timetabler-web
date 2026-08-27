@@ -287,3 +287,251 @@ class TestFamily:
         )
 
         assert family_title(family) == "Dip of IT"
+
+
+class TestRedeal:
+    """Re-opening the split on a qualification that already has stages.
+
+    The first pass at which class belongs to which year is routinely wrong, so
+    the split has to be re-runnable: every class in the qualification on the
+    table, wherever it currently sits, and free to move.
+    """
+
+    def _split_dip(self, db, groups: int = 1):
+        q = _qual(db, "Dip", groups=groups)
+        a, b, c = _unit(db, "A", q), _unit(db, "B", q), _unit(db, "C", q)
+        db.commit()
+        out = _split(db, q, [
+            StagePlan("Dip Stg1", groups, (a.id,)),
+            StagePlan("Dip Stg2", groups, (b.id, c.id)),
+        ])
+        first, second = out["stage_qualification_ids"]
+        return db.get(Qualification, first), db.get(Qualification, second), (a, b, c)
+
+    def test_preview_from_one_stage_lists_the_whole_qualification(self, db):
+        first, second, (a, b, c) = self._split_dip(db)
+
+        out = stage_split_preview(db, timetable_session_id=SID, qualification_id=second.id)
+
+        assert out["is_split"] is True
+        assert {row["name"] for row in out["classes"]} == {"A", "B", "C"}
+        # Each class says which stage it is in now, so the dialog can open on
+        # the split as it stands instead of a blank form.
+        by_name = {row["name"]: row["stage_qualification_id"] for row in out["classes"]}
+        assert by_name == {"A": first.id, "B": second.id, "C": second.id}
+        assert [s["id"] for s in out["stages"]] == [first.id, second.id]
+        assert out["name"] == "Dip"
+
+    def test_preview_of_an_unsplit_qualification_is_a_family_of_one(self, db):
+        q = _qual(db, "Cert IV")
+        _unit(db, "A", q)
+        db.commit()
+
+        out = stage_split_preview(db, timetable_session_id=SID, qualification_id=q.id)
+
+        assert out["is_split"] is False
+        assert [s["id"] for s in out["stages"]] == [q.id]
+        assert out["classes"][0]["stage_qualification_id"] == q.id
+
+    def test_moves_a_class_between_existing_stages(self, db):
+        first, second, (a, b, c) = self._split_dip(db)
+
+        out = split_qualification_into_stages(
+            db,
+            timetable_session_id=SID,
+            qualification_id=second.id,
+            stages=[
+                StagePlan("Dip Stg1", 1, (a.id, b.id), qualification_id=first.id),
+                StagePlan("Dip Stg2", 1, (c.id,), qualification_id=second.id),
+            ],
+        )
+
+        # The same two records, not two more.
+        assert out["stage_qualification_ids"] == [first.id, second.id]
+        assert _classes_of(db, first.id) == {"A", "B"}
+        assert _classes_of(db, second.id) == {"C"}
+        assert db.query(Qualification).count() == 2
+
+    def test_swapping_two_stage_names_is_allowed(self, db):
+        first, second, _ = self._split_dip(db)
+
+        split_qualification_into_stages(
+            db,
+            timetable_session_id=SID,
+            qualification_id=first.id,
+            stages=[
+                StagePlan("Dip Stg2", 1, (), qualification_id=first.id),
+                StagePlan("Dip Stg1", 1, (), qualification_id=second.id),
+            ],
+        )
+
+        assert db.get(Qualification, first.id).name == "Dip Stg2"
+        assert db.get(Qualification, second.id).name == "Dip Stg1"
+
+    def test_adding_a_stage_keeps_the_family(self, db):
+        first, second, (a, b, c) = self._split_dip(db)
+
+        out = split_qualification_into_stages(
+            db,
+            timetable_session_id=SID,
+            qualification_id=first.id,
+            stages=[
+                StagePlan("Dip Stg1", 1, (a.id,), qualification_id=first.id),
+                StagePlan("Dip Stg2", 1, (b.id,), qualification_id=second.id),
+                StagePlan("Dip Stg3", 2, (c.id,)),
+            ],
+        )
+
+        ids = out["stage_qualification_ids"]
+        assert ids[:2] == [first.id, second.id]
+        assert _classes_of(db, ids[2]) == {"C"}
+        family = family_qualifications(db, timetable_session_id=SID, qualification_id=ids[2])
+        assert [f.id for f in family] == sorted(ids)
+        assert db.query(Course).filter_by(qualification_id=ids[2]).count() == 2
+
+    def test_dropping_a_stage_removes_it_and_keeps_its_classes(self, db):
+        first, second, (a, b, c) = self._split_dip(db)
+
+        grown = split_qualification_into_stages(
+            db,
+            timetable_session_id=SID,
+            qualification_id=first.id,
+            stages=[
+                StagePlan("Dip Stg1", 1, (a.id,), qualification_id=first.id),
+                StagePlan("Dip Stg2", 1, (b.id,), qualification_id=second.id),
+                StagePlan("Dip Stg3", 1, (c.id,)),
+            ],
+        )
+        third = grown["stage_qualification_ids"][2]
+
+        shrunk = split_qualification_into_stages(
+            db,
+            timetable_session_id=SID,
+            qualification_id=first.id,
+            stages=[
+                StagePlan("Dip Stg1", 1, (a.id, c.id), qualification_id=first.id),
+                StagePlan("Dip Stg2", 1, (b.id,), qualification_id=second.id),
+            ],
+        )
+
+        assert shrunk["stage_qualification_ids"] == [first.id, second.id]
+        assert db.get(Qualification, third) is None
+        # The class that was on the dropped stage went where it was put, not away.
+        assert _classes_of(db, first.id) == {"A", "C"}
+        assert db.query(Course).filter_by(qualification_id=third).count() == 0
+
+    def test_refuses_a_stage_from_another_qualification(self, db):
+        first, second, _ = self._split_dip(db)
+        stranger = _qual(db, "Elsewhere")
+        db.commit()
+
+        with pytest.raises(StageSplitError, match="stage of this qualification"):
+            split_qualification_into_stages(
+                db,
+                timetable_session_id=SID,
+                qualification_id=first.id,
+                stages=[
+                    StagePlan("Dip Stg1", 1, (), qualification_id=first.id),
+                    StagePlan("Dip Stg2", 1, (), qualification_id=stranger.id),
+                ],
+            )
+
+    def test_refuses_two_plans_for_one_stage_record(self, db):
+        first, second, _ = self._split_dip(db)
+
+        with pytest.raises(StageSplitError, match="same stage record"):
+            split_qualification_into_stages(
+                db,
+                timetable_session_id=SID,
+                qualification_id=first.id,
+                stages=[
+                    StagePlan("Dip Stg1", 1, (), qualification_id=first.id),
+                    StagePlan("Dip Stg2", 1, (), qualification_id=first.id),
+                ],
+            )
+
+    def test_refuses_when_any_stage_in_the_family_is_timetabled(self, db):
+        first, second, _ = self._split_dip(db)
+        course = db.query(Course).filter_by(qualification_id=second.id).first()
+        sem = Semester(timetable_session_id=SID, name="S1")
+        db.add(sem)
+        db.flush()
+        week = Week(semester_id=sem.id, week_number=0)
+        db.add(week)
+        db.flush()
+        db.add(Booking(week_id=week.id, course_id=course.id, day=0, start_slot=0, end_slot=2))
+        db.commit()
+
+        # Opened on stage one, blocked by a booking on stage two: a redeal
+        # moves classes across the whole family, so the whole family counts.
+        out = stage_split_preview(db, timetable_session_id=SID, qualification_id=first.id)
+        assert out["can_split"] is False
+        with pytest.raises(StageSplitError, match="scheduled"):
+            split_qualification_into_stages(
+                db,
+                timetable_session_id=SID,
+                qualification_id=first.id,
+                stages=[
+                    StagePlan("Dip Stg1", 1, (), qualification_id=first.id),
+                    StagePlan("Dip Stg2", 1, (), qualification_id=second.id),
+                ],
+            )
+
+    def test_a_class_shared_with_another_qualification_still_moves_cleanly(self, db):
+        first, second, (a, b, c) = self._split_dip(db)
+        other = _qual(db, "Elsewhere")
+        db.add(UnitQualification(unit_id=a.id, qualification_id=other.id))
+        db.commit()
+
+        split_qualification_into_stages(
+            db,
+            timetable_session_id=SID,
+            qualification_id=first.id,
+            stages=[
+                StagePlan("Dip Stg1", 1, (b.id, c.id), qualification_id=first.id),
+                StagePlan("Dip Stg2", 1, (a.id,), qualification_id=second.id),
+            ],
+        )
+
+        assert _classes_of(db, second.id) == {"A"}
+        assert _classes_of(db, other.id) == {"A"}
+
+    def test_a_class_linked_to_two_stages_lands_in_exactly_one(self, db):
+        first, second, (a, b, c) = self._split_dip(db)
+        # Hand-made data can have a class under two stages at once; a redeal has
+        # to resolve that rather than trip over the link it already has.
+        db.add(UnitQualification(unit_id=a.id, qualification_id=second.id))
+        db.commit()
+
+        split_qualification_into_stages(
+            db,
+            timetable_session_id=SID,
+            qualification_id=first.id,
+            stages=[
+                StagePlan("Dip Stg1", 1, (b.id, c.id), qualification_id=first.id),
+                StagePlan("Dip Stg2", 1, (a.id,), qualification_id=second.id),
+            ],
+        )
+
+        assert _classes_of(db, first.id) == {"B", "C"}
+        assert _classes_of(db, second.id) == {"A"}
+        assert (
+            db.query(UnitQualification).filter(UnitQualification.unit_id == a.id).count() == 1
+        )
+
+    def test_renamed_stages_get_group_courses_under_the_new_name(self, db):
+        first, second, _ = self._split_dip(db)
+
+        split_qualification_into_stages(
+            db,
+            timetable_session_id=SID,
+            qualification_id=first.id,
+            stages=[
+                StagePlan("Dip Year 1", 1, (), qualification_id=first.id),
+                StagePlan("Dip Year 2", 2, (), qualification_id=second.id),
+            ],
+        )
+
+        codes = {c.code for c in db.query(Course).filter_by(qualification_id=second.id).all()}
+        assert len(codes) == 2
+        assert all(code.startswith("Dip Year 2") for code in codes), codes
