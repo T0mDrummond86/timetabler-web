@@ -6,6 +6,9 @@ One tab per lecturer in `Staff`, each carrying:
   - each preference row has two dropdowns:
       Qualification, then Class (filtered by Qualification)
   - a single non-teaching day picked from a dropdown
+  - the number of delivery hours the lecturer is asking for, pre-filled with
+    the 21 hours one FTE carries, so most people only have to change it
+  - a free-text box for anything the fixed sections cannot say
   - a blocked-times grid (Mon–Sat × half-hour slots), ending at 21:30
 
 A hidden `_classes` sheet holds validation data.
@@ -31,6 +34,11 @@ from ..core.models import Qualification, Staff, Unit, UnitQualification
 
 
 CLASS_LIST_SHEET = "_classes"
+
+#: Hours one FTE delivers, the same figure `Staff.fte` is multiplied by. Almost
+#: every lecturer is asking for exactly this, so the cell arrives filled in and
+#: the few who want more or less are the only ones who have to type.
+DEFAULT_REQUESTED_HOURS = 21
 
 
 def _safe_sheet_name(name: str, used: set[str]) -> str:
@@ -165,8 +173,58 @@ def _populate_lecturer_sheet(ws, staff: Staff, n_quals: int, n_map_rows: int) ->
     day_cell.alignment = centre
     day_dv.add(day_cell)
 
+    # ---- Requested delivery hours ----
+    # Section headings sit alone on their row, as the ones above and below do:
+    # column A is only 14 wide (it has to fit "08:00–08:30" in the grid), so a
+    # heading with anything beside it would be clipped to half a word.
+    hint_font = Font(name="Calibri", size=9, italic=True, color="FF555555")
+    hint_align = Alignment(horizontal="left", vertical="center")
+
+    hours_row = nt_row + 2
+    ws.cell(row=hours_row, column=1, value="Delivery hours requested").font = section_font
+    hours_cell = ws.cell(row=hours_row + 1, column=2, value=DEFAULT_REQUESTED_HOURS)
+    hours_cell.border = border
+    hours_cell.alignment = centre
+    hours_dv = DataValidation(
+        type="decimal", operator="between", formula1=0, formula2=40, allow_blank=True
+    )
+    hours_dv.error = "Enter the number of hours you are asking to deliver each week."
+    hours_dv.errorTitle = "Hours out of range"
+    ws.add_data_validation(hours_dv)
+    hours_dv.add(hours_cell)
+    hours_hint = ws.cell(
+        row=hours_row + 1,
+        column=3,
+        value=f"Hours per week. {DEFAULT_REQUESTED_HOURS} is a full load — change it if yours differs.",
+    )
+    hours_hint.font = hint_font
+    hours_hint.alignment = hint_align
+
+    # ---- Additional notes ----
+    notes_row = hours_row + 3
+    ws.cell(row=notes_row, column=1, value="Additional notes").font = section_font
+    notes_hint = ws.cell(
+        row=notes_row + 1,
+        column=1,
+        value="Anything the sections above cannot say — job-share, travel between campuses, study leave.",
+    )
+    notes_hint.font = hint_font
+    notes_hint.alignment = hint_align
+    # One merged box rather than ruled lines: a lecturer with two sentences and
+    # a lecturer with ten both get somewhere obvious to put them.
+    notes_top = notes_row + 2
+    notes_bottom = notes_top + 5
+    notes_last_col = get_column_letter(1 + NUM_DAYS)
+    ws.merge_cells(f"A{notes_top}:{notes_last_col}{notes_bottom}")
+    notes_box = ws.cell(row=notes_top, column=1)
+    notes_box.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+    for r in range(notes_top, notes_bottom + 1):
+        ws.row_dimensions[r].height = 18
+        for c in range(1, 2 + NUM_DAYS):
+            ws.cell(row=r, column=c).border = border
+
     # ---- Blocked times grid ----
-    grid_top = nt_row + 5
+    grid_top = notes_bottom + 2
     ws.cell(row=grid_top, column=1, value="Blocked times — write X in slots you cannot teach").font = section_font
     # Day headers.
     header_row = grid_top + 2
@@ -209,16 +267,9 @@ def _populate_lecturer_sheet(ws, staff: Staff, n_quals: int, n_map_rows: int) ->
             ws.column_dimensions[get_column_letter(2 + d)].width or 0, 11
         )
 
-    # Make `B` wider near the top to fit longer class names; reset for the
-    # grid section is unnecessary because the grid uses different columns
-    # too. The class-preference area only uses columns A–B, the grid uses A
-    # and C..H — they don't share columns 3+.
-    # Actually wait: the grid uses column 2 (B) too for Mondays. Hmm.
-    # Re-do: shift the grid to start at column 2 (B = Time) and 3..8 = days,
-    # so the class-preference table (cols A–B) doesn't fight for width. Done
-    # below by re-laying out only if a future tweak is needed. For now both
-    # share `A` (rank/time labels) and `B` (class / Monday) which is fine
-    # because B is wide.
+    # Columns A and B are shared: A carries the priority labels and the time
+    # labels, B carries the qualification names and Monday. B is set wide for
+    # the qualification names, which is more than Monday needs and harmless.
     ws.freeze_panes = "B6"
 
 
