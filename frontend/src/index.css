@@ -2114,6 +2114,16 @@ body:has(.app-shell--fill) #root {
   margin-top: 0.75rem;
 }
 
+/* An opened drill-through scrolls rather than growing without limit. A busy
+   session can offer dozens of free rooms, and the menu itself already caps at
+   70vh -- without this, opening one list pushes everything after it out of
+   reach, which is the problem the drill-through exists to solve. */
+.ctx-scroll-list {
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .ctx-item.ctx-nested {
   padding-left: 1.25rem;
   font-size: var(--text-md);

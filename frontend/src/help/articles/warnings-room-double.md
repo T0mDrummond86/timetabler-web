@@ -8,7 +8,7 @@ keywords: room double booked, same room twice, two classes one room, room clash,
 **Hard clash.** The same physical room is booked twice at overlapping times.
 
 To fix it, move one of the two classes, or put one in a different room. The
-placecard editor's *Available rooms* list shows what is actually free at that
+right-click menu's **Move to another room** lists what is actually free at that
 time, which saves guessing.
 
 If the two classes genuinely run together in one room — a combined class — use

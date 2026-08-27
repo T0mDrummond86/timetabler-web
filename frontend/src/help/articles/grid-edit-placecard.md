@@ -11,7 +11,9 @@ Click a placecard to open its editor. From there you can set:
 
 - **Lecturer** — who teaches it. Lecturers who are competent in the class are
   offered first; see [Allowed lecturers](#staff-competency).
-- **Room** — where it runs. *Available rooms* lists what is free at that time.
+- **Room** — where it runs. To move a class to a different free room without
+  opening the editor, right-click it and use **Move to another room**, which
+  lists what is actually free at that time.
 - **Notes** — free text shown on the card.
 - **Card ID** — your own reference for this specific booking. The same class
   can carry a different ID in each group.

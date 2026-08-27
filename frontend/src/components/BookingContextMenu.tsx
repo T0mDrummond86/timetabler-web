@@ -60,6 +60,10 @@ export function BookingContextMenu({
     viewKind === "block_delivery";
   const timesOnly = viewKind === "staff";
 
+  // Collapsed by default. A busy session offers dozens of free rooms, and
+  // listing them flat pushed everything below out of the menu -- including the
+  // actions people came for.
+  const [roomsOpen, setRoomsOpen] = useState(false);
   const [slots, setSlots] = useState<AlternateSlots | null>(null);
   const [loading, setLoading] = useState(showAlternate);
   const [alternateOpen, setAlternateOpen] = useState(false);
@@ -212,31 +216,43 @@ export function BookingContextMenu({
       {slots && slots.available_rooms.length > 0 && (
         <>
           <div className="ctx-divider" />
-          <span className="ctx-label">Available rooms</span>
-          {slots.available_rooms.map((r) => (
-            <button
-              key={r.room_id}
-              type="button"
-              className="ctx-item"
-              disabled={r.is_current}
-              onClick={() => {
-                onAlternateMove({
-                  day: booking.day,
-                  start_slot: booking.start_slot,
-                  end_slot: booking.end_slot,
-                  time_label: "",
-                  room_id: r.room_id,
-                  room_code: r.room_code,
-                  staff_id: null,
-                  is_current: r.is_current,
-                });
-                onClose();
-              }}
-            >
-              {r.room_code}
-              {r.is_current ? " ◆" : ""}
-            </button>
-          ))}
+          <button
+            type="button"
+            className="ctx-item ctx-expand"
+            aria-expanded={roomsOpen}
+            onClick={() => setRoomsOpen((open) => !open)}
+          >
+            {`Move to another room (${slots.available_rooms.length})`}
+            {roomsOpen ? " ▾" : " ▸"}
+          </button>
+          {roomsOpen && (
+            <div className="ctx-submenu ctx-scroll-list">
+              {slots.available_rooms.map((r) => (
+                <button
+                  key={r.room_id}
+                  type="button"
+                  className="ctx-item ctx-nested"
+                  disabled={r.is_current}
+                  onClick={() => {
+                    onAlternateMove({
+                      day: booking.day,
+                      start_slot: booking.start_slot,
+                      end_slot: booking.end_slot,
+                      time_label: "",
+                      room_id: r.room_id,
+                      room_code: r.room_code,
+                      staff_id: null,
+                      is_current: r.is_current,
+                    });
+                    onClose();
+                  }}
+                >
+                  {r.room_code}
+                  {r.is_current ? " ◆" : ""}
+                </button>
+              ))}
+            </div>
+          )}
         </>
       )}
       {showAlternate && (
@@ -266,8 +282,9 @@ export function BookingContextMenu({
                     {day.day_label}
                     {day.is_current_day ? " ◆" : ""}
                   </button>
-                  {expandedDay === day.day &&
-                    day.slots.map((slot) =>
+                  {expandedDay === day.day && (
+                    <div className="ctx-scroll-list">
+                      {day.slots.map((slot) =>
                       slot.options.map((opt) => (
                         <button
                           key={`${opt.day}-${opt.start_slot}-${opt.room_id}`}
@@ -282,8 +299,10 @@ export function BookingContextMenu({
                           {slot.time_label} — {opt.room_code}
                           {opt.is_current ? " ◆" : ""}
                         </button>
-                      )),
-                    )}
+                        )),
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </>
