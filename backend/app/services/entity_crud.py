@@ -201,5 +201,6 @@ def _unit_payload(unit: Unit, qualification_ids: list[int]) -> dict:
         "double_session_same_day": getattr(unit, "double_session_same_day", None),
         "double_session_first_slots": getattr(unit, "double_session_first_slots", None),
         "screen_fill_colour": getattr(unit, "screen_fill_colour", None),
+        "common_class": getattr(unit, "common_class", 0) or 0,
         "qualification_ids": qualification_ids,
     }

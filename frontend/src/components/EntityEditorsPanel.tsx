@@ -8,6 +8,7 @@ import {
   StaffAvailabilityGrid,
 } from "./StaffAvailabilityGrid";
 import { StaffHoursTable } from "./StaffHoursTable";
+import { ClassConsolidationDialog } from "./ClassConsolidationDialog";
 import { QualificationMergeDialog } from "./QualificationMergeDialog";
 import { StageSplitDialog } from "./StageSplitDialog";
 import { LinkedSessionImportPanel } from "./LinkedSessionImportPanel";
@@ -122,6 +123,15 @@ export function EntityEditorsPanel({
   const [unitSearch, setUnitSearch] = useState("");
   const [qualSearch, setQualSearch] = useState("");
   const [unitQualFilter, setUnitQualFilter] = useState<number | "">("");
+  // Marking classes as common is a separate job from editing one, so the list
+  // grows ticks and a filter of its own rather than putting it in the form.
+  const [unitCommonFilter, setUnitCommonFilter] = useState<"" | "marked" | "suggested">("");
+  const [commonSuggestions, setCommonSuggestions] = useState<Set<number>>(new Set());
+  // Ticks show immediately and save in the background. Marking is a
+  // tick-down-the-list job, so blocking the list on each round trip loses
+  // ticks: a second click landing during the first save was simply dropped.
+  const [markOverrides, setMarkOverrides] = useState<Map<number, boolean>>(new Map());
+  const [consolidateFor, setConsolidateFor] = useState<Unit[] | null>(null);
   const [roomTypeChoices, setRoomTypeChoices] = useState<[string, string][]>([]);
   const [staffHoursRows, setStaffHoursRows] = useState<StaffHoursRow[]>([]);
   const [staffHoursLoading, setStaffHoursLoading] = useState(false);
@@ -195,6 +205,25 @@ export function EntityEditorsPanel({
     setError(null);
     onFocusConsumed?.();
   }, [focusEntityId, fixedTab, activeTab, onFocusConsumed]);
+
+  // Which classes share a unit code with another. Worked out server-side rather
+  // than stored, so it has to be fetched, and refetched after a consolidation
+  // removes one of a pair.
+  useEffect(() => {
+    if (activeTab !== "units") return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await api.commonClassSuggestions(sessionId);
+        if (!cancelled) setCommonSuggestions(new Set(data.unit_ids));
+      } catch {
+        if (!cancelled) setCommonSuggestions(new Set());
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, activeTab, units]);
 
   useEffect(() => {
     if (activeTab !== "staff" || selectedId == null) {
@@ -312,6 +341,11 @@ export function EntityEditorsPanel({
                 memberIds: f.stages.map((s) => s.id),
               }));
 
+  const isMarked = useCallback(
+    (unit: Unit) => markOverrides.get(unit.id) ?? !!unit.common_class,
+    [markOverrides],
+  );
+
   const rows = useMemo(() => {
     if (activeTab === "units") {
       const q = unitSearch.trim().toLowerCase();
@@ -322,6 +356,8 @@ export function EntityEditorsPanel({
           return false;
         }
         if (q && !unit.name.toLowerCase().includes(q)) return false;
+        if (unitCommonFilter === "marked" && !isMarked(unit)) return false;
+        if (unitCommonFilter === "suggested" && !commonSuggestions.has(unit.id)) return false;
         return true;
       });
     }
@@ -337,7 +373,82 @@ export function EntityEditorsPanel({
       });
     }
     return baseRows;
-  }, [activeTab, baseRows, units, unitSearch, unitQualFilter, qualSearch, qualifications]);
+  }, [
+    activeTab,
+    baseRows,
+    units,
+    unitSearch,
+    unitQualFilter,
+    unitCommonFilter,
+    commonSuggestions,
+    isMarked,
+    qualSearch,
+    qualifications,
+  ]);
+
+  const markedUnits = useMemo(() => units.filter(isMarked), [units, isMarked]);
+
+  // Drop an override once the reloaded list agrees with it, so the two cannot
+  // drift if a save fails somewhere else.
+  useEffect(() => {
+    setMarkOverrides((prev) => {
+      if (!prev.size) return prev;
+      const next = new Map(prev);
+      for (const unit of units) {
+        if (next.get(unit.id) === !!unit.common_class) next.delete(unit.id);
+      }
+      return next.size === prev.size ? prev : next;
+    });
+  }, [units]);
+
+  /** Tick or untick one class. Saved in the background -- there is no form to submit. */
+  async function toggleCommon(unitId: number, marked: boolean) {
+    setMarkOverrides((prev) => new Map(prev).set(unitId, marked));
+    setError(null);
+    try {
+      await api.markCommonClasses(sessionId, [unitId], marked);
+      onUpdated();
+    } catch (err) {
+      setMarkOverrides((prev) => {
+        const next = new Map(prev);
+        next.delete(unitId);
+        return next;
+      });
+      setError(err instanceof Error ? err.message : "Could not save");
+    }
+  }
+
+  async function markSuggested() {
+    const ids = [...commonSuggestions];
+    if (!ids.length) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await api.markCommonClasses(sessionId, ids, true);
+      setMessage(`Marked ${result.updated} class(es) that share a unit code.`);
+      onUpdated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function clearMarks() {
+    const ids = markedUnits.map((u) => u.id);
+    if (!ids.length) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await api.markCommonClasses(sessionId, ids, false);
+      setMessage(null);
+      onUpdated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const onCampusRoomIds = useMemo(
     () => rooms.filter(isOnCampusRoom).map((r) => r.id),
@@ -530,6 +641,50 @@ export function EntityEditorsPanel({
     }
   }
 
+  /** Copy the selected qualification, sharing its classes rather than recreating them.
+   *
+   * The sharing is the point, so the prompt says it in as many words: a user
+   * who expects a deep copy would otherwise go looking for the duplicated
+   * classes in the Classes tab and not find them.
+   */
+  async function duplicateQualification() {
+    if (selectedId == null) return;
+    let preview: import("../types").QualificationDuplicatePreview;
+    try {
+      preview = await api.qualificationDuplicatePreview(sessionId, selectedId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load");
+      return;
+    }
+    const label = await prompt({
+      title: `Duplicate ${preview.source_name}`,
+      message:
+        `The copy shares this qualification's ${preview.class_count} class(es) rather ` +
+        `than making new ones, so editing a class changes it in both. It gets its own ` +
+        `${preview.num_groups} group(s) with those classes ready to place, and starts ` +
+        `with an empty timetable.`,
+      defaultValue: preview.suggested_name,
+      placeholder: "New qualification name",
+      confirmLabel: "Duplicate",
+    });
+    if (!label?.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await api.duplicateQualification(sessionId, selectedId, label.trim());
+      setMessage(result.summary);
+      setQualRefresh((n) => n + 1);
+      // A new qualification with new group courses — the sidebar and every
+      // list of qualifications is stale until the caller reloads.
+      setSelectedId(result.qualification_id);
+      onUpdated({ qualificationId: result.qualification_id });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Duplicate failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function deleteEntity() {
     if (selectedId == null) return;
     const row = rows.find((r) => r.id === selectedId);
@@ -647,6 +802,57 @@ export function EntityEditorsPanel({
                   </option>
                 ))}
               </select>
+              <select
+                className="field-select"
+                value={unitCommonFilter}
+                onChange={(e) =>
+                  setUnitCommonFilter(e.target.value as "" | "marked" | "suggested")
+                }
+                aria-label="Filter by common class"
+              >
+                <option value="">All classes</option>
+                <option value="marked">Marked common ({markedUnits.length})</option>
+                <option value="suggested">
+                  Suggested ({commonSuggestions.size})
+                </option>
+              </select>
+            </div>
+          )}
+          {activeTab === "units" && (
+            <div className="entity-list-toolbar common-class-toolbar">
+              <span className="muted common-class-count">
+                {markedUnits.length} marked
+              </span>
+              <button
+                type="button"
+                className="btn-secondary btn-xs"
+                disabled={saving || commonSuggestions.size === 0}
+                onClick={() => void markSuggested()}
+                title="Tick every class that shares a unit code with another"
+              >
+                Mark suggested
+              </button>
+              <button
+                type="button"
+                className="btn-secondary btn-xs"
+                disabled={saving || markedUnits.length === 0}
+                onClick={() => void clearMarks()}
+              >
+                Clear marks
+              </button>
+              <button
+                type="button"
+                className="btn-primary btn-xs"
+                disabled={saving || markedUnits.length < 2}
+                onClick={() => setConsolidateFor(markedUnits)}
+                title={
+                  markedUnits.length < 2
+                    ? "Tick at least two classes to consolidate"
+                    : "Fold the marked classes into one"
+                }
+              >
+                Consolidate…
+              </button>
             </div>
           )}
           {activeTab === "qualifications" && (
@@ -674,6 +880,17 @@ export function EntityEditorsPanel({
               >
                 Delete
               </button>
+              {activeTab === "qualifications" && (
+                <button
+                  type="button"
+                  className="btn-secondary btn-xs"
+                  onClick={() => void duplicateQualification()}
+                  disabled={saving || selectedId == null}
+                  title="Copy this qualification, sharing its classes rather than recreating them"
+                >
+                  Duplicate
+                </button>
+              )}
             </div>
           )}
           {activeTab === "staff" ? (
@@ -690,7 +907,24 @@ export function EntityEditorsPanel({
           ) : (
             <ul className="entity-list">
               {rows.map((row) => (
-                <li key={row.id}>
+                <li key={row.id} className={activeTab === "units" ? "entity-row-ticked" : undefined}>
+                  {activeTab === "units" && (
+                    <input
+                      type="checkbox"
+                      className="entity-tick"
+                      checked={
+                        markOverrides.get(row.id) ??
+                        !!units.find((u) => u.id === row.id)?.common_class
+                      }
+                      onChange={(e) => void toggleCommon(row.id, e.target.checked)}
+                      aria-label={`Mark ${row.label} as taught under several qualifications`}
+                      title={
+                        commonSuggestions.has(row.id)
+                          ? "Shares a unit code with another class"
+                          : "Mark as common across qualifications"
+                      }
+                    />
+                  )}
                   <button
                     type="button"
                     className={
@@ -1300,6 +1534,21 @@ export function EntityEditorsPanel({
             // Select the new one, since it is what the user just made.
             setSelectedId(newId);
             onUpdated({ qualificationId: newId });
+          }}
+        />
+      )}
+      {consolidateFor && consolidateFor.length > 1 && (
+        <ClassConsolidationDialog
+          sessionId={sessionId}
+          units={consolidateFor}
+          onClose={() => setConsolidateFor(null)}
+          onConsolidated={(summary, survivorId) => {
+            setConsolidateFor(null);
+            setMessage(summary);
+            // Classes were deleted and placecards repointed -- the grid, the
+            // sidebar and every class list are stale until the caller reloads.
+            setSelectedId(survivorId);
+            onUpdated();
           }}
         />
       )}

@@ -188,6 +188,12 @@ class Unit(Base):
     # Set by hand to override the derived custodian (who delivers it most).
     # Null means "whoever the deliveries say", which is the usual case.
     custodian_staff_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Ticked by hand to say "this is the same delivery as another class here".
+    # Names are unique per session, so genuine duplicates arrive under different
+    # names ("ICTNWK540 CertIV" / "ICTNWK540 Dip") and nothing about the row
+    # itself proves they are the same thing -- only somebody who knows the
+    # course does. Marking is that judgement, recorded for later.
+    common_class: Mapped[int] = mapped_column(Integer, default=0)
 
     lap: Mapped["UnitLap | None"] = relationship(back_populates="unit", uselist=False)
 

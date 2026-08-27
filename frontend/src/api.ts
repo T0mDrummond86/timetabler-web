@@ -362,6 +362,8 @@ export type Unit = {
   double_session_same_day?: number | null;
   double_session_first_slots?: number | null;
   screen_fill_colour?: string | null;
+  /** 1 when someone has ticked this class as taught under several qualifications. */
+  common_class?: number;
   qualification_ids?: number[];
 };
 export type Qualification = {
@@ -1311,6 +1313,57 @@ export const api = {
   qualificationMergePreview: (sessionId: number, first: number, second: number) =>
     apiFetch<import("./types").QualificationMergePreview>(
       `/sessions/${sessionId}/qualifications/merge-preview?first=${first}&second=${second}`,
+    ),
+
+  /** What a copy of this qualification would hold, and a free name for it. */
+  qualificationDuplicatePreview: (sessionId: number, qualificationId: number) =>
+    apiFetch<import("./types").QualificationDuplicatePreview>(
+      `/sessions/${sessionId}/qualifications/${qualificationId}/duplicate-preview`,
+    ),
+
+  /** Copy a qualification, sharing its classes rather than recreating them. */
+  duplicateQualification: (
+    sessionId: number,
+    qualificationId: number,
+    name: string,
+  ) =>
+    apiFetch<import("./types").QualificationDuplicateResult>(
+      `/sessions/${sessionId}/qualifications/${qualificationId}/duplicate`,
+      { method: "POST", body: JSON.stringify({ name }) },
+    ),
+
+  /** Classes sharing a unit code with another class — a hint for the marking. */
+  commonClassSuggestions: (sessionId: number) =>
+    apiFetch<{ unit_ids: number[] }>(
+      `/sessions/${sessionId}/units/common-class-suggestions`,
+    ),
+
+  /** Tick or untick several classes at once. */
+  markCommonClasses: (sessionId: number, unitIds: number[], marked: boolean) =>
+    apiFetch<{ updated: number }>(`/sessions/${sessionId}/units/mark-common`, {
+      method: "POST",
+      body: JSON.stringify({ unit_ids: unitIds, marked }),
+    }),
+
+  /** What folding these classes into one would do, before it is done. */
+  classConsolidationPreview: (
+    sessionId: number,
+    survivorId: number,
+    absorbedIds: number[],
+  ) =>
+    apiFetch<import("./types").ClassConsolidationPreview>(
+      `/sessions/${sessionId}/units/consolidate-preview?survivor=${survivorId}` +
+        `&absorbed=${absorbedIds.join(",")}`,
+    ),
+
+  /** Fold duplicate classes into one linked to every qualification they served. */
+  consolidateClasses: (
+    sessionId: number,
+    body: { survivor_id: number; absorbed_ids: number[]; merge_codes: boolean },
+  ) =>
+    apiFetch<import("./types").ClassConsolidationResult>(
+      `/sessions/${sessionId}/units/consolidate`,
+      { method: "POST", body: JSON.stringify(body) },
     ),
 
   /** Create a qualification holding both sources' classes. Both sources stay. */

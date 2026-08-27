@@ -18,8 +18,28 @@ from ..services.qualification_merge import (
     merge_preview,
     merge_qualifications,
 )
+from ..services.qualification_duplicate import (
+    QualificationDuplicateError,
+    duplicate_preview,
+    duplicate_qualification,
+)
+from ..services.class_consolidation import (
+    ClassConsolidationError,
+    consolidate_classes,
+    consolidation_preview,
+    suggested_common_class_ids,
+)
 from ..database import get_db
 from ..schemas import (
+    ClassConsolidationPreviewOut,
+    ClassConsolidationRequest,
+    ClassConsolidationResultOut,
+    CommonClassMarkRequest,
+    CommonClassMarkResultOut,
+    CommonClassSuggestionsOut,
+    QualificationDuplicatePreviewOut,
+    QualificationDuplicateRequest,
+    QualificationDuplicateResultOut,
     QualificationMergePreviewOut,
     QualificationMergeRequest,
     QualificationMergeResultOut,
@@ -871,3 +891,165 @@ def update_course(
     db.commit()
     db.refresh(row)
     return row
+
+
+@router.get(
+    "/sessions/{session_id}/units/common-class-suggestions",
+    response_model=CommonClassSuggestionsOut,
+)
+def common_class_suggestions(
+    session_id: int,
+    ctx: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    """Classes that share a unit code with another class in this session.
+
+    A starting point for the marking, not an instruction: two classes can
+    legitimately teach the same code.
+    """
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    return {
+        "unit_ids": sorted(suggested_common_class_ids(db, timetable_session_id=session_id))
+    }
+
+
+@router.post(
+    "/sessions/{session_id}/units/mark-common",
+    response_model=CommonClassMarkResultOut,
+)
+def mark_common_classes(
+    session_id: int,
+    body: CommonClassMarkRequest,
+    ctx: AuthContext = Depends(require_session_editor),
+    db: Session = Depends(get_db),
+):
+    """Tick or untick several classes at once, so a whole suggestion can be taken."""
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    if not body.unit_ids:
+        return {"updated": 0}
+    rows = (
+        db.query(Unit)
+        .filter(Unit.id.in_(body.unit_ids), Unit.timetable_session_id == session_id)
+        .all()
+    )
+    value = 1 if body.marked else 0
+    for row in rows:
+        row.common_class = value
+    db.commit()
+    return {"updated": len(rows)}
+
+
+@router.get(
+    "/sessions/{session_id}/units/consolidate-preview",
+    response_model=ClassConsolidationPreviewOut,
+)
+def class_consolidation_preview(
+    session_id: int,
+    survivor: int,
+    absorbed: str,
+    ctx: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    """What the fold would do. ``absorbed`` is a comma-separated list of ids."""
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        absorbed_ids = [int(part) for part in absorbed.split(",") if part.strip()]
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Classes to fold must be a comma-separated list of ids.",
+        ) from exc
+    try:
+        return consolidation_preview(
+            db,
+            timetable_session_id=session_id,
+            survivor_id=survivor,
+            absorbed_ids=absorbed_ids,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ClassConsolidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+
+
+@router.post(
+    "/sessions/{session_id}/units/consolidate",
+    response_model=ClassConsolidationResultOut,
+)
+def class_consolidation(
+    session_id: int,
+    body: ClassConsolidationRequest,
+    ctx: AuthContext = Depends(require_session_editor),
+    db: Session = Depends(get_db),
+):
+    """Fold duplicate classes into one linked to every qualification they served."""
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        return consolidate_classes(
+            db,
+            timetable_session_id=session_id,
+            survivor_id=body.survivor_id,
+            absorbed_ids=body.absorbed_ids,
+            merge_codes=body.merge_codes,
+        )
+    except LookupError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (ClassConsolidationError, ValueError) as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+
+
+@router.get(
+    "/sessions/{session_id}/qualifications/{qualification_id}/duplicate-preview",
+    response_model=QualificationDuplicatePreviewOut,
+)
+def qualification_duplicate_preview(
+    session_id: int,
+    qualification_id: int,
+    ctx: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    """What the copy would contain, and a free name to offer for it."""
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        return duplicate_preview(
+            db, timetable_session_id=session_id, qualification_id=qualification_id
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post(
+    "/sessions/{session_id}/qualifications/{qualification_id}/duplicate",
+    response_model=QualificationDuplicateResultOut,
+    status_code=201,
+)
+def qualification_duplicate(
+    session_id: int,
+    qualification_id: int,
+    body: QualificationDuplicateRequest,
+    ctx: AuthContext = Depends(require_session_editor),
+    db: Session = Depends(get_db),
+):
+    """Copy a qualification, sharing its classes rather than recreating them."""
+    assert_session_in_org(db, session_id, ctx.organization.id)
+    try:
+        return duplicate_qualification(
+            db,
+            timetable_session_id=session_id,
+            qualification_id=qualification_id,
+            name=body.name,
+        )
+    except LookupError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (QualificationDuplicateError, ValueError) as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc

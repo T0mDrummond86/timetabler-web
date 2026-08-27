@@ -29,3 +29,8 @@ Details worth knowing:
 - The result is a standalone qualification, never added to a stage family.
 
 You cannot reuse either source's name — they are both still there.
+
+Merge is not the tool for running the same qualification a second time: use
+[Duplicate](#quals-duplicate) for that. Nor is it the tool for tidying up the
+same class imported twice: use
+[Consolidate](#classes-consolidate) on the **Classes** tab.

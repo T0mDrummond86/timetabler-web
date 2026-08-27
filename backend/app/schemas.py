@@ -700,6 +700,7 @@ class UnitOut(BaseModel):
     double_session_same_day: int | None = None
     double_session_first_slots: int | None = None
     screen_fill_colour: str | None = None
+    common_class: int = 0
     qualification_ids: list[int] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
@@ -713,6 +714,7 @@ class UnitPatch(BaseModel):
     double_session_same_day: int | None = Field(default=None, ge=0, le=1)
     double_session_first_slots: int | None = Field(default=None, ge=1, le=27)
     screen_fill_colour: str | None = None
+    common_class: int | None = Field(default=None, ge=0, le=1)
 
     @field_validator("screen_fill_colour", mode="before")
     @classmethod
@@ -1130,6 +1132,91 @@ class QualificationMergeResultOut(BaseModel):
     shared_class_count: int
     num_groups: int
     summary: str
+
+
+class QualificationDuplicatePreviewOut(BaseModel):
+    source_id: int
+    source_name: str
+    class_count: int
+    num_groups: int
+    suggested_name: str
+
+
+class QualificationDuplicateRequest(BaseModel):
+    #: Null takes the suggested "<name> (copy)". Length is checked by the
+    #: service so it owns every message the user sees.
+    name: str | None = None
+
+
+class QualificationDuplicateResultOut(BaseModel):
+    qualification_id: int
+    name: str
+    source_name: str
+    #: Classes shared with the source, not copies of them.
+    class_count: int
+    num_groups: int
+    groups_assigned: int
+    summary: str
+
+
+class ClassConsolidationSideOut(BaseModel):
+    """One class going into a consolidation, as the dialog lists it."""
+    id: int
+    name: str
+    component_codes: str | None = None
+    length_slots: int | None = None
+    qualifications: list[str] = Field(default_factory=list)
+    groups: list[str] = Field(default_factory=list)
+    booking_count: int = 0
+
+
+class ClassConsolidationPreviewOut(BaseModel):
+    survivor: ClassConsolidationSideOut
+    absorbed: list[ClassConsolidationSideOut] = Field(default_factory=list)
+    qualifications_gained: int = 0
+    groups_gained: int = 0
+    bookings_moving: int = 0
+    combined_qualifications: list[str] = Field(default_factory=list)
+    #: Things the fold discards. Shown because the folded rows are deleted.
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ClassConsolidationRequest(BaseModel):
+    #: The class that stays. Its own settings are kept as they are.
+    survivor_id: int
+    absorbed_ids: list[int] = Field(default_factory=list)
+    #: Append unit codes only the folded classes carried. The dialog offers this
+    #: ticked: a surviving class that no longer records the units it delivers is
+    #: a quiet loss that only shows up later in the admin export.
+    merge_codes: bool = False
+
+
+class ClassConsolidationResultOut(BaseModel):
+    survivor_id: int
+    survivor_name: str
+    absorbed_count: int
+    qualifications_gained: int
+    groups_gained: int
+    bookings_moved: int
+    preferences_moved: int
+    #: Placecards that now sit on top of each other for one group.
+    overlaps_created: int
+    codes_gained: list[str] = Field(default_factory=list)
+    summary: str
+
+
+class CommonClassSuggestionsOut(BaseModel):
+    #: Classes sharing a unit code with another class -- a hint, not a verdict.
+    unit_ids: list[int] = Field(default_factory=list)
+
+
+class CommonClassMarkRequest(BaseModel):
+    unit_ids: list[int] = Field(default_factory=list)
+    marked: bool = True
+
+
+class CommonClassMarkResultOut(BaseModel):
+    updated: int
 
 
 class UnitCustodianPatch(BaseModel):

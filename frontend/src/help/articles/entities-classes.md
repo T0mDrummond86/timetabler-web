@@ -2,7 +2,7 @@
 id: entities-classes
 title: Classes — adding and editing
 category: Classes, groups and qualifications
-keywords: class, unit, new class, add class, edit class, duration, hours, units column, class name, double session, two bookings, first session hours, split a class, second sitting
+keywords: class, unit, new class, add class, edit class, duration, hours, units column, class name, double session, two bookings, first session hours, split a class, second sitting, tick, common class, mark class
 ---
 
 A **class** is the thing you place on the timetable. Open the **Classes** tab
@@ -27,3 +27,7 @@ Select a class from the list to edit:
   [Allowed lecturers](#staff-competency).
 
 **New class** creates one. A class name is required.
+
+Each class in the list also has a **tick**, for marking classes that are really
+the same class arriving twice under different qualifications. See
+[Consolidate duplicate classes](#classes-consolidate).

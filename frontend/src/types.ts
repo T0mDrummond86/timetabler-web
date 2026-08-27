@@ -437,6 +437,59 @@ export type QualificationMergePreview = {
   warnings: string[];
 };
 
+export type QualificationDuplicatePreview = {
+  source_id: number;
+  source_name: string;
+  class_count: number;
+  num_groups: number;
+  suggested_name: string;
+};
+
+export type QualificationDuplicateResult = {
+  qualification_id: number;
+  name: string;
+  source_name: string;
+  /** Classes shared with the source, not copies of them. */
+  class_count: number;
+  num_groups: number;
+  groups_assigned: number;
+  summary: string;
+};
+
+export type ClassConsolidationSide = {
+  id: number;
+  name: string;
+  component_codes?: string | null;
+  length_slots?: number | null;
+  qualifications: string[];
+  groups: string[];
+  booking_count: number;
+};
+
+export type ClassConsolidationPreview = {
+  survivor: ClassConsolidationSide;
+  absorbed: ClassConsolidationSide[];
+  qualifications_gained: number;
+  groups_gained: number;
+  bookings_moving: number;
+  combined_qualifications: string[];
+  /** Things the fold discards. The folded classes are deleted, so this matters. */
+  warnings: string[];
+};
+
+export type ClassConsolidationResult = {
+  survivor_id: number;
+  survivor_name: string;
+  absorbed_count: number;
+  qualifications_gained: number;
+  groups_gained: number;
+  bookings_moved: number;
+  preferences_moved: number;
+  overlaps_created: number;
+  codes_gained: string[];
+  summary: string;
+};
+
 export type QualificationMergeResult = {
   qualification_id: number;
   name: string;

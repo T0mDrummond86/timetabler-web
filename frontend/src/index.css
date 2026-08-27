@@ -6582,3 +6582,120 @@ body.staff-editor-resizing {
     animation: import-spin 2.4s linear infinite !important;
   }
 }
+
+/* --- Common classes: marking and consolidation ---------------------------- */
+
+/* The tick sits outside the class button rather than inside it, so clicking a
+   class still selects it for editing and only the tick marks it. */
+.entity-list li.entity-row-ticked {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.entity-list li.entity-row-ticked .entity-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.entity-tick {
+  flex: none;
+  margin-left: var(--space-1);
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+/* Four controls in a column barely wider than one of them, so they wrap rather
+   than squeeze: a cramped "Consolidate…" is the one button here that must not
+   be misread. */
+.common-class-toolbar {
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 0.35rem;
+}
+
+.common-class-count {
+  flex: 1 0 100%;
+  font-size: var(--text-xs);
+}
+
+.common-class-toolbar .btn-xs {
+  white-space: nowrap;
+}
+
+/* Wider than the qualification merge card: this one has to list what is about
+   to be deleted, and a cramped list is exactly the wrong place to economise. */
+.class-merge-card {
+  width: min(620px, 94vw);
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.class-merge-choice {
+  margin: var(--space-3) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.class-merge-choice legend {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  padding: 0 var(--space-1);
+}
+
+.class-merge-option {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  font-size: var(--text-md);
+  cursor: pointer;
+}
+
+.class-merge-option-name {
+  overflow-wrap: anywhere;
+}
+
+.class-merge-option-codes {
+  font-size: var(--text-xs);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* The one decision in the consolidate dialog that is not "which one stays".
+   Sits with the warnings, since it is the answer to one of them. */
+.class-merge-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.class-merge-toggle input {
+  margin-top: 2px;
+  flex: none;
+  accent-color: var(--primary);
+}
+
+/* The prompt's input sizes itself to its content by default, which was fine
+   while every prompt started empty. Duplicate opens it pre-filled with a
+   qualification name, and a name you cannot read is a name you cannot edit. */
+.prompt-dialog .modal-form label,
+.prompt-dialog .modal-form input {
+  display: block;
+  width: 100%;
+}
+
+.prompt-dialog {
+  width: min(420px, 94vw);
+}
